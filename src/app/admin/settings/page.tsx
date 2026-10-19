@@ -305,7 +305,7 @@ export default function WebsiteSettingsPage() {
               <h3 className="font-extrabold text-white text-base flex items-center gap-2">
                 Supabase PostgreSQL Backend &amp; Storage Architecture
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  eibjvsfxucifbeckftjw
+                  nxlaazpcbvzxmdboqlxe
                 </span>
               </h3>
               <p className="text-slate-400 text-xs">
@@ -341,14 +341,14 @@ export default function WebsiteSettingsPage() {
                 {testResult?.connected ? 'Live Supabase Connection Verified' : 'Supabase Live Token Status'}
               </p>
               <p className="text-[11px] opacity-80 mt-0.5">
-                {testResult?.message || 'Ready to communicate with project eibjvsfxucifbeckftjw.'}
+                {testResult?.message || 'Ready to communicate with project nxlaazpcbvzxmdboqlxe.'}
               </p>
             </div>
           </div>
 
           <div className="text-right font-mono text-[11px] shrink-0">
             <span className="text-slate-400">Endpoint: </span>
-            <span className="text-white">https://eibjvsfxucifbeckftjw.supabase.co</span>
+            <span className="text-white">https://nxlaazpcbvzxmdboqlxe.supabase.co</span>
           </div>
         </div>
 
@@ -393,7 +393,7 @@ export default function WebsiteSettingsPage() {
               <span>Update Supabase API Keys (Optional)</span>
             </div>
             <a
-              href="https://supabase.com/dashboard/project/eibjvsfxucifbeckftjw/settings/api"
+              href="https://supabase.com/dashboard/project/nxlaazpcbvzxmdboqlxe/settings/api"
               target="_blank"
               rel="noreferrer"
               className="text-emerald-400 hover:text-emerald-300 text-[11px] flex items-center gap-1 font-mono"

@@ -1,6 +1,6 @@
 -- ====================================================================
 -- OFFICIAL IEDC GPTC PMNA MASTER SUPABASE DATABASE MIGRATION
--- Project: eibjvsfxucifbeckftjw
+-- Project: nxlaazpcbvzxmdboqlxe
 -- Safe, Idempotent, and Preserves All Existing Data
 -- ====================================================================
 
@@ -58,6 +58,7 @@ ON CONFLICT (id) DO NOTHING;
 -- -------------------------------------------------------------
 -- 3. EVENTS & WORKSHOPS TABLE
 -- -------------------------------------------------------------
+DROP TABLE IF EXISTS public.events CASCADE;
 CREATE TABLE IF NOT EXISTS public.events (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,

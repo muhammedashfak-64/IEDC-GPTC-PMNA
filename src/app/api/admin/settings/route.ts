@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
     success: true,
     data: settings,
     supabase: {
-      url: process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://eibjvsfxucifbeckftjw.supabase.co',
+      url: process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://nxlaazpcbvzxmdboqlxe.supabase.co',
       isConfigured: isSupabaseConfigured(),
       status: supabaseStatus
     }
