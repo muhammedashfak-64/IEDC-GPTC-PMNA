@@ -16,6 +16,7 @@ import {
   Key,
   ExternalLink
 } from 'lucide-react';
+import FileUpload from '@/components/admin/FileUpload';
 
 export default function WebsiteSettingsPage() {
   const { isFaculty, addToast } = useAdmin();
@@ -26,6 +27,7 @@ export default function WebsiteSettingsPage() {
     contactEmail: 'iedc@gptcpmna.edu.in',
     contactPhone: '+91 4933 227221',
     address: 'Govt Polytechnic College, Angadippuram PO, Perinthalmanna, Malappuram, Kerala 679321',
+    logoUrl: '/college-logo.png',
     github: 'https://github.com/iedc-gptc-pmna',
     linkedin: 'https://linkedin.com/company/iedc-gptc-pmna',
     instagram: 'https://instagram.com/iedc_gptcpmna'
@@ -49,6 +51,7 @@ export default function WebsiteSettingsPage() {
             contactEmail: d.contact?.email || 'iedc@gptcpmna.edu.in',
             contactPhone: d.contact?.phone || '+91 4933 227221',
             address: d.contact?.address || '',
+            logoUrl: d.logoUrl || '/college-logo.png',
             github: d.social?.github || '',
             linkedin: d.social?.linkedin || '',
             instagram: d.social?.instagram || ''
@@ -202,6 +205,17 @@ export default function WebsiteSettingsPage() {
                 value={formData.address}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                 className="w-full bg-[#18181D] border border-white/10 rounded-xl p-2.5 text-xs text-white"
+              />
+            </div>
+
+            <div className="pt-2 border-t border-white/10">
+              <FileUpload
+                label="Official Website & College Logo"
+                value={formData.logoUrl}
+                onChange={(url) => setFormData({ ...formData, logoUrl: url })}
+                folder="website"
+                accept="image/png,image/svg+xml,image/jpeg,image/webp"
+                helperText="Upload official college or IEDC logo (PNG, SVG, WebP) from your PC"
               />
             </div>
           </div>

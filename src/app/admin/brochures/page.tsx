@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAdmin } from '@/context/AdminContext';
 import { FileText, Plus, Download, Trash2, Calendar, Upload } from 'lucide-react';
+import FileUpload from '@/components/admin/FileUpload';
 
 export default function BrochuresManagementPage() {
   const { addToast } = useAdmin();
@@ -148,17 +149,16 @@ export default function BrochuresManagementPage() {
                 </select>
               </div>
 
-              <div>
-                <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">File URL / Storage Link</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="/brochures/hackathon-2026.pdf"
-                  value={formData.fileUrl}
-                  onChange={(e) => setFormData({ ...formData, fileUrl: e.target.value })}
-                  className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
-                />
-              </div>
+              <FileUpload
+                label="Event Brochure Document (PDF / DOCX)"
+                value={formData.fileUrl}
+                onChange={(url) => setFormData({ ...formData, fileUrl: url })}
+                folder="documents"
+                isDocument={true}
+                accept=".pdf,.docx,.doc"
+                helperText="Upload official PDF brochure or leaflet from your PC"
+                required={true}
+              />
 
               <div className="flex gap-2 pt-3 border-t border-white/10">
                 <button

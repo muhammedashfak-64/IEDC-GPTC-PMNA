@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAdmin } from '@/context/AdminContext';
 import { BookOpen, Plus, Trash2, Edit3, Eye, CheckCircle2 } from 'lucide-react';
+import FileUpload from '@/components/admin/FileUpload';
 
 export default function BlogsManagerPage() {
   const { addToast } = useAdmin();
@@ -172,6 +173,17 @@ export default function BlogsManagerPage() {
                     className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
                   />
                 </div>
+              </div>
+
+              <div className="pt-2 border-t border-white/10">
+                <FileUpload
+                  label="Article Cover Photograph"
+                  value={formData.imageUrl}
+                  onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+                  folder="blogs"
+                  accept="image/jpeg,image/png,image/webp"
+                  helperText="Upload blog headline cover banner or photo from your PC"
+                />
               </div>
 
               <div className="flex gap-2 pt-3 border-t border-white/10">

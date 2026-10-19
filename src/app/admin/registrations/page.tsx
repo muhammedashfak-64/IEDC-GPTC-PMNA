@@ -1,35 +1,127 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAdmin } from '@/context/AdminContext';
-import { Users, Search, Download, Filter, CheckCircle2, Clock, XCircle, Mail, Phone } from 'lucide-react';
+import {
+  Users,
+  Search,
+  Download,
+  Filter,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  Mail,
+  Phone,
+  Calendar,
+  MessageSquare,
+  FileSpreadsheet,
+  FileText,
+  Copy,
+  Trash2,
+  Eye,
+  RefreshCw,
+  ExternalLink,
+  ChevronLeft,
+  ChevronRight,
+  UserCheck,
+  Building,
+  Award
+} from 'lucide-react';
+import * as XLSX from 'xlsx';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
-export default function EventRegistrationsPage() {
+export default function AdminRegistrationsPage() {
   const { addToast } = useAdmin();
   const [registrations, setRegistrations] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
-  const [selectedEventId, setSelectedEventId] = useState('All');
-  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const loadData = () => {
+  // Filters & Search
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedEventId, setSelectedEventId] = useState('All');
+  const [selectedDepartment, setSelectedDepartment] = useState('All');
+  const [selectedStatus, setSelectedStatus] = useState('All');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name'>('newest');
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 15;
+
+  // Modals & Details
+  const [selectedRegistration, setSelectedRegistration] = useState<any | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const loadData = async () => {
     setLoading(true);
-    Promise.all([
-      fetch('/api/admin/registrations').then((r) => r.json()),
-      fetch('/api/admin/events').then((r) => r.json())
-    ])
-      .then(([regJson, evtJson]) => {
-        if (regJson.success) setRegistrations(regJson.data || []);
-        if (evtJson.success) setEvents(evtJson.data || []);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+    try {
+      const [regRes, evtRes] = await Promise.all([
+        fetch('/api/admin/registrations'),
+        fetch('/api/admin/events')
+      ]);
+      const regJson = await regRes.json();
+      const evtJson = await evtRes.json();
+
+      if (regJson.success) setRegistrations(regJson.data || []);
+      if (evtJson.success) setEvents(evtJson.data || []);
+    } catch (err: any) {
+      addToast('Error', err.message || 'Failed to fetch data.', 'error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     loadData();
   }, []);
 
+  // Filtered and Sorted Registrations
+  const filteredList = useMemo(() => {
+    return registrations
+      .filter((r) => {
+        const matchesEvent = selectedEventId === 'All' || r.eventId === selectedEventId;
+        const matchesDept = selectedDepartment === 'All' || r.department === selectedDepartment;
+        const matchesStatus = selectedStatus === 'All' || r.status === selectedStatus;
+        const cleanSearch = searchTerm.toLowerCase().trim();
+        const matchesSearch =
+          !cleanSearch ||
+          r.studentName?.toLowerCase().includes(cleanSearch) ||
+          r.registerNumber?.toLowerCase().includes(cleanSearch) ||
+          r.registrationCode?.toLowerCase().includes(cleanSearch) ||
+          r.email?.toLowerCase().includes(cleanSearch) ||
+          r.phone?.includes(cleanSearch);
+
+        return matchesEvent && matchesDept && matchesStatus && matchesSearch;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'newest') {
+          return new Date(b.registeredAt || b.createdAt || 0).getTime() - new Date(a.registeredAt || a.createdAt || 0).getTime();
+        }
+        if (sortBy === 'oldest') {
+          return new Date(a.registeredAt || a.createdAt || 0).getTime() - new Date(b.registeredAt || b.createdAt || 0).getTime();
+        }
+        return (a.studentName || '').localeCompare(b.studentName || '');
+      });
+  }, [registrations, selectedEventId, selectedDepartment, selectedStatus, searchTerm, sortBy]);
+
+  // Statistics
+  const stats = useMemo(() => {
+    const total = registrations.length;
+    const confirmed = registrations.filter((r) => r.status === 'Confirmed').length;
+    const attended = registrations.filter((r) => r.status === 'Attended').length;
+    const cancelled = registrations.filter((r) => r.status === 'Cancelled').length;
+    return { total, confirmed, attended, cancelled };
+  }, [registrations]);
+
+  // Paginated View
+  const paginatedList = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredList.slice(start, start + pageSize);
+  }, [filteredList, currentPage]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredList.length / pageSize));
+
+  // Handle Status Update
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
       const res = await fetch('/api/admin/registrations', {
@@ -37,184 +129,665 @@ export default function EventRegistrationsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status: newStatus })
       });
-      if (res.ok) {
-        addToast('Status Updated', `Registration marked as ${newStatus}`, 'success');
-        loadData();
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'Failed to update status.');
       }
+
+      setRegistrations((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, status: newStatus } : r))
+      );
+      if (selectedRegistration && selectedRegistration.id === id) {
+        setSelectedRegistration({ ...selectedRegistration, status: newStatus });
+      }
+
+      addToast('Status Updated', `Registration marked as ${newStatus}`, 'success');
     } catch (err: any) {
-      addToast('Error', err.message, 'error');
+      addToast('Update Failed', err.message, 'error');
     }
   };
 
-  const exportCSV = () => {
-    const headers = ['ID', 'Student Name', 'Register No', 'Email', 'Phone', 'Department', 'Status', 'Registered At'];
-    const rows = filteredList.map((r) => [
-      r.id,
-      r.studentName,
-      r.registerNumber,
-      r.email,
-      r.phone || 'N/A',
-      r.department,
-      r.status,
-      r.registeredAt
-    ]);
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `IEDC_Registrations_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    addToast('CSV Exported', 'Participant registration records downloaded.', 'success');
+  // Handle Delete Registration
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this registration?')) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/admin/registrations?id=${id}`, {
+        method: 'DELETE'
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.error || 'Failed to delete');
+
+      setRegistrations((prev) => prev.filter((r) => r.id !== id));
+      if (selectedRegistration?.id === id) setSelectedRegistration(null);
+      addToast('Deleted', 'Registration record removed successfully.', 'success');
+    } catch (err: any) {
+      addToast('Error', err.message, 'error');
+    } finally {
+      setDeletingId(null);
+    }
   };
 
-  const filteredList = registrations.filter((r) => {
-    const matchesEvent = selectedEventId === 'All' || r.eventId === selectedEventId;
-    const matchesSearch =
-      r.studentName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.registerNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.email?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesEvent && matchesSearch;
-  });
+  // -------------------------------------------------------------
+  // EXCEL EXPORT (.XLSX)
+  // -------------------------------------------------------------
+  const exportExcel = (exportAll = false) => {
+    const recordsToExport = exportAll ? registrations : filteredList;
+
+    if (recordsToExport.length === 0) {
+      addToast('No Data', 'No registration records available to export.', 'warning');
+      return;
+    }
+
+    const eventTitle =
+      selectedEventId !== 'All'
+        ? events.find((e) => e.id === selectedEventId)?.title || 'Selected_Event'
+        : 'All_Events';
+
+    const cleanRows = recordsToExport.map((r, index) => ({
+      'Sl No': index + 1,
+      'Registration ID': r.registrationCode || r.id,
+      'Student Name': r.studentName,
+      'Register Number': r.registerNumber,
+      'Department': r.department,
+      'Academic Year': r.academicYear || '2nd Year',
+      'Event / Program': r.eventTitle || 'Campus Event',
+      'Email Address': r.email,
+      'Mobile / WhatsApp': r.phone || 'N/A',
+      'Institution': r.collegeName || 'Govt Polytechnic College Perinthalmanna',
+      'Status': r.status,
+      'Registered Date': r.registeredAt
+        ? new Date(r.registeredAt).toLocaleString('en-IN')
+        : 'N/A',
+      'Additional Notes': r.additionalNotes || ''
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(cleanRows);
+
+    // Set readable column widths
+    worksheet['!cols'] = [
+      { wch: 8 },  // Sl No
+      { wch: 18 }, // Reg ID
+      { wch: 24 }, // Name
+      { wch: 16 }, // Reg No
+      { wch: 25 }, // Dept
+      { wch: 15 }, // Year
+      { wch: 28 }, // Event
+      { wch: 28 }, // Email
+      { wch: 16 }, // Phone
+      { wch: 32 }, // Institution
+      { wch: 14 }, // Status
+      { wch: 22 }, // Date
+      { wch: 30 }  // Notes
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Registrations');
+
+    const timestamp = new Date().toISOString().split('T')[0];
+    const filename = `IEDC_Registrations_${eventTitle.replace(/[^a-zA-Z0-9_-]/g, '_')}_${timestamp}.xlsx`;
+
+    XLSX.writeFile(workbook, filename);
+    addToast('Excel Exported', `Downloaded ${recordsToExport.length} registrations as genuine .xlsx file.`, 'success');
+  };
+
+  // -------------------------------------------------------------
+  // PDF EXPORT (.PDF)
+  // -------------------------------------------------------------
+  const exportPDF = (exportAll = false) => {
+    const recordsToExport = exportAll ? registrations : filteredList;
+
+    if (recordsToExport.length === 0) {
+      addToast('No Data', 'No registration records available to export.', 'warning');
+      return;
+    }
+
+    const doc = new jsPDF({
+      orientation: 'landscape',
+      unit: 'mm',
+      format: 'a4'
+    });
+
+    const eventTitle =
+      selectedEventId !== 'All'
+        ? events.find((e) => e.id === selectedEventId)?.title || 'All Events'
+        : 'All Events & Workshops';
+
+    // Header Title
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(16);
+    doc.setTextColor(20, 20, 20);
+    doc.text('IEDC — GOVERNMENT POLYTECHNIC COLLEGE PERINTHALMANNA', 14, 15);
+
+    // Subtitle
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(80, 80, 80);
+    doc.text('Student Event Registrations & Participant Master Report', 14, 21);
+
+    // Meta details line
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 100, 100);
+    const dateStr = new Date().toLocaleString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    doc.text(`Event: ${eventTitle}  |  Department Filter: ${selectedDepartment}  |  Total Count: ${recordsToExport.length}  |  Generated: ${dateStr}`, 14, 27);
+
+    // Draw thin line under header
+    doc.setDrawColor(220, 220, 220);
+    doc.line(14, 29, 283, 29);
+
+    const tableColumns = [
+      'Sl',
+      'Reg ID',
+      'Participant Name',
+      'Register No',
+      'Department',
+      'Event Name',
+      'Mobile No',
+      'Status',
+      'Date'
+    ];
+
+    const tableRows = recordsToExport.map((r, i) => [
+      i + 1,
+      r.registrationCode || r.id,
+      r.studentName,
+      r.registerNumber,
+      r.department,
+      r.eventTitle || 'Campus Event',
+      r.phone || 'N/A',
+      r.status,
+      r.registeredAt ? new Date(r.registeredAt).toLocaleDateString('en-IN') : 'N/A'
+    ]);
+
+    autoTable(doc, {
+      head: [tableColumns],
+      body: tableRows,
+      startY: 32,
+      theme: 'striped',
+      headStyles: {
+        fillColor: [24, 24, 29],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 8,
+        halign: 'left'
+      },
+      styles: {
+        fontSize: 7.5,
+        cellPadding: 2.5,
+        textColor: [30, 30, 30],
+        overflow: 'linebreak'
+      },
+      columnStyles: {
+        0: { cellWidth: 10 },
+        1: { cellWidth: 26, fontStyle: 'bold' },
+        2: { cellWidth: 42, fontStyle: 'bold' },
+        3: { cellWidth: 24 },
+        4: { cellWidth: 40 },
+        5: { cellWidth: 48 },
+        6: { cellWidth: 26 },
+        7: { cellWidth: 22 },
+        8: { cellWidth: 25 }
+      },
+      didDrawPage: (data) => {
+        // Footer: Page Number
+        const pageCount = (doc as any).internal.getNumberOfPages();
+        doc.setFontSize(8);
+        doc.setTextColor(140, 140, 140);
+        doc.text(
+          `Page ${data.pageNumber} of ${pageCount} — Confidential • IEDC GPTC PMNA`,
+          14,
+          doc.internal.pageSize.height - 8
+        );
+      }
+    });
+
+    const timestamp = new Date().toISOString().split('T')[0];
+    const filename = `IEDC_Registrations_${eventTitle.replace(/[^a-zA-Z0-9_-]/g, '_')}_${timestamp}.pdf`;
+    doc.save(filename);
+    addToast('PDF Exported', `Generated printable PDF report for ${recordsToExport.length} participants.`, 'success');
+  };
+
+  // WhatsApp helper
+  const openWhatsApp = (reg: any) => {
+    const phone = (reg.phone || '').replace(/\D/g, '');
+    if (!phone) {
+      addToast('No Phone Number', 'This student has no phone number recorded.', 'warning');
+      return;
+    }
+    const cleanNumber = phone.length === 10 ? `91${phone}` : phone;
+    const message = encodeURIComponent(
+      `Hello ${reg.studentName},\n\nYour registration for "${reg.eventTitle || 'the campus event'}" at IEDC GPTC Perinthalmanna has been confirmed.\n\nRegistration ID: ${reg.registrationCode || reg.id}\nStatus: ${reg.status}\n\nPlease present this ID at the entry desk.\n\nIEDC GPTC PMNA`
+    );
+    window.open(`https://wa.me/${cleanNumber}?text=${message}`, '_blank');
+  };
+
+  const copyConfirmationMessage = (reg: any) => {
+    const text = `Hello ${reg.studentName},\n\nYour registration for "${reg.eventTitle || 'the campus event'}" at IEDC GPTC Perinthalmanna has been confirmed.\n\nRegistration ID: ${reg.registrationCode || reg.id}\nStatus: ${reg.status}\n\nPlease present this ID at the entry desk.\n\nIEDC GPTC PMNA`;
+    navigator.clipboard.writeText(text);
+    addToast('Copied to Clipboard', 'WhatsApp confirmation message template copied.', 'success');
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+      {/* Page Header */}
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 border-b border-white/10 pb-5">
         <div>
-          <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block mb-1">
-            MODULE 05 / PARTICIPATION
+          <span className="text-[10px] font-mono font-bold text-[#F98A5B] uppercase tracking-widest block mb-1">
+            MODULE 05 / REGISTRATION MANAGEMENT
           </span>
-          <h1 className="text-2xl font-black text-white">Event Registrations</h1>
-          <p className="text-slate-400 text-xs">
-            Review live student registrations, verify attendance check-ins, and export participant data.
+          <h1 className="text-2xl sm:text-3xl font-black text-white">Event Registrations</h1>
+          <p className="text-slate-400 text-xs mt-1">
+            Real-time participant database, attendance tracking, and Excel &amp; PDF report generation.
           </p>
         </div>
 
-        <button
-          onClick={exportCSV}
-          className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer"
-        >
-          <Download className="w-4 h-4 text-emerald-400" />
-          <span>Export CSV</span>
-        </button>
+        {/* Action Buttons: Excel & PDF */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          <button
+            onClick={() => exportExcel(false)}
+            className="px-4 py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer shadow-md"
+            title={`Download Excel workbook for ${filteredList.length} filtered records`}
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
+            <span>Download Excel ({filteredList.length})</span>
+          </button>
+
+          <button
+            onClick={() => exportPDF(false)}
+            className="px-4 py-2.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer shadow-md"
+            title={`Download PDF report for ${filteredList.length} filtered records`}
+          >
+            <FileText className="w-4 h-4 text-blue-400" />
+            <span>Download PDF ({filteredList.length})</span>
+          </button>
+
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            title="Refresh from Supabase"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#F98A5B]' : ''}`} />
+          </button>
+        </div>
       </div>
 
-      {/* Filter and Search */}
-      <div className="p-4 rounded-2xl bg-[#121216] border border-white/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search by student name, register number, or email..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-[#18181D] border border-white/10 focus:border-white/30 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none"
-          />
+      {/* Summary KPI Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+        <div className="p-4 rounded-2xl bg-[#121216] border border-white/10 space-y-1">
+          <span className="text-[10px] font-mono text-slate-400 uppercase">Total Registrations</span>
+          <p className="text-2xl font-black text-white">{stats.total}</p>
+          <span className="text-[10px] text-slate-500">Across all campus programs</span>
+        </div>
+        <div className="p-4 rounded-2xl bg-[#121216] border border-white/10 space-y-1">
+          <span className="text-[10px] font-mono text-emerald-400 uppercase">Confirmed</span>
+          <p className="text-2xl font-black text-emerald-400">{stats.confirmed}</p>
+          <span className="text-[10px] text-slate-500">Active seat reservations</span>
+        </div>
+        <div className="p-4 rounded-2xl bg-[#121216] border border-white/10 space-y-1">
+          <span className="text-[10px] font-mono text-blue-400 uppercase">Attended Check-In</span>
+          <p className="text-2xl font-black text-blue-400">{stats.attended}</p>
+          <span className="text-[10px] text-slate-500">Verified at venue</span>
+        </div>
+        <div className="p-4 rounded-2xl bg-[#121216] border border-white/10 space-y-1">
+          <span className="text-[10px] font-mono text-red-400 uppercase">Cancelled</span>
+          <p className="text-2xl font-black text-red-400">{stats.cancelled}</p>
+          <span className="text-[10px] text-slate-500">Seats restored</span>
+        </div>
+      </div>
+
+      {/* Filter & Search Bar */}
+      <div className="p-4 rounded-2xl bg-[#121216] border border-white/10 space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+          {/* Search Input */}
+          <div className="md:col-span-5 relative">
+            <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search by student name, register no, email, or phone..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none"
+            />
+          </div>
+
+          {/* Event Filter */}
+          <div className="md:col-span-3">
+            <select
+              value={selectedEventId}
+              onChange={(e) => {
+                setSelectedEventId(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none truncate"
+            >
+              <option value="All">All Events &amp; Workshops</option>
+              {events.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.title}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Department Filter */}
+          <div className="md:col-span-2">
+            <select
+              value={selectedDepartment}
+              onChange={(e) => {
+                setSelectedDepartment(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none"
+            >
+              <option value="All">All Departments</option>
+              <option value="Computer Engineering">Computer Engg</option>
+              <option value="Electronics Engineering">Electronics Engg</option>
+              <option value="Electrical & Electronics Engineering">EEE</option>
+              <option value="Mechanical Engineering">Mechanical Engg</option>
+              <option value="Civil Engineering">Civil Engg</option>
+              <option value="General">General</option>
+            </select>
+          </div>
+
+          {/* Status Filter */}
+          <div className="md:col-span-2">
+            <select
+              value={selectedStatus}
+              onChange={(e) => {
+                setSelectedStatus(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none"
+            >
+              <option value="All">All Statuses</option>
+              <option value="Confirmed">Confirmed</option>
+              <option value="Attended">Attended</option>
+              <option value="Pending">Pending</option>
+              <option value="Cancelled">Cancelled</option>
+            </select>
+          </div>
         </div>
 
-        <select
-          value={selectedEventId}
-          onChange={(e) => setSelectedEventId(e.target.value)}
-          className="bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none"
-        >
-          <option value="All">All Events &amp; Workshops</option>
-          {events.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.title}
-            </option>
-          ))}
-        </select>
+        {/* Filter Summary & Sort Bar */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-2 border-t border-white/5 text-[11px] text-slate-400">
+          <div>
+            Showing <span className="font-bold text-white">{filteredList.length}</span> matching registrations
+            {filteredList.length !== registrations.length && (
+              <span> (filtered from {registrations.length} total)</span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="font-mono">Sort by:</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="bg-transparent border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none"
+            >
+              <option value="newest" className="bg-[#18181D]">Newest First</option>
+              <option value="oldest" className="bg-[#18181D]">Oldest First</option>
+              <option value="name" className="bg-[#18181D]">Student Name (A-Z)</option>
+            </select>
+          </div>
+        </div>
       </div>
 
-      {/* Table */}
+      {/* Registrations Table */}
       <div className="rounded-3xl bg-[#121216] border border-white/10 overflow-hidden shadow-xl">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-[#18181E] border-b border-white/10 text-[10px] font-mono uppercase tracking-wider text-slate-400">
               <tr>
+                <th className="py-3.5 px-4 font-bold">Pass ID</th>
                 <th className="py-3.5 px-4 font-bold">Student Participant</th>
-                <th className="py-3.5 px-4 font-bold">Register Number</th>
+                <th className="py-3.5 px-4 font-bold">Event &amp; Department</th>
                 <th className="py-3.5 px-4 font-bold">Contact Info</th>
-                <th className="py-3.5 px-4 font-bold">Department</th>
-                <th className="py-3.5 px-4 font-bold">Attendance Status</th>
-                <th className="py-3.5 px-4 font-bold text-right">Action</th>
+                <th className="py-3.5 px-4 font-bold">Status</th>
+                <th className="py-3.5 px-4 font-bold text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5 text-slate-300">
-              {filteredList.length > 0 ? (
-                filteredList.map((reg) => (
+              {paginatedList.length > 0 ? (
+                paginatedList.map((reg) => (
                   <tr key={reg.id} className="hover:bg-white/[0.02] transition-colors">
-                    <td className="py-4 px-4 font-bold text-white text-sm">
-                      {reg.studentName}
+                    {/* Pass ID */}
+                    <td className="py-4 px-4 font-mono text-xs font-bold text-[#F98A5B] whitespace-nowrap">
+                      {reg.registrationCode || reg.id}
                     </td>
 
-                    <td className="py-4 px-4 font-mono text-slate-300">
-                      {reg.registerNumber}
-                    </td>
-
-                    <td className="py-4 px-4 space-y-1">
-                      <div className="flex items-center gap-1.5 text-[11px] text-slate-300">
-                        <Mail className="w-3.5 h-3.5 text-slate-500" />
-                        <span>{reg.email}</span>
-                      </div>
-                      {reg.phone && (
-                        <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-mono">
-                          <Phone className="w-3.5 h-3.5 text-slate-500" />
-                          <span>{reg.phone}</span>
-                        </div>
-                      )}
-                    </td>
-
-                    <td className="py-4 px-4 text-slate-300">
-                      {reg.department}
-                    </td>
-
+                    {/* Student Name & Reg No */}
                     <td className="py-4 px-4">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold ${
-                          reg.status === 'Attended'
-                            ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                      <div className="font-bold text-white text-sm">{reg.studentName}</div>
+                      <div className="text-[11px] font-mono text-slate-400">
+                        {reg.registerNumber} • {reg.academicYear || '2nd Year'}
+                      </div>
+                    </td>
+
+                    {/* Event & Department */}
+                    <td className="py-4 px-4 max-w-xs">
+                      <div className="font-semibold text-white truncate">{reg.eventTitle || 'Campus Event'}</div>
+                      <div className="text-[11px] text-slate-400 truncate">{reg.department}</div>
+                    </td>
+
+                    {/* Contact Info & WhatsApp */}
+                    <td className="py-4 px-4 whitespace-nowrap">
+                      <div className="flex items-center gap-1.5 text-slate-300">
+                        <Mail className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span className="text-[11px] truncate max-w-[150px]">{reg.email}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-slate-300 mt-1">
+                        <Phone className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        <span className="font-mono text-[11px]">{reg.phone || 'N/A'}</span>
+                        {reg.phone && (
+                          <button
+                            onClick={() => openWhatsApp(reg)}
+                            className="text-emerald-400 hover:text-emerald-300 p-0.5 ml-1"
+                            title="Chat on WhatsApp"
+                          >
+                            <MessageSquare className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Status with quick selector */}
+                    <td className="py-4 px-4 whitespace-nowrap">
+                      <select
+                        value={reg.status}
+                        onChange={(e) => handleStatusChange(reg.id, e.target.value)}
+                        className={`text-[10px] font-mono font-bold uppercase rounded-lg px-2.5 py-1 border focus:outline-none ${
+                          reg.status === 'Confirmed'
+                            ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                            : reg.status === 'Attended'
+                            ? 'bg-blue-500/10 border-blue-500/30 text-blue-400'
                             : reg.status === 'Cancelled'
-                            ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30'
-                            : 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                            ? 'bg-red-500/10 border-red-500/30 text-red-400'
+                            : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
                         }`}
                       >
-                        {reg.status}
-                      </span>
+                        <option value="Confirmed" className="bg-[#18181D] text-white">Confirmed</option>
+                        <option value="Attended" className="bg-[#18181D] text-white">Attended</option>
+                        <option value="Pending" className="bg-[#18181D] text-white">Pending</option>
+                        <option value="Cancelled" className="bg-[#18181D] text-white">Cancelled</option>
+                      </select>
                     </td>
 
-                    <td className="py-4 px-4 text-right space-x-1.5 whitespace-nowrap">
-                      {reg.status !== 'Attended' && (
+                    {/* Actions */}
+                    <td className="py-4 px-4 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-1.5">
                         <button
-                          onClick={() => handleStatusChange(reg.id, 'Attended')}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold text-[10px]"
+                          onClick={() => setSelectedRegistration(reg)}
+                          className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                          title="View Full Registration Details"
                         >
-                          Mark Attended
+                          <Eye className="w-4 h-4" />
                         </button>
-                      )}
-                      {reg.status !== 'Cancelled' && (
                         <button
-                          onClick={() => handleStatusChange(reg.id, 'Cancelled')}
-                          className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold text-[10px]"
+                          onClick={() => copyConfirmationMessage(reg)}
+                          className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-[#F98A5B] hover:text-white transition-colors cursor-pointer"
+                          title="Copy WhatsApp Message"
                         >
-                          Cancel
+                          <Copy className="w-4 h-4" />
                         </button>
-                      )}
+                        <button
+                          onClick={() => handleDelete(reg.id)}
+                          disabled={deletingId === reg.id}
+                          className="p-1.5 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors cursor-pointer"
+                          title="Delete Registration"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-400">
-                    {loading ? 'Loading registrations...' : 'No registrations found.'}
+                  <td colSpan={6} className="py-12 text-center text-slate-500">
+                    <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                    <p className="text-sm font-semibold">No registrations found matching your criteria</p>
+                    <p className="text-xs mt-1">Try resetting the search keyword or selecting &quot;All Events&quot;.</p>
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+
+        {/* Pagination Bar */}
+        {totalPages > 1 && (
+          <div className="p-4 border-t border-white/10 flex items-center justify-between text-xs text-slate-400">
+            <div>
+              Page <span className="font-bold text-white">{currentPage}</span> of{' '}
+              <span className="font-bold text-white">{totalPages}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white disabled:opacity-40 transition-colors cursor-pointer flex items-center gap-1"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+                <span>Previous</span>
+              </button>
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white disabled:opacity-40 transition-colors cursor-pointer flex items-center gap-1"
+              >
+                <span>Next</span>
+                <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* DETAIL MODAL */}
+      {selectedRegistration && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-lg rounded-3xl border border-white/20 bg-[#121216] p-6 sm:p-8 space-y-6 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div>
+                <span className="text-[10px] font-mono font-bold text-[#F98A5B] uppercase block">
+                  PARTICIPANT DETAILS
+                </span>
+                <h3 className="text-xl font-black text-white">{selectedRegistration.studentName}</h3>
+              </div>
+              <button
+                onClick={() => setSelectedRegistration(null)}
+                className="p-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white"
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="p-3 rounded-2xl bg-black/40 border border-white/10 flex items-center justify-between">
+                <div>
+                  <span className="text-[10px] font-mono text-slate-400">REGISTRATION ID</span>
+                  <p className="text-lg font-mono font-black text-[#F98A5B]">
+                    {selectedRegistration.registrationCode || selectedRegistration.id}
+                  </p>
+                </div>
+                <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-white/10 text-white">
+                  {selectedRegistration.status}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div>
+                  <span className="text-slate-500 block text-[10px] font-mono">ADMISSION / REG NO</span>
+                  <span className="font-bold text-white">{selectedRegistration.registerNumber}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[10px] font-mono">DEPARTMENT</span>
+                  <span className="text-white">{selectedRegistration.department}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[10px] font-mono">ACADEMIC YEAR</span>
+                  <span className="text-white">{selectedRegistration.academicYear || '2nd Year'}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[10px] font-mono">COLLEGE</span>
+                  <span className="text-white truncate block">{selectedRegistration.collegeName}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[10px] font-mono">EMAIL</span>
+                  <span className="text-white">{selectedRegistration.email}</span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[10px] font-mono">MOBILE / WHATSAPP</span>
+                  <span className="text-white font-mono">{selectedRegistration.phone}</span>
+                </div>
+              </div>
+
+              {selectedRegistration.additionalNotes && (
+                <div className="p-3 rounded-xl bg-white/5 border border-white/10 mt-2">
+                  <span className="text-slate-400 block text-[10px] font-mono">STUDENT NOTES &amp; QUESTIONS:</span>
+                  <p className="text-slate-200 text-xs mt-1">{selectedRegistration.additionalNotes}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Action Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-white/10">
+              <button
+                onClick={() => openWhatsApp(selectedRegistration)}
+                className="px-4 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Chat on WhatsApp</span>
+              </button>
+
+              <button
+                onClick={() => copyConfirmationMessage(selectedRegistration)}
+                className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Copy className="w-3.5 h-3.5 text-[#F98A5B]" />
+                <span>Copy Message</span>
+              </button>
+
+              <button
+                onClick={() => setSelectedRegistration(null)}
+                className="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 text-xs font-bold transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

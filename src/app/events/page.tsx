@@ -168,13 +168,13 @@ export default function EventsPage() {
                       </a>
                     )}
 
-                    <button
-                      onClick={() => handleRegister(e.id, e.title)}
-                      disabled={registered[e.id] || (e.seatsAvailable === 0)}
-                      className="w-full py-2.5 rounded-xl bg-[#F98A5B] hover:bg-[#fa753e] text-neutral-950 font-bold text-xs shadow-lg transition-colors cursor-pointer disabled:opacity-50"
+                    <Link
+                      href={`/register?event=${e.id}`}
+                      className="w-full py-2.5 rounded-xl bg-[#F98A5B] hover:bg-[#fa753e] text-neutral-950 font-bold text-xs shadow-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
-                      {registered[e.id] ? 'Registered ✓' : (e.seatsAvailable === 0 ? 'Seats Full' : 'Register Now')}
-                    </button>
+                      <span>Register for Event</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </Link>
                   </div>
                 </div>
               </div>

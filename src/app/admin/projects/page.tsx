@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAdmin } from '@/context/AdminContext';
 import { Cpu, Plus, Search, Trash2, Edit3, Code2, ExternalLink, CheckCircle2 } from 'lucide-react';
+import FileUpload from '@/components/admin/FileUpload';
 
 export default function AdminProjectsPage() {
   const { addToast } = useAdmin();
@@ -361,6 +362,17 @@ export default function AdminProjectsPage() {
                     className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
                   />
                 </div>
+              </div>
+
+              <div className="pt-2 border-t border-white/10">
+                <FileUpload
+                  label="Project Prototype Photograph"
+                  value={formData.imageUrl}
+                  onChange={(url) => setFormData({ ...formData, imageUrl: url })}
+                  folder="projects"
+                  accept="image/jpeg,image/png,image/webp"
+                  helperText="Upload hardware prototype, circuitry, or interface screenshot from your PC"
+                />
               </div>
 
               <div className="flex gap-2 pt-3 border-t border-white/10">

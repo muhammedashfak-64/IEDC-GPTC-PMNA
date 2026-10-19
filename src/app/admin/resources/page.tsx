@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAdmin } from '@/context/AdminContext';
 import { GraduationCap, Plus, Download, FileText, Trash2, Eye } from 'lucide-react';
+import FileUpload from '@/components/admin/FileUpload';
 
 export default function ResourcesManagerPage() {
   const { addToast } = useAdmin();
@@ -165,17 +166,16 @@ export default function ResourcesManagerPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">File URL / Download Link</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="/templates/sample.pdf or https://..."
-                  value={formData.fileUrl}
-                  onChange={(e) => setFormData({ ...formData, fileUrl: e.target.value })}
-                  className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
-                />
-              </div>
+              <FileUpload
+                label="Resource Document File"
+                value={formData.fileUrl}
+                onChange={(url) => setFormData({ ...formData, fileUrl: url })}
+                folder="resources"
+                isDocument={true}
+                accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.zip,.pptx"
+                helperText="Upload official PDF notes, templates, or spreadsheets from your PC"
+                required={true}
+              />
 
               <div>
                 <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Brief Description</label>

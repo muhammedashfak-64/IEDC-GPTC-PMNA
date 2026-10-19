@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAdmin } from '@/context/AdminContext';
 import { Megaphone, Plus, Trash2, CheckCircle2 } from 'lucide-react';
+import FileUpload from '@/components/admin/FileUpload';
 
 export default function AnnouncementsManagerPage() {
   const { addToast } = useAdmin();
@@ -13,7 +14,8 @@ export default function AnnouncementsManagerPage() {
     title: '',
     message: '',
     priority: 'High',
-    targetAudience: 'All'
+    targetAudience: 'All',
+    attachmentUrl: ''
   });
 
   const loadData = () => {
@@ -68,7 +70,8 @@ export default function AnnouncementsManagerPage() {
               title: '',
               message: '',
               priority: 'High',
-              targetAudience: 'All'
+              targetAudience: 'All',
+              attachmentUrl: ''
             });
             setShowModal(true);
           }}
@@ -167,6 +170,17 @@ export default function AnnouncementsManagerPage() {
                     <option value="Executive">Student Leads Only</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="pt-2 border-t border-white/10">
+                <FileUpload
+                  label="Announcement Banner or Attachment (Optional)"
+                  value={formData.attachmentUrl || ''}
+                  onChange={(url) => setFormData({ ...formData, attachmentUrl: url })}
+                  folder="announcements"
+                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  helperText="Upload circular poster (JPG/PNG) or official notice (PDF) from your PC"
+                />
               </div>
 
               <div className="flex gap-2 pt-3 border-t border-white/10">

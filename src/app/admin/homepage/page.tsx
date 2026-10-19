@@ -15,6 +15,7 @@ import {
   Globe,
   Settings
 } from 'lucide-react';
+import FileUpload from '@/components/admin/FileUpload';
 
 export default function HomepageManagementPage() {
   const { addToast } = useAdmin();
@@ -236,29 +237,14 @@ export default function HomepageManagementPage() {
               <ImageIcon className="w-4 h-4 text-slate-300" /> Campus Background Image
             </h3>
 
-            <div>
-              <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
-                Campus Image URL or Relative Asset Path
-              </label>
-              <input
-                type="text"
-                value={formData.campusPhotoUrl}
-                onChange={(e) => setFormData({ ...formData, campusPhotoUrl: e.target.value })}
-                className="w-full bg-[#18181D] border border-white/10 focus:border-white/30 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none font-mono"
-              />
-            </div>
-
-            <div className="p-3 rounded-2xl bg-[#18181D] border border-white/10 flex items-center gap-4">
-              <img
-                src={formData.campusPhotoUrl}
-                alt="Campus Preview"
-                className="w-24 h-16 object-cover rounded-xl border border-white/10"
-              />
-              <div className="text-xs space-y-1">
-                <div className="font-bold text-white">Current Overlay Photo</div>
-                <div className="text-[11px] text-slate-400">Renders as blurred ambient backdrop behind the homepage.</div>
-              </div>
-            </div>
+            <FileUpload
+              label="Campus Background / Hero Backdrop Image"
+              value={formData.campusPhotoUrl}
+              onChange={(url) => setFormData({ ...formData, campusPhotoUrl: url })}
+              folder="homepage"
+              accept="image/jpeg,image/png,image/webp"
+              helperText="Upload official campus drone shot or high-resolution backdrop from your PC"
+            />
           </div>
         </div>
 

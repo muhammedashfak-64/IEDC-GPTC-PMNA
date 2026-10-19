@@ -10,3 +10,7 @@ export const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
     persistSession: false
   }
 });
+
+export function isSupabaseAdminConfigured(): boolean {
+  return Boolean(supabaseUrl && serviceRoleKey && !serviceRoleKey.includes('placeholder'));
+}

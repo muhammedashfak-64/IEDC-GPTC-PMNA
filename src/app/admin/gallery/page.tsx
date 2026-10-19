@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAdmin } from '@/context/AdminContext';
-import { Image as ImageIcon, Plus, Trash2, Eye, CheckCircle2, Upload, Tag, Filter } from 'lucide-react';
+import { Image as ImageIcon, Plus, Trash2, Eye, CheckCircle2, Upload, Tag, Filter, UploadCloud } from 'lucide-react';
+import FileUpload from '@/components/admin/FileUpload';
+import MultiFileUpload from '@/components/admin/MultiFileUpload';
 
 export default function GalleryManagementPage() {
   const { addToast } = useAdmin();
@@ -227,17 +229,16 @@ export default function GalleryManagementPage() {
                 />
               </div>
 
-              <div>
-                <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Image URL / Storage Path</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="https://images.unsplash.com/... or /campus-main.jpeg"
-                  value={formData.mediaUrl}
-                  onChange={(e) => setFormData({ ...formData, mediaUrl: e.target.value })}
-                  className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
-                />
-              </div>
+              <FileUpload
+                label="Photograph / Video File"
+                value={formData.mediaUrl}
+                onChange={(url) => setFormData({ ...formData, mediaUrl: url })}
+                folder="gallery"
+                accept="image/jpeg,image/png,image/webp,video/mp4,video/webm"
+                isVideo={formData.mediaUrl.endsWith('.mp4') || formData.mediaUrl.endsWith('.webm')}
+                helperText="Upload JPG, PNG, WebP image or MP4 video directly from your PC"
+                required={true}
+              />
 
               <div>
                 <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Caption</label>

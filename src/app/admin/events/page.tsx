@@ -23,6 +23,7 @@ import {
   ArrowUpRight,
   Sparkles
 } from 'lucide-react';
+import FileUpload from '@/components/admin/FileUpload';
 
 export default function AdminEventsPage() {
   const { addToast } = useAdmin();
@@ -558,27 +559,25 @@ export default function AdminEventsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Banner Image URL</label>
-                  <input
-                    type="text"
-                    value={formData.bannerImage}
-                    onChange={(e) => setFormData({ ...formData, bannerImage: e.target.value })}
-                    className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
-                  />
-                </div>
+              <div className="space-y-4 pt-2 border-t border-white/10">
+                <FileUpload
+                  label="Event Poster / Banner Image"
+                  value={formData.bannerImage}
+                  onChange={(url) => setFormData({ ...formData, bannerImage: url })}
+                  folder="events"
+                  accept="image/jpeg,image/png,image/webp"
+                  helperText="Upload event poster or creative graphic (JPG, PNG, WebP)"
+                />
 
-                <div>
-                  <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Brochure PDF URL</label>
-                  <input
-                    type="text"
-                    placeholder="/brochures/hackathon-2026.pdf"
-                    value={formData.brochureUrl}
-                    onChange={(e) => setFormData({ ...formData, brochureUrl: e.target.value })}
-                    className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
-                  />
-                </div>
+                <FileUpload
+                  label="Event Brochure Document"
+                  value={formData.brochureUrl}
+                  onChange={(url) => setFormData({ ...formData, brochureUrl: url })}
+                  folder="documents"
+                  isDocument={true}
+                  accept=".pdf,.docx,.doc"
+                  helperText="Upload official guidelines, schedule, or brochure (PDF or DOCX)"
+                />
               </div>
 
               <div className="flex items-center justify-between pt-2">

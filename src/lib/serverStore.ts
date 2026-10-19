@@ -17,7 +17,9 @@ import {
   syncAnnouncementToSupabase,
   syncStartupToSupabase,
   syncSettingsToSupabase,
-  syncAuditLogToSupabase
+  syncAuditLogToSupabase,
+  syncRegistrationToSupabase,
+  deleteRegistrationFromSupabase
 } from './supabaseSync';
 
 const DB_FILE = path.join(process.cwd(), 'src', 'data', 'db.json');
@@ -255,46 +257,153 @@ export function deleteEvent(id: string, user: AuthUser) {
 export function getRegistrations(eventId?: string) {
   const db = loadDb();
   let list = db.registrations || [];
-  if (eventId) {
+  if (eventId && eventId !== 'All') {
     list = list.filter((r: any) => r.eventId === eventId);
   }
-  return list;
+
+  // Enrich with event details if missing
+  const eventsMap = new Map((db.events || []).map((e: any) => [e.id, e.title]));
+  return list.map((r: any) => ({
+    ...r,
+    eventTitle: r.eventTitle || eventsMap.get(r.eventId) || 'Campus Event'
+  }));
 }
 
-export function addRegistration(regData: any) {
+export function registerStudentForEvent(data: {
+  eventId: string;
+  studentName: string;
+  registerNumber: string;
+  email: string;
+  phone: string;
+  department: string;
+  academicYear?: string;
+  collegeName?: string;
+  additionalNotes?: string;
+  consent?: boolean;
+}) {
   const db = loadDb();
   if (!db.registrations) db.registrations = [];
-  const newReg = {
-    id: `reg-${Date.now()}`,
-    eventId: regData.eventId,
-    studentName: regData.studentName,
-    registerNumber: regData.registerNumber,
-    email: regData.email,
-    phone: regData.phone,
-    department: regData.department || 'General',
-    status: 'Registered',
-    registeredAt: new Date().toISOString()
-  };
-  db.registrations.unshift(newReg);
+  if (!db.events) db.events = [];
 
-  // Update seats available in event
-  const evtIdx = (db.events || []).findIndex((e: any) => e.id === regData.eventId);
-  if (evtIdx !== -1 && db.events[evtIdx].seatsAvailable > 0) {
-    db.events[evtIdx].seatsAvailable -= 1;
+  // 1. Validation
+  if (!data.eventId) throw new Error('Event ID is required.');
+  if (!data.studentName?.trim()) throw new Error('Student name is required.');
+  if (!data.registerNumber?.trim()) throw new Error('Admission / Register number is required.');
+  if (!data.email?.trim()) throw new Error('Email address is required.');
+  if (!data.phone?.trim()) throw new Error('Mobile number is required.');
+  if (!data.department?.trim()) throw new Error('Department is required.');
+
+  // 2. Check Event
+  const event = db.events.find((e: any) => e.id === data.eventId);
+  if (!event) throw new Error('Selected event was not found.');
+  if (event.status !== 'Published') throw new Error('Registration is not currently open for this event.');
+
+  const cleanRegNo = data.registerNumber.trim().toUpperCase();
+  const cleanEmail = data.email.trim().toLowerCase();
+
+  // 3. Duplicate Prevention
+  const existing = db.registrations.find(
+    (r: any) =>
+      r.eventId === data.eventId &&
+      (r.registerNumber?.trim().toUpperCase() === cleanRegNo ||
+        r.email?.trim().toLowerCase() === cleanEmail)
+  );
+
+  if (existing) {
+    throw new Error(
+      `You are already registered for "${event.title}". Your Registration ID is ${existing.registrationCode || existing.id}.`
+    );
+  }
+
+  // 4. Capacity Limit Check
+  const eventRegistrations = db.registrations.filter(
+    (r: any) => r.eventId === data.eventId && r.status !== 'Cancelled'
+  );
+  if (event.totalSeats && eventRegistrations.length >= Number(event.totalSeats)) {
+    throw new Error(`Registration closed: The capacity limit of ${event.totalSeats} seats has been reached.`);
+  }
+
+  // 5. Generate unique registration code and ID
+  const codeNum = Math.floor(10000 + Math.random() * 90000);
+  const registrationCode = `REG-2026-${codeNum}`;
+  const newRegistration = {
+    id: `reg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+    registrationCode,
+    eventId: data.eventId,
+    eventTitle: event.title,
+    studentName: data.studentName.trim(),
+    registerNumber: cleanRegNo,
+    email: cleanEmail,
+    phone: data.phone.trim(),
+    department: data.department.trim(),
+    academicYear: data.academicYear || '2nd Year',
+    collegeName: data.collegeName || 'Govt Polytechnic College Perinthalmanna',
+    additionalNotes: data.additionalNotes || '',
+    status: 'Confirmed',
+    consent: data.consent !== false,
+    registeredAt: new Date().toISOString(),
+    createdAt: new Date().toISOString()
+  };
+
+  db.registrations.unshift(newRegistration);
+
+  // Update seats available on event
+  if (typeof event.seatsAvailable === 'number') {
+    event.seatsAvailable = Math.max(0, event.seatsAvailable - 1);
   }
 
   saveDb(db);
-  return newReg;
+
+  // Async sync to Supabase
+  syncRegistrationToSupabase(newRegistration, false).catch(console.error);
+  syncEventToSupabase(event, true).catch(console.error);
+
+  return newRegistration;
 }
 
 export function updateRegistrationStatus(id: string, status: string, user: AuthUser) {
   const db = loadDb();
-  const idx = (db.registrations || []).findIndex((r: any) => r.id === id);
-  if (idx === -1) return null;
-  db.registrations[idx].status = status;
+  if (!db.registrations) db.registrations = [];
+
+  const index = db.registrations.findIndex((r: any) => r.id === id);
+  if (index === -1) throw new Error('Registration not found.');
+
+  const validStatuses = ['Confirmed', 'Pending', 'Attended', 'Cancelled'];
+  if (!validStatuses.includes(status)) {
+    throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
+  }
+
+  db.registrations[index].status = status;
+  db.registrations[index].updatedAt = new Date().toISOString();
   saveDb(db);
-  addAuditLog('REGISTRATION_STATUS', user, `Updated registration ${id} status to ${status}`);
-  return db.registrations[idx];
+
+  syncRegistrationToSupabase(db.registrations[index], true).catch(console.error);
+  addAuditLog('REGISTRATION_STATUS_UPDATE', user, `Changed status of ${db.registrations[index].studentName} (${id}) to ${status}`);
+
+  return db.registrations[index];
+}
+
+export function deleteRegistration(id: string, user: AuthUser) {
+  const db = loadDb();
+  if (!db.registrations) return false;
+
+  const target = db.registrations.find((r: any) => r.id === id);
+  if (!target) return false;
+
+  db.registrations = db.registrations.filter((r: any) => r.id !== id);
+
+  // Restore seat if applicable
+  const event = (db.events || []).find((e: any) => e.id === target.eventId);
+  if (event && typeof event.seatsAvailable === 'number') {
+    event.seatsAvailable = Math.min(event.totalSeats || 60, event.seatsAvailable + 1);
+    syncEventToSupabase(event, true).catch(console.error);
+  }
+
+  saveDb(db);
+  deleteRegistrationFromSupabase(id).catch(console.error);
+  addAuditLog('REGISTRATION_DELETE', user, `Deleted registration for ${target.studentName} (${id})`);
+
+  return true;
 }
 
 // -------------------------------------------------------------

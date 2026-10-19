@@ -338,3 +338,40 @@ export async function syncAuditLogToSupabase(log: any) {
     return supabaseAdmin.from('audit_logs').insert(row);
   });
 }
+
+// -------------------------------------------------------------
+// REGISTRATIONS
+// -------------------------------------------------------------
+export async function syncRegistrationToSupabase(reg: any, isUpdate = false) {
+  return safeDbOp('syncRegistrationToSupabase', async () => {
+    const row = {
+      id: reg.id,
+      registration_code: reg.registrationCode || reg.registration_code || `REG-2026-${reg.id.replace('reg-', '').padStart(5, '0')}`,
+      event_id: reg.eventId || reg.event_id,
+      event_title: reg.eventTitle || reg.event_title || 'Campus Event',
+      student_name: reg.studentName || reg.student_name,
+      register_number: reg.registerNumber || reg.register_number,
+      email: reg.email,
+      phone: reg.phone,
+      department: reg.department || 'General',
+      academic_year: reg.academicYear || reg.academic_year || '2nd Year',
+      college_name: reg.collegeName || reg.college_name || 'Govt Polytechnic College Perinthalmanna',
+      additional_notes: reg.additionalNotes || reg.additional_notes || '',
+      status: ['Confirmed', 'Pending', 'Attended', 'Cancelled'].includes(reg.status) ? reg.status : 'Confirmed',
+      consent: reg.consent !== false,
+      created_at: reg.registeredAt || reg.created_at || new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    if (isUpdate) {
+      return supabaseAdmin.from('registrations').upsert(row, { onConflict: 'id' });
+    }
+    return supabaseAdmin.from('registrations').insert(row);
+  });
+}
+
+export async function deleteRegistrationFromSupabase(id: string) {
+  return safeDbOp('deleteRegistrationFromSupabase', async () => {
+    return supabaseAdmin.from('registrations').delete().eq('id', id);
+  });
+}

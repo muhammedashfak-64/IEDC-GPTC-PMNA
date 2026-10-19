@@ -108,7 +108,7 @@
       "description": "24-hour flagship state-level hackathon empowering polytechnic students across Kerala to build smart campus, robotics, and clean-tech prototypes.",
       "speaker": "Er. Mohammed Shafi (KSUM Innovation Mentor)",
       "totalSeats": 120,
-      "seatsAvailable": 34,
+      "seatsAvailable": 33,
       "bannerImage": "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&auto=format&fit=crop&q=80",
       "brochureUrl": "/brochures/hackathon-2026-brochure.pdf",
       "registrationOpen": true,
@@ -166,6 +166,24 @@
   ],
   "registrations": [
     {
+      "id": "reg-1792434122135-zuv9",
+      "registrationCode": "REG-2026-73830",
+      "eventId": "evt-001",
+      "eventTitle": "GPTC PMNA State Hackathon 2026",
+      "studentName": "Anaswara P",
+      "registerNumber": "21059901",
+      "email": "anaswara.p@gptcpmna.edu.in",
+      "phone": "9847555666",
+      "department": "Electronics Engineering",
+      "academicYear": "2nd Year",
+      "collegeName": "Govt Polytechnic College Perinthalmanna",
+      "additionalNotes": "Bringing laptop for hardware simulation.",
+      "status": "Confirmed",
+      "consent": true,
+      "registeredAt": "2026-10-19T18:22:02.135Z",
+      "createdAt": "2026-10-19T18:22:02.135Z"
+    },
+    {
       "id": "reg-001",
       "eventId": "evt-001",
       "studentName": "Rahul V",
@@ -195,7 +213,7 @@
       "email": "arjun.k@gptcpmna.edu.in",
       "phone": "9847000111",
       "department": "Electrical Engineering",
-      "status": "Registered",
+      "status": "Attended",
       "registeredAt": "2026-08-10T16:45:00Z"
     }
   ],
@@ -215,7 +233,7 @@
       "qrCodeUrl": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/IEDC-2026-41296",
       "pdfStorageUrl": "C:\\Users\\USER\\Desktop\\3D\\3D WORKSHOP CERTIFICATE\\GPTC PMNA",
       "status": "Published",
-      "downloadsCount": 3,
+      "downloadsCount": 4,
       "issuedBy": "usr-faculty-01",
       "issuedAt": "2026-10-19T09:54:45.453Z"
     },
@@ -234,7 +252,7 @@
       "qrCodeUrl": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/IEDC-2026-89412",
       "pdfStorageUrl": "/certificates/IEDC-2026-89412.pdf",
       "status": "Published",
-      "downloadsCount": 7,
+      "downloadsCount": 8,
       "issuedBy": "usr-faculty-01",
       "issuedAt": "2026-08-26T12:00:00Z"
     },
@@ -319,7 +337,20 @@
       "uploadedAt": "2026-07-12T11:30:00Z"
     }
   ],
-  "gallery": [],
+  "gallery": [
+    {
+      "id": "gal-1792434283902",
+      "title": "3D DESIGNING AND PRINTING WORKSHOP",
+      "albumName": "3D DESIGNING AND PRINTING WORKSHOP",
+      "mediaType": "Image",
+      "mediaUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/gallery/gallery/2026_07_21_14_31_00_IMG_4003_JPG_1792434228075.jpg",
+      "caption": "",
+      "altText": "3D DESIGNING AND PRINTING WORKSHOP",
+      "status": "Published",
+      "isCover": false,
+      "createdAt": "2026-10-19T18:24:43.902Z"
+    }
+  ],
   "projects": [
     {
       "id": "proj-001",
@@ -869,6 +900,26 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "log-1792434283905-89at",
+      "userId": "usr-faculty-01",
+      "userName": "System / Anonymous",
+      "userRole": "faculty_coordinator",
+      "action": "GALLERY_UPLOAD",
+      "details": "Uploaded gallery item: 3D DESIGNING AND PRINTING WORKSHOP",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T18:24:43.905Z"
+    },
+    {
+      "id": "log-1792432329691-72fo",
+      "userId": "usr-faculty-01",
+      "userName": "System / Anonymous",
+      "userRole": "faculty_coordinator",
+      "action": "REGISTRATION_STATUS",
+      "details": "Updated registration reg-003 status to Attended",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T17:52:09.691Z"
+    },
     {
       "id": "log-1792431171148-61b7",
       "userId": "usr-faculty-01",

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAdmin } from '@/context/AdminContext';
 import { ShieldCheck, Plus, Trash2, Edit3, Mail, Phone, Lock } from 'lucide-react';
+import FileUpload from '@/components/admin/FileUpload';
 
 export default function FacultyCoordinatorsManagementPage() {
   const { isFaculty, addToast } = useAdmin();
@@ -244,15 +245,14 @@ export default function FacultyCoordinatorsManagementPage() {
                 />
               </div>
 
-              <div>
-                <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Photograph URL</label>
-                <input
-                  type="text"
-                  value={formData.photoUrl}
-                  onChange={(e) => setFormData({ ...formData, photoUrl: e.target.value })}
-                  className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
-                />
-              </div>
+              <FileUpload
+                label="Faculty Photograph"
+                value={formData.photoUrl}
+                onChange={(url) => setFormData({ ...formData, photoUrl: url })}
+                folder="faculty"
+                accept="image/jpeg,image/png,image/webp"
+                helperText="Upload official faculty photograph from computer"
+              />
 
               <div>
                 <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Professional Biography</label>

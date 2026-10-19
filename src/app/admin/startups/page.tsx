@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAdmin } from '@/context/AdminContext';
 import { Rocket, Plus, ExternalLink, Trash2 } from 'lucide-react';
+import FileUpload from '@/components/admin/FileUpload';
 
 export default function StartupsManagerPage() {
   const { addToast } = useAdmin();
@@ -183,6 +184,17 @@ export default function StartupsManagerPage() {
                     className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
                   />
                 </div>
+              </div>
+
+              <div className="pt-2 border-t border-white/10">
+                <FileUpload
+                  label="Startup Brand Logo / Image"
+                  value={formData.logoUrl}
+                  onChange={(url) => setFormData({ ...formData, logoUrl: url })}
+                  folder="startups"
+                  accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                  helperText="Upload official startup logo or prototype photo from your PC"
+                />
               </div>
 
               <div className="flex gap-2 pt-3 border-t border-white/10">

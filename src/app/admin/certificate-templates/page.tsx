@@ -2,10 +2,15 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAdmin } from '@/context/AdminContext';
-import { Stamp, Plus, CheckCircle2, Eye, Sparkles } from 'lucide-react';
+import { Stamp, Plus, CheckCircle2, Eye, Sparkles, XCircle } from 'lucide-react';
+import FileUpload from '@/components/admin/FileUpload';
 
 export default function CertificateTemplatesPage() {
   const { addToast } = useAdmin();
+  const [showModal, setShowModal] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newBackgroundUrl, setNewBackgroundUrl] = useState('');
+  const [newBorderColor, setNewBorderColor] = useState('#F98A5B');
   const [templates, setTemplates] = useState<any[]>([
     {
       id: 'tpl-001',
@@ -32,6 +37,33 @@ export default function CertificateTemplatesPage() {
     addToast('Active Template Set', 'Certificate generation template updated.', 'success');
   };
 
+  const handleAddTemplate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle.trim()) {
+      addToast('Validation', 'Template title is required.', 'error');
+      return;
+    }
+    if (!newBackgroundUrl) {
+      addToast('Validation', 'Please upload or select a background image.', 'error');
+      return;
+    }
+
+    const newTpl = {
+      id: `tpl-${Date.now()}`,
+      title: newTitle.trim(),
+      backgroundImageUrl: newBackgroundUrl,
+      fontColor: '#FFFFFF',
+      borderColor: newBorderColor,
+      isActive: false
+    };
+
+    setTemplates([newTpl, ...templates]);
+    setShowModal(false);
+    setNewTitle('');
+    setNewBackgroundUrl('');
+    addToast('Template Added', `Uploaded certificate template "${newTpl.title}"`, 'success');
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
@@ -44,6 +76,14 @@ export default function CertificateTemplatesPage() {
             Manage background layout borders, color grading, and active master template for automated certificate generation.
           </p>
         </div>
+
+        <button
+          onClick={() => setShowModal(true)}
+          className="px-5 py-2.5 rounded-xl bg-white text-black font-extrabold text-xs flex items-center gap-2 hover:bg-slate-200 cursor-pointer shadow-sm"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Upload Certificate Template</span>
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -98,6 +138,67 @@ export default function CertificateTemplatesPage() {
           </div>
         ))}
       </div>
+      {showModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-md p-6 rounded-3xl bg-[#121216] border border-white/20 space-y-4 shadow-2xl relative">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
+              <h3 className="text-base font-bold text-white">Upload Certificate Template</h3>
+              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white">✕</button>
+            </div>
+
+            <form onSubmit={handleAddTemplate} className="space-y-4 text-xs">
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Template Title</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. State Innovation Summit 2026 Template"
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                />
+              </div>
+
+              <FileUpload
+                label="Template Background Graphic"
+                value={newBackgroundUrl}
+                onChange={(url) => setNewBackgroundUrl(url)}
+                folder="certificates"
+                accept="image/jpeg,image/png,image/webp"
+                helperText="Upload official high-resolution certificate frame or background layout from your PC"
+                required={true}
+              />
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Border Accent Color</label>
+                <input
+                  type="text"
+                  value={newBorderColor}
+                  onChange={(e) => setNewBorderColor(e.target.value)}
+                  placeholder="#F98A5B"
+                  className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-3 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-white text-black font-extrabold hover:bg-slate-200"
+                >
+                  Save Template
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
