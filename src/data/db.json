@@ -1,0 +1,952 @@
+{
+  "settings": {
+    "siteTitle": "IEDC GPTC PMNA",
+    "collegeName": "Government Polytechnic College, Perinthalmanna",
+    "heroHeading": "Where Innovation Meets Opportunity",
+    "heroSub": "Innovation and Entrepreneurship Development Centre (IEDC) is the official innovation hub of Government Polytechnic College, Perinthalmanna, empowering students to innovate, build startups, develop technical skills, and transform ideas into impactful solutions.",
+    "tickerAnnouncement": "Hackathon 2026 Registrations are now LIVE! Certificate portal is open for recent workshops.",
+    "campusPhotoUrl": "/campus-main.jpeg",
+    "collegeLogoUrl": "/college-logo.png",
+    "iedcLogoUrl": "/iedc-logo.png",
+    "stats": [
+      {
+        "label": "Active Members",
+        "value": "650+"
+      },
+      {
+        "label": "Student Projects",
+        "value": "120+"
+      },
+      {
+        "label": "Events Hosted",
+        "value": "35+"
+      },
+      {
+        "label": "Incubated Startups",
+        "value": "15+"
+      },
+      {
+        "label": "Awards & Prizes",
+        "value": "25+"
+      }
+    ],
+    "contact": {
+      "email": "iedc@gptcpmna.edu.in",
+      "phone": "+91 4933 227221",
+      "altPhone": "+91 9447 123456",
+      "address": "Govt Polytechnic College, Angadippuram PO, Perinthalmanna, Malappuram, Kerala 679321"
+    },
+    "social": {
+      "website": "https://iedcgptcpmna.in",
+      "github": "https://github.com/iedc-gptc-pmna",
+      "linkedin": "https://linkedin.com/company/iedc-gptc-pmna",
+      "instagram": "https://instagram.com/iedc_gptcpmna"
+    }
+  },
+  "profiles": [
+    {
+      "id": "usr-faculty-01",
+      "username": "iedc.faculty",
+      "email": "faculty@iedcgptcpmna.in",
+      "passwordHash": "Faculty@123",
+      "full_name": "Prof. Muhammed Rashid",
+      "role": "faculty_coordinator",
+      "phone": "9447123456",
+      "department": "Electronics Engineering",
+      "designation": "Nodal Officer & Lecturer",
+      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80",
+      "staffId": "IEDC001",
+      "isActive": true,
+      "createdAt": "2026-01-10T10:00:00Z"
+    },
+    {
+      "id": "usr-studentlead-01",
+      "username": "iedc.studentlead",
+      "email": "studentlead@iedcgptcpmna.in",
+      "passwordHash": "Student@123",
+      "full_name": "Rahul V",
+      "role": "student_lead",
+      "phone": "9847123456",
+      "department": "Computer Engineering",
+      "designation": "Student Lead (Chairperson)",
+      "avatar": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80",
+      "staffId": "SL001",
+      "isActive": true,
+      "createdAt": "2026-01-15T10:00:00Z"
+    }
+  ],
+  "events": [
+    {
+      "id": "evt-001",
+      "title": "GPTC PMNA State Hackathon 2026",
+      "category": "Hackathon",
+      "level": "State",
+      "date": "2026-08-25",
+      "time": "09:00 AM - 05:00 PM",
+      "venue": "Main Auditorium & ICFC Lab",
+      "description": "24-hour flagship state-level hackathon empowering polytechnic students across Kerala to build smart campus, robotics, and clean-tech prototypes.",
+      "speaker": "Er. Mohammed Shafi (KSUM Innovation Mentor)",
+      "totalSeats": 120,
+      "seatsAvailable": 34,
+      "bannerImage": "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&auto=format&fit=crop&q=80",
+      "brochureUrl": "/brochures/hackathon-2026-brochure.pdf",
+      "registrationOpen": true,
+      "certificateEligible": true,
+      "status": "Published",
+      "facultyCoordinator": "Prof. Muhammed Rashid",
+      "studentCoordinator": "Rahul V",
+      "createdBy": "usr-faculty-01",
+      "createdAt": "2026-07-01T09:00:00Z"
+    },
+    {
+      "id": "evt-002",
+      "title": "Hands-on ESP32 IoT & Embedded Robotics Bootcamp",
+      "category": "Workshop",
+      "level": "College",
+      "date": "2026-09-02",
+      "time": "10:00 AM - 04:00 PM",
+      "venue": "Electronics Lab 2 & Maker Space",
+      "description": "Intensive hands-on practical bootcamp on ESP32 microcontroller architecture, MQTT cloud communication, sensor telemetry, and actuator control.",
+      "speaker": "Prof. Muhammed Rashid (Faculty Nodal Officer)",
+      "totalSeats": 60,
+      "seatsAvailable": 12,
+      "bannerImage": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80",
+      "brochureUrl": "/brochures/iot-bootcamp-brochure.pdf",
+      "registrationOpen": true,
+      "certificateEligible": true,
+      "status": "Published",
+      "facultyCoordinator": "Prof. Muhammed Rashid",
+      "studentCoordinator": "Fathima Riya",
+      "createdBy": "usr-faculty-01",
+      "createdAt": "2026-07-10T10:30:00Z"
+    },
+    {
+      "id": "evt-003",
+      "title": "State-Level Idea Fest & YIP 5.0 Orientation",
+      "category": "State Program",
+      "level": "State",
+      "date": "2026-09-15",
+      "time": "11:00 AM - 01:30 PM",
+      "venue": "Seminar Hall A",
+      "description": "Comprehensive orientation on Young Innovators Programme (YIP) guidelines, proposal writing, seed grants, and government prototype support.",
+      "speaker": "K-DISC District Program Executive",
+      "totalSeats": 150,
+      "seatsAvailable": 45,
+      "bannerImage": "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=800&auto=format&fit=crop&q=80",
+      "brochureUrl": "/brochures/yip-orientation.pdf",
+      "registrationOpen": true,
+      "certificateEligible": true,
+      "status": "Published",
+      "facultyCoordinator": "Prof. Muhammed Rashid",
+      "studentCoordinator": "Arjun K",
+      "createdBy": "usr-faculty-01",
+      "createdAt": "2026-07-15T11:00:00Z"
+    }
+  ],
+  "registrations": [
+    {
+      "id": "reg-001",
+      "eventId": "evt-001",
+      "studentName": "Rahul V",
+      "registerNumber": "21051234",
+      "email": "rahul.v@gptcpmna.edu.in",
+      "phone": "9847123456",
+      "department": "Computer Engineering",
+      "status": "Attended",
+      "registeredAt": "2026-08-01T10:00:00Z"
+    },
+    {
+      "id": "reg-002",
+      "eventId": "evt-002",
+      "studentName": "Fathima Riya",
+      "registerNumber": "21051235",
+      "email": "fathima.riya@gptcpmna.edu.in",
+      "phone": "9847654321",
+      "department": "Electronics Engineering",
+      "status": "Attended",
+      "registeredAt": "2026-08-05T14:20:00Z"
+    },
+    {
+      "id": "reg-003",
+      "eventId": "evt-003",
+      "studentName": "Arjun K",
+      "registerNumber": "21051236",
+      "email": "arjun.k@gptcpmna.edu.in",
+      "phone": "9847000111",
+      "department": "Electrical Engineering",
+      "status": "Registered",
+      "registeredAt": "2026-08-10T16:45:00Z"
+    }
+  ],
+  "certificates": [
+    {
+      "id": "cert-db-001",
+      "certificateId": "IEDC-2026-89412",
+      "eventId": "evt-001",
+      "eventName": "GPTC PMNA State Hackathon 2026",
+      "participantName": "Rahul V",
+      "registerNumber": "21051234",
+      "phone": "9847123456",
+      "email": "rahul.v@gptcpmna.edu.in",
+      "certificateType": "Winner",
+      "eventDate": "2026-08-25",
+      "issueDate": "2026-08-26",
+      "qrCodeUrl": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/IEDC-2026-89412",
+      "pdfStorageUrl": "/certificates/IEDC-2026-89412.pdf",
+      "status": "Published",
+      "downloadsCount": 7,
+      "issuedBy": "usr-faculty-01",
+      "issuedAt": "2026-08-26T12:00:00Z"
+    },
+    {
+      "id": "cert-db-002",
+      "certificateId": "IEDC-2026-89413",
+      "eventId": "evt-002",
+      "eventName": "Hands-on ESP32 IoT & Embedded Robotics Bootcamp",
+      "participantName": "Fathima Riya",
+      "registerNumber": "21051235",
+      "phone": "9847654321",
+      "email": "fathima.riya@gptcpmna.edu.in",
+      "certificateType": "Participation",
+      "eventDate": "2026-09-02",
+      "issueDate": "2026-09-03",
+      "qrCodeUrl": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/IEDC-2026-89413",
+      "pdfStorageUrl": "/certificates/IEDC-2026-89413.pdf",
+      "status": "Published",
+      "downloadsCount": 2,
+      "issuedBy": "usr-faculty-01",
+      "issuedAt": "2026-09-03T11:00:00Z"
+    },
+    {
+      "id": "cert-db-003",
+      "certificateId": "IEDC-2026-89414",
+      "eventId": "evt-003",
+      "eventName": "State-Level Idea Fest & YIP 5.0 Orientation",
+      "participantName": "Arjun K",
+      "registerNumber": "21051236",
+      "phone": "9847000111",
+      "email": "arjun.k@gptcpmna.edu.in",
+      "certificateType": "Organizer",
+      "eventDate": "2026-09-15",
+      "issueDate": "2026-09-16",
+      "qrCodeUrl": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/IEDC-2026-89414",
+      "pdfStorageUrl": "/certificates/IEDC-2026-89414.pdf",
+      "status": "Published",
+      "downloadsCount": 1,
+      "issuedBy": "usr-faculty-01",
+      "issuedAt": "2026-09-16T15:30:00Z"
+    }
+  ],
+  "certificateTemplates": [
+    {
+      "id": "tpl-001",
+      "title": "Official State Hackathon Template 2026",
+      "backgroundImageUrl": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80",
+      "fontColor": "#FFFFFF",
+      "borderColor": "#F98A5B",
+      "isActive": true,
+      "createdAt": "2026-06-01T10:00:00Z"
+    },
+    {
+      "id": "tpl-002",
+      "title": "Technical Workshop Certificate Template",
+      "backgroundImageUrl": "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=1200&auto=format&fit=crop&q=80",
+      "fontColor": "#F3F4F6",
+      "borderColor": "#EC3A74",
+      "isActive": false,
+      "createdAt": "2026-06-15T12:00:00Z"
+    }
+  ],
+  "brochures": [
+    {
+      "id": "bro-001",
+      "eventId": "evt-001",
+      "title": "State Hackathon 2026 Official Brochure",
+      "fileUrl": "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=1200&auto=format&fit=crop&q=80",
+      "fileSize": "2.4 MB",
+      "fileType": "PDF",
+      "downloads": 128,
+      "uploadedAt": "2026-07-02T10:00:00Z"
+    },
+    {
+      "id": "bro-002",
+      "eventId": "evt-002",
+      "title": "IoT & Robotics Bootcamp Schedule & Syllabus",
+      "fileUrl": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=1200&auto=format&fit=crop&q=80",
+      "fileSize": "1.8 MB",
+      "fileType": "PDF",
+      "downloads": 84,
+      "uploadedAt": "2026-07-12T11:30:00Z"
+    }
+  ],
+  "gallery": [
+    {
+      "id": "gal-001",
+      "title": "Smart Campus Prototype Demonstration",
+      "albumName": "Hackathon 2026",
+      "mediaType": "Image",
+      "mediaUrl": "https://images.unsplash.com/photo-1531482615713-2afd69097998?w=1000&auto=format&fit=crop&q=80",
+      "caption": "Students presenting autonomous rover telemetry to the evaluation jury.",
+      "altText": "Diploma students with robotics prototype",
+      "status": "Published",
+      "isCover": true,
+      "createdAt": "2026-08-25T16:00:00Z"
+    },
+    {
+      "id": "gal-002",
+      "title": "Hands-on ESP32 Soldering & Circuit Testing",
+      "albumName": "IoT Bootcamp",
+      "mediaType": "Image",
+      "mediaUrl": "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=1000&auto=format&fit=crop&q=80",
+      "caption": "Participants assembling sensor nodes and breadboards in the Maker Space.",
+      "altText": "Soldering microcontroller circuits",
+      "status": "Published",
+      "isCover": true,
+      "createdAt": "2026-09-02T14:30:00Z"
+    },
+    {
+      "id": "gal-003",
+      "title": "IEDC State Summit Delegation",
+      "albumName": "State Events",
+      "mediaType": "Image",
+      "mediaUrl": "https://images.unsplash.com/photo-1515187029135-18ee286d815b?w=1000&auto=format&fit=crop&q=80",
+      "caption": "GPTC Perinthalmanna student leaders at Kerala Startup Mission headquarters.",
+      "altText": "State summit delegation group photo",
+      "status": "Published",
+      "isCover": true,
+      "createdAt": "2026-06-20T17:00:00Z"
+    },
+    {
+      "id": "gal-004",
+      "title": "Maker Space 3D Printing Facility",
+      "albumName": "Campus Facilities",
+      "mediaType": "Image",
+      "mediaUrl": "https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=1000&auto=format&fit=crop&q=80",
+      "caption": "Precision 3D printers and CNC cutting tools available at ICFC Lab.",
+      "altText": "3D printer in action",
+      "status": "Published",
+      "isCover": false,
+      "createdAt": "2026-05-15T11:00:00Z"
+    }
+  ],
+  "projects": [
+    {
+      "id": "proj-001",
+      "title": "Autonomous Solar Campus Rover",
+      "description": "Obstacle-avoiding campus surveillance rover with high-efficiency solar tracking, LoRa telemetry, and edge-AI visual detection for night patrolling.",
+      "department": "Electronics Engineering",
+      "technology": [
+        "ESP32",
+        "OpenCV",
+        "LoRa",
+        "Solar MPPT",
+        "Python"
+      ],
+      "year": "2026",
+      "status": "Incubated",
+      "author": "Rahul V & Team",
+      "mentor": "Prof. Muhammed Rashid",
+      "likes": 48,
+      "bookmarks": 14,
+      "githubUrl": "https://github.com/iedc-gptc-pmna/solar-campus-rover",
+      "demoUrl": "https://rover-telemetry.gptcpmna.edu.in",
+      "imageUrl": "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&auto=format&fit=crop&q=80",
+      "teamMembers": [
+        "Rahul V (CT)",
+        "Arjun K (EEE)",
+        "Sreelakshmi P (ECE)"
+      ],
+      "publicationStatus": "Published",
+      "createdAt": "2026-05-01T10:00:00Z"
+    },
+    {
+      "id": "proj-002",
+      "title": "Smart Polytechnic Water Recycling Grid",
+      "description": "Automated lab graywater filtration and distribution system utilizing solenoid valves, ultrasonic flow sensors, and an ESP32 telemetry gateway.",
+      "department": "Electrical Engineering",
+      "technology": [
+        "ESP32",
+        "MQTT",
+        "Node-RED",
+        "Flow Sensors"
+      ],
+      "year": "2026",
+      "status": "Prototype",
+      "author": "Arjun K & Fathima Riya",
+      "mentor": "Er. Mohammed Shafi",
+      "likes": 36,
+      "bookmarks": 9,
+      "githubUrl": "https://github.com/iedc-gptc-pmna/smart-water-grid",
+      "demoUrl": "https://water-grid.gptcpmna.edu.in",
+      "imageUrl": "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800&auto=format&fit=crop&q=80",
+      "teamMembers": [
+        "Arjun K (EEE)",
+        "Fathima Riya (ECE)"
+      ],
+      "publicationStatus": "Published",
+      "createdAt": "2026-06-15T12:00:00Z"
+    }
+  ],
+  "ideas": [
+    {
+      "id": "idea-001",
+      "title": "Automated Polytechnic Examination Paper Sorter",
+      "studentName": "Fathima Riya",
+      "registerNumber": "21051235",
+      "department": "Electronics Engineering",
+      "problemStatement": "Manual sorting of 2000+ diploma examination papers consumes 15+ teacher hours each exam cycle.",
+      "proposedSolution": "Optical barcode scanner and stepper-motor bin diverter powered by Raspberry Pi Pico.",
+      "technologyStack": [
+        "Raspberry Pi Pico",
+        "MicroPython",
+        "Stepper Motors",
+        "Barcode Scanner"
+      ],
+      "status": "Approved",
+      "assignedMentor": "Prof. Muhammed Rashid",
+      "submittedAt": "2026-08-01T14:00:00Z"
+    },
+    {
+      "id": "idea-002",
+      "title": "Solar Powered EV Charging Station for Campus E-Bikes",
+      "studentName": "Arjun K",
+      "registerNumber": "21051236",
+      "department": "Electrical Engineering",
+      "problemStatement": "Students commuting by electric scooters lack on-campus charging points.",
+      "proposedSolution": "Off-grid 3kW solar canopy with smart RFID billing system for polytechnic students.",
+      "technologyStack": [
+        "Solar Inverter",
+        "RFID MFRC522",
+        "Arduino Mega",
+        "Cloud Dashboard"
+      ],
+      "status": "Under Review",
+      "assignedMentor": "Pending Assignment",
+      "submittedAt": "2026-08-08T16:30:00Z"
+    }
+  ],
+  "startups": [
+    {
+      "id": "startup-001",
+      "name": "AgriTech Automation Systems",
+      "tagline": "IoT Precision Irrigation for Malappuram Spice Plantations",
+      "description": "AI-driven low-cost solar irrigation controllers specifically calibrated for soil moisture levels in rubber and pepper plantations across Malappuram district.",
+      "founders": [
+        "Fathima Riya (ECE)",
+        "Muhammed Ameen (ME)"
+      ],
+      "department": "Electronics Engineering",
+      "stage": "Incubated",
+      "fundingAmount": "₹2,00,000 YIP 5.0 Seed Grant",
+      "logoUrl": "https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=300&auto=format&fit=crop&q=80",
+      "website": "https://agritech-pmna.com",
+      "pitchDeckUrl": "/pitch-decks/agritech-deck.pdf",
+      "status": "Published",
+      "createdAt": "2026-04-10T10:00:00Z"
+    }
+  ],
+  "resources": [
+    {
+      "id": "res-001",
+      "title": "ESP32 Embedded Systems & RTOS Handbook",
+      "category": "Embedded Systems",
+      "fileType": "PDF",
+      "description": "Complete reference manual with schematics, FreeRTOS tasks, and WiFi server examples for diploma students.",
+      "fileUrl": "https://www.espressif.com/sites/default/files/documentation/esp32_datasheet_en.pdf",
+      "fileSize": "4.8 MB",
+      "author": "Prof. Muhammed Rashid",
+      "views": 420,
+      "status": "Published",
+      "createdAt": "2026-05-10T09:00:00Z"
+    },
+    {
+      "id": "res-002",
+      "title": "Official IEDC Innovation Pitch Deck Template (PPTX)",
+      "category": "Startup Templates",
+      "fileType": "PPT",
+      "description": "Standard 10-slide pitch presentation deck approved by Kerala Startup Mission for college incubator screening.",
+      "fileUrl": "/templates/iedc-pitch-deck.pptx",
+      "fileSize": "3.5 MB",
+      "author": "IEDC GPTC PMNA",
+      "views": 290,
+      "status": "Published",
+      "createdAt": "2026-05-20T14:00:00Z"
+    }
+  ],
+  "blogs": [
+    {
+      "id": "blog-001",
+      "title": "How IEDC GPTC PMNA Built an Award-Winning Solar Rover",
+      "excerpt": "A behind-the-scenes journey of how diploma electronics students transformed raw scrap parts and microcontrollers into a state-winning rover.",
+      "content": "Building an autonomous solar rover inside a polytechnic makerspace was both challenging and exhilarating. Our team of second and third-year students spent evenings in the ICFC lab experimenting with motor drivers, LoRa radio packets, and computer vision models...",
+      "author": "Prof. Muhammed Rashid",
+      "authorRole": "Nodal Officer",
+      "category": "Innovation",
+      "tags": [
+        "Robotics",
+        "ESP32",
+        "Solar Energy",
+        "Diploma Excellence"
+      ],
+      "readTime": "5 min read",
+      "imageUrl": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80",
+      "status": "Published",
+      "createdAt": "2026-08-02T10:00:00Z"
+    }
+  ],
+  "announcements": [
+    {
+      "id": "ann-001",
+      "title": "Hackathon 2026 Registration Deadline Extended",
+      "message": "Due to overwhelming student interest from across diploma colleges, team submissions for GPTC PMNA Hackathon remain open until Aug 22.",
+      "priority": "High",
+      "targetAudience": "All",
+      "isActive": true,
+      "createdAt": "2026-08-15T09:00:00Z"
+    },
+    {
+      "id": "ann-002",
+      "title": "New Certificate Verification Portal is LIVE",
+      "message": "Participants can now download verified event certificates using their Registration Number and registered 10-digit mobile number.",
+      "priority": "Medium",
+      "targetAudience": "All",
+      "isActive": true,
+      "createdAt": "2026-08-10T12:00:00Z"
+    }
+  ],
+  "committee": [
+    {
+      "id": "com-001",
+      "name": "Rahul V",
+      "position": "Chairperson (Student Lead)",
+      "department": "Computer Engineering",
+      "academicYear": "2025 - 2026",
+      "bio": "Passionate software developer and robotics enthusiast directing IEDC operations, hackathons, and technical bootcamps.",
+      "linkedinUrl": "https://linkedin.com/in/rahul-v-iedc",
+      "publicEmail": "rahul.v@gptcpmna.edu.in",
+      "publicPhone": "+91 9847 123456",
+      "photoUrl": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&auto=format&fit=crop&q=80",
+      "type": "Executive Committee",
+      "status": "Published",
+      "displayOrder": 1
+    },
+    {
+      "id": "com-002",
+      "name": "Fathima Riya",
+      "position": "Vice Chairperson & Innovation Lead",
+      "department": "Electronics Engineering",
+      "academicYear": "2025 - 2026",
+      "bio": "IoT researcher and YIP grant recipient leading student ideation, startup mentorship, and Maker Space lab coordination.",
+      "linkedinUrl": "https://linkedin.com/in/fathima-riya",
+      "publicEmail": "fathima.riya@gptcpmna.edu.in",
+      "publicPhone": "+91 9847 654321",
+      "photoUrl": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
+      "type": "Executive Committee",
+      "status": "Published",
+      "displayOrder": 2
+    },
+    {
+      "id": "com-003",
+      "name": "Arjun K",
+      "position": "Technical & Project Lead",
+      "department": "Electrical Engineering",
+      "academicYear": "2025 - 2026",
+      "bio": "Embedded systems builder and hardware developer coordinating hackathons, PCB design workshops, and prototype review desks.",
+      "linkedinUrl": "https://linkedin.com/in/arjun-k-pmna",
+      "publicEmail": "arjun.k@gptcpmna.edu.in",
+      "publicPhone": "+91 9847 000111",
+      "photoUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80",
+      "type": "Executive Committee",
+      "status": "Published",
+      "displayOrder": 3
+    },
+    {
+      "id": "com-004",
+      "name": "Ananya S",
+      "position": "Media & Communications Lead",
+      "department": "Civil Engineering",
+      "academicYear": "2025 - 2026",
+      "bio": "Creative designer and publicist managing event brochures, photography documentation, social outreach, and community engagement.",
+      "linkedinUrl": "https://linkedin.com/in/ananya-s",
+      "publicEmail": "ananya.s@gptcpmna.edu.in",
+      "publicPhone": "",
+      "photoUrl": "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&auto=format&fit=crop&q=80",
+      "type": "Executive Committee",
+      "status": "Published",
+      "displayOrder": 4
+    }
+  ],
+  "facultyCoordinators": [
+    {
+      "id": "fac-001",
+      "name": "Prof. Muhammed Rashid",
+      "designation": "Nodal Officer & Lecturer",
+      "department": "Department of Electronics Engineering",
+      "bio": "State-level certified innovation ambassador with 12+ years of academic and incubation mentoring experience empowering polytechnic engineers.",
+      "email": "faculty@iedcgptcpmna.in",
+      "phone": "+91 9447 123456",
+      "photoUrl": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
+      "displayOrder": 1,
+      "isActive": true
+    },
+    {
+      "id": "fac-002",
+      "name": "Prof. Anoop K",
+      "designation": "Assistant Nodal Officer & Lecturer",
+      "department": "Department of Computer Engineering",
+      "bio": "Software architecture specialist and open-source advocate overseeing web, mobile, and cloud software development programs at IEDC.",
+      "email": "anoop.k@gptcpmna.edu.in",
+      "phone": "+91 9447 654321",
+      "photoUrl": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80",
+      "displayOrder": 2,
+      "isActive": true
+    }
+  ],
+  "partners": [
+    {
+      "id": "prt-001",
+      "name": "Kerala Startup Mission (KSUM)",
+      "logoUrl": "/ksum-logo.png",
+      "websiteUrl": "https://startupmission.kerala.gov.in",
+      "description": "Nodal agency of Govt. of Kerala for entrepreneurship development and startup incubation.",
+      "tier": "State Nodal Partner",
+      "displayOrder": 1,
+      "isActive": true
+    },
+    {
+      "id": "prt-002",
+      "name": "IEDC Kerala",
+      "logoUrl": "/iedc-logo.png",
+      "websiteUrl": "https://iedckerala.in",
+      "description": "Nurturing campus entrepreneurship & technical innovation across colleges in Kerala.",
+      "tier": "Flagship Network",
+      "displayOrder": 2,
+      "isActive": true
+    },
+    {
+      "id": "prt-003",
+      "name": "Young Innovators Programme (YIP)",
+      "logoUrl": "/yip-logo.png",
+      "websiteUrl": "https://yip.kerala.gov.in",
+      "description": "Flagship program by K-DISC to empower youth to solve real-world community problems.",
+      "tier": "Innovation Partner",
+      "displayOrder": 3,
+      "isActive": true
+    },
+    {
+      "id": "prt-004",
+      "name": "MuLearn",
+      "logoUrl": "/mulearn-logo.png",
+      "websiteUrl": "https://mulearn.org",
+      "description": "Peer-to-peer learning network empowering students with industry skills & mentorship.",
+      "tier": "Skill Partner",
+      "displayOrder": 4,
+      "isActive": true
+    }
+  ],
+  "teamMembers": [
+    {
+      "id": "lead-01",
+      "name": "ANSHADH PK",
+      "role": "Student Lead-I",
+      "category": "Student Leads",
+      "department": "Electronics Engineering",
+      "email": "panshadh@gmail.com",
+      "contact": "7034265962",
+      "showEmailPublicly": false,
+      "showContactPublicly": false,
+      "graduationDate": "31/05/2027",
+      "photoUrl": "",
+      "instagramUsername": "panshadh",
+      "instagramUrl": "https://instagram.com/panshadh",
+      "linkedinUrl": "",
+      "bio": "Student Lead-I driving campus innovation, robotics projects, and KSUM partnership programs.",
+      "displayOrder": 1,
+      "status": "Published",
+      "verificationFlag": "",
+      "createdAt": "2026-08-01T10:00:00Z",
+      "updatedAt": "2026-10-19T05:44:31.132Z"
+    },
+    {
+      "id": "lead-02",
+      "name": "FAHEEMA FARHANATH P",
+      "role": "Student Lead-II",
+      "category": "Student Leads",
+      "department": "Electrical Engineering",
+      "email": "faheemafarhanath213@gmail.com",
+      "contact": "8137815384",
+      "showEmailPublicly": false,
+      "showContactPublicly": false,
+      "graduationDate": "31/05/2027",
+      "photoUrl": "",
+      "instagramUsername": "faheemafarhanath",
+      "instagramUrl": "https://instagram.com/faheemafarhanath",
+      "linkedinUrl": "",
+      "bio": "Student Lead-II organizing student innovation tracks and inter-departmental tech workshops.",
+      "displayOrder": 2,
+      "status": "Published",
+      "verificationFlag": "",
+      "createdAt": "2026-08-01T10:00:00Z",
+      "updatedAt": "2026-10-19T05:44:31.132Z"
+    },
+    {
+      "id": "lead-03",
+      "name": "ANAGHA C",
+      "role": "Community Lead",
+      "category": "Community and Special Interest Leads",
+      "department": "Electrical Engineering",
+      "email": "canagha999@gmail.com",
+      "contact": "9746338340",
+      "showEmailPublicly": false,
+      "showContactPublicly": false,
+      "graduationDate": "31/05/2027",
+      "photoUrl": "",
+      "instagramUsername": "canagha",
+      "instagramUrl": "https://instagram.com/canagha",
+      "linkedinUrl": "",
+      "bio": "Community builder fostering open discussions, peer mentorship, and student involvement in IEDC.",
+      "displayOrder": 3,
+      "status": "Published",
+      "verificationFlag": "",
+      "createdAt": "2026-08-01T10:00:00Z",
+      "updatedAt": "2026-10-19T05:44:31.132Z"
+    },
+    {
+      "id": "lead-04",
+      "name": "NITHYA K",
+      "role": "Branding and Marketing Lead",
+      "category": "Executive Members",
+      "department": "Electronics Engineering",
+      "email": "nithyamadhavan243@gmail.com",
+      "contact": "8921242179",
+      "showEmailPublicly": false,
+      "showContactPublicly": false,
+      "graduationDate": "31/05/2027",
+      "photoUrl": "",
+      "instagramUsername": "nithyamadhavan",
+      "instagramUrl": "https://instagram.com/nithyamadhavan",
+      "linkedinUrl": "",
+      "bio": "Managing brand presence, event outreach, and visual identity for IEDC GPTC PMNA.",
+      "displayOrder": 4,
+      "status": "Published",
+      "verificationFlag": "",
+      "createdAt": "2026-08-01T10:00:00Z",
+      "updatedAt": "2026-10-19T05:44:31.132Z"
+    },
+    {
+      "id": "lead-05",
+      "name": "MUHAMMED NAHAN KC",
+      "role": "Quality and Operations Lead",
+      "category": "Executive Members",
+      "department": "Mechanical Engineering",
+      "email": "nahansamad@gmail.com",
+      "contact": "9738400700",
+      "showEmailPublicly": false,
+      "showContactPublicly": false,
+      "graduationDate": "31/05/2027",
+      "photoUrl": "",
+      "instagramUsername": "nahansamad",
+      "instagramUrl": "https://instagram.com/nahansamad",
+      "linkedinUrl": "",
+      "bio": "Overseeing operations, venue arrangements, event quality standards, and logistics.",
+      "displayOrder": 7,
+      "status": "Published",
+      "verificationFlag": "Typo in source image: nahansamad@gmail.com.com; normalized to nahansamad@gmail.com. Please verify.",
+      "createdAt": "2026-08-01T10:00:00Z",
+      "updatedAt": "2026-10-19T05:44:31.132Z"
+    },
+    {
+      "id": "lead-06",
+      "name": "NOURIN JINAN",
+      "role": "Women Innovation Lead",
+      "category": "Community and Special Interest Leads",
+      "department": "Electronics Engineering",
+      "email": "nourinjinan@gmail.com",
+      "contact": "9539738278",
+      "showEmailPublicly": false,
+      "showContactPublicly": false,
+      "graduationDate": "31/05/2027",
+      "photoUrl": "",
+      "instagramUsername": "nourinjinan",
+      "instagramUrl": "https://instagram.com/nourinjinan",
+      "linkedinUrl": "",
+      "bio": "Championing women in technology, organizing leadership workshops, and encouraging female innovators.",
+      "displayOrder": 5,
+      "status": "Published",
+      "verificationFlag": "",
+      "createdAt": "2026-08-01T10:00:00Z",
+      "updatedAt": "2026-10-19T05:44:31.132Z"
+    },
+    {
+      "id": "lead-07",
+      "name": "FARHAN. E. K",
+      "role": "Finance Lead",
+      "category": "Executive Members",
+      "department": "Electrical Engineering",
+      "email": "zafrane953@gmail.com",
+      "contact": "8848807212",
+      "showEmailPublicly": false,
+      "showContactPublicly": false,
+      "graduationDate": "31/05/2028",
+      "photoUrl": "",
+      "instagramUsername": "zafrane",
+      "instagramUrl": "https://instagram.com/zafrane",
+      "linkedinUrl": "",
+      "bio": "Managing event financial planning, budget allocations, sponsorships, and transparency.",
+      "displayOrder": 6,
+      "status": "Published",
+      "verificationFlag": "",
+      "createdAt": "2026-08-01T10:00:00Z",
+      "updatedAt": "2026-10-19T05:44:31.132Z"
+    },
+    {
+      "id": "lead-08",
+      "name": "ASWIN . K",
+      "role": "IPR and Research Lead",
+      "category": "Executive Members",
+      "department": "Electronics Engineering",
+      "email": "aswink4814@gmail.com",
+      "contact": "8848934814",
+      "showEmailPublicly": false,
+      "showContactPublicly": false,
+      "graduationDate": "31/05/2028",
+      "photoUrl": "",
+      "instagramUsername": "aswink4814",
+      "instagramUrl": "https://instagram.com/aswink4814",
+      "linkedinUrl": "",
+      "bio": "Helping students research intellectual property, patent documentation, and technical papers.",
+      "displayOrder": 8,
+      "status": "Published",
+      "verificationFlag": "",
+      "createdAt": "2026-08-01T10:00:00Z",
+      "updatedAt": "2026-10-19T05:44:31.132Z"
+    },
+    {
+      "id": "lead-09",
+      "name": "MUHAMMED HASHIR K",
+      "role": "Creative and Innovation Lead",
+      "category": "Executive Members",
+      "department": "Electronics Engineering",
+      "email": "muhdhashir2007@gmail.com",
+      "contact": "8075314188",
+      "showEmailPublicly": false,
+      "showContactPublicly": false,
+      "graduationDate": "31/05/2028",
+      "photoUrl": "",
+      "instagramUsername": "muhdhashir",
+      "instagramUrl": "https://instagram.com/muhdhashir",
+      "linkedinUrl": "",
+      "bio": "Creative direction, visual storytelling, multimedia content, and design thinking lead.",
+      "displayOrder": 9,
+      "status": "Published",
+      "verificationFlag": "",
+      "createdAt": "2026-08-01T10:00:00Z",
+      "updatedAt": "2026-10-19T05:44:31.132Z"
+    },
+    {
+      "id": "lead-10",
+      "name": "A.ABHIJITH",
+      "role": "Technology Lead",
+      "category": "Executive Members",
+      "department": "Mechanical Engineering",
+      "email": "abhidoes10207@gmail.com",
+      "contact": "INCOMPLETE (8...)",
+      "showEmailPublicly": false,
+      "showContactPublicly": false,
+      "graduationDate": "31/05/2028",
+      "photoUrl": "",
+      "instagramUsername": "abhidoes",
+      "instagramUrl": "https://instagram.com/abhidoes",
+      "linkedinUrl": "",
+      "bio": "Technical infrastructure, hardware maker lab activities, and software deployment lead.",
+      "displayOrder": 10,
+      "status": "Published",
+      "verificationFlag": "Contact number incomplete in reference sheet (starts with 8...). Please update via admin panel.",
+      "createdAt": "2026-08-01T10:00:00Z",
+      "updatedAt": "2026-10-19T05:44:31.132Z"
+    }
+  ],
+  "notifications": [
+    {
+      "id": "notif-001",
+      "title": "Welcome to IEDC Admin CMS",
+      "message": "System separated into Public Frontend and Private Admin Backend. Full CRUD active.",
+      "targetAudience": "All",
+      "isRead": false,
+      "sentBy": "System",
+      "createdAt": "2026-08-18T12:00:00Z"
+    }
+  ],
+  "auditLogs": [
+    {
+      "id": "log-1792388671135-3e2s",
+      "userId": "usr-studentlead-01",
+      "userName": "System / Anonymous",
+      "userRole": "student_lead",
+      "action": "TEAM_REORDER",
+      "details": "Reordered 10 team members",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T05:44:31.135Z"
+    },
+    {
+      "id": "log-1792388669390-dqti",
+      "userId": "usr-studentlead-01",
+      "userName": "System / Anonymous",
+      "userRole": "student_lead",
+      "action": "TEAM_REORDER",
+      "details": "Reordered 10 team members",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T05:44:29.390Z"
+    },
+    {
+      "id": "log-1792388608948-b0x5",
+      "userId": "usr-studentlead-01",
+      "userName": "System / Anonymous",
+      "userRole": "student_lead",
+      "action": "TEAM_MEMBER_UPDATE",
+      "details": "Updated team member: A.ABHIJITH",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T05:43:28.948Z"
+    },
+    {
+      "id": "log-1792388050209-28qt",
+      "userId": "usr-studentlead-01",
+      "userName": "System / Anonymous",
+      "userRole": "student_lead",
+      "action": "ADMIN_LOGIN_SUCCESS",
+      "details": "User Rahul V logged in via student_lead",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T05:34:10.209Z"
+    },
+    {
+      "id": "log-1792386172607-r67w",
+      "userId": "usr-studentlead-01",
+      "userName": "System / Anonymous",
+      "userRole": "student_lead",
+      "action": "ADMIN_LOGIN_SUCCESS",
+      "details": "User Rahul V logged in via student_lead",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T05:02:52.607Z"
+    },
+    {
+      "id": "log-1792381829257-81b9",
+      "userId": "usr-faculty-01",
+      "userName": "System / Anonymous",
+      "userRole": "faculty_coordinator",
+      "action": "ADMIN_LOGIN_SUCCESS",
+      "details": "User Prof. Muhammed Rashid logged in via faculty_coordinator",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T03:50:29.257Z"
+    },
+    {
+      "id": "log-001",
+      "userId": "usr-faculty-01",
+      "userName": "Prof. Muhammed Rashid",
+      "userRole": "faculty_coordinator",
+      "action": "SYSTEM_INITIALIZE",
+      "details": "Restructured architecture into Public Frontend and Private Admin Backend.",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-08-18T12:00:00Z"
+    }
+  ]
+}

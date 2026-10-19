@@ -1,0 +1,627 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useAdmin } from '@/context/AdminContext';
+import {
+  Calendar,
+  Plus,
+  Search,
+  Filter,
+  Edit3,
+  Trash2,
+  Copy,
+  Eye,
+  CheckCircle2,
+  XCircle,
+  FileText,
+  MapPin,
+  Clock,
+  Users,
+  Award,
+  Upload,
+  ArrowUpRight,
+  Sparkles
+} from 'lucide-react';
+
+export default function AdminEventsPage() {
+  const { addToast } = useAdmin();
+  const [events, setEvents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState('All');
+  const [filterStatus, setFilterStatus] = useState('All');
+
+  // Modal State
+  const [showModal, setShowModal] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<any>(null);
+  const [formData, setFormData] = useState({
+    title: '',
+    category: 'Hackathon',
+    level: 'College',
+    date: new Date().toISOString().split('T')[0],
+    time: '10:00 AM - 04:00 PM',
+    venue: 'Main Auditorium',
+    description: '',
+    speaker: '',
+    totalSeats: 60,
+    seatsAvailable: 60,
+    bannerImage: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&auto=format&fit=crop&q=80',
+    brochureUrl: '',
+    registrationOpen: true,
+    certificateEligible: true,
+    status: 'Published',
+    facultyCoordinator: 'Prof. Muhammed Rashid',
+    studentCoordinator: 'Rahul V'
+  });
+
+  const loadEvents = () => {
+    setLoading(true);
+    fetch('/api/admin/events')
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && json.data) {
+          setEvents(json.data);
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadEvents();
+  }, []);
+
+  const openCreateModal = () => {
+    setEditingEvent(null);
+    setFormData({
+      title: '',
+      category: 'Hackathon',
+      level: 'State',
+      date: new Date().toISOString().split('T')[0],
+      time: '09:00 AM - 05:00 PM',
+      venue: 'Main Auditorium & ICFC Lab',
+      description: '',
+      speaker: '',
+      totalSeats: 100,
+      seatsAvailable: 100,
+      bannerImage: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&auto=format&fit=crop&q=80',
+      brochureUrl: '',
+      registrationOpen: true,
+      certificateEligible: true,
+      status: 'Published',
+      facultyCoordinator: 'Prof. Muhammed Rashid',
+      studentCoordinator: 'Rahul V'
+    });
+    setShowModal(true);
+  };
+
+  const openEditModal = (evt: any) => {
+    setEditingEvent(evt);
+    setFormData({
+      title: evt.title,
+      category: evt.category || 'Workshop',
+      level: evt.level || 'College',
+      date: evt.date,
+      time: evt.time || '10:00 AM - 04:00 PM',
+      venue: evt.venue,
+      description: evt.description || '',
+      speaker: evt.speaker || '',
+      totalSeats: evt.totalSeats || 60,
+      seatsAvailable: evt.seatsAvailable || 60,
+      bannerImage: evt.bannerImage || '',
+      brochureUrl: evt.brochureUrl || '',
+      registrationOpen: evt.registrationOpen ?? true,
+      certificateEligible: evt.certificateEligible ?? true,
+      status: evt.status || 'Published',
+      facultyCoordinator: evt.facultyCoordinator || '',
+      studentCoordinator: evt.studentCoordinator || ''
+    });
+    setShowModal(true);
+  };
+
+  const handleDuplicate = async (evt: any) => {
+    const dupPayload = {
+      ...evt,
+      title: `${evt.title} (Copy)`,
+      status: 'Draft'
+    };
+    delete dupPayload.id;
+
+    try {
+      const res = await fetch('/api/admin/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dupPayload)
+      });
+      if (res.ok) {
+        addToast('Event Duplicated', `Created draft copy of ${evt.title}`, 'success');
+        loadEvents();
+      }
+    } catch (err: any) {
+      addToast('Error', err.message, 'error');
+    }
+  };
+
+  const handleTogglePublish = async (evt: any) => {
+    const newStatus = evt.status === 'Published' ? 'Draft' : 'Published';
+    try {
+      const res = await fetch('/api/admin/events', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: evt.id, status: newStatus })
+      });
+      if (res.ok) {
+        addToast('Status Updated', `Event marked as ${newStatus}`, 'info');
+        loadEvents();
+      }
+    } catch (err: any) {
+      addToast('Error', err.message, 'error');
+    }
+  };
+
+  const handleDelete = async (id: string, title: string) => {
+    if (!confirm(`Are you sure you want to delete event "${title}"?`)) return;
+
+    try {
+      const res = await fetch(`/api/admin/events?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        addToast('Event Deleted', `Removed ${title} from database.`, 'info');
+        loadEvents();
+      }
+    } catch (err: any) {
+      addToast('Error', err.message, 'error');
+    }
+  };
+
+  const handleSubmitForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    try {
+      if (editingEvent) {
+        const res = await fetch('/api/admin/events', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: editingEvent.id, ...formData })
+        });
+        if (res.ok) {
+          addToast('Event Updated', `Saved changes to ${formData.title}`, 'success');
+          setShowModal(false);
+          loadEvents();
+        }
+      } else {
+        const res = await fetch('/api/admin/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        });
+        if (res.ok) {
+          addToast('Event Created', `Created new event: ${formData.title}`, 'success');
+          setShowModal(false);
+          loadEvents();
+        }
+      }
+    } catch (err: any) {
+      addToast('Error', err.message, 'error');
+    }
+  };
+
+  // Filtered Events
+  const filteredEvents = events.filter((e) => {
+    const matchesSearch =
+      e.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      e.venue?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      e.speaker?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = filterCategory === 'All' || e.category === filterCategory;
+    const matchesStatus = filterStatus === 'All' || e.status === filterStatus;
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
+
+  return (
+    <div className="space-y-6">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+        <div>
+          <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block mb-1">
+            MODULE 04 / EVENT MANAGEMENT
+          </span>
+          <h1 className="text-2xl font-black text-white">Events &amp; Workshops</h1>
+          <p className="text-slate-400 text-xs">
+            Create, duplicate, publish, manage brochures, and oversee registration seat caps for college and state events.
+          </p>
+        </div>
+
+        <button
+          onClick={openCreateModal}
+          className="px-5 py-2.5 rounded-xl bg-white text-black font-extrabold text-xs flex items-center gap-2 hover:bg-slate-200 cursor-pointer shadow-sm transition-all"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Add New Event</span>
+        </button>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="p-4 rounded-2xl bg-[#121216] border border-white/10 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search by title, speaker, or venue..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-[#18181D] border border-white/10 focus:border-white/30 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <select
+            value={filterCategory}
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none"
+          >
+            <option value="All">All Categories</option>
+            <option value="Hackathon">Hackathon</option>
+            <option value="Workshop">Workshop</option>
+            <option value="Seminar">Seminar</option>
+            <option value="Bootcamp">Bootcamp</option>
+            <option value="Competition">Competition</option>
+            <option value="State Program">State Program</option>
+          </select>
+
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none"
+          >
+            <option value="All">All Statuses</option>
+            <option value="Published">Published</option>
+            <option value="Draft">Draft</option>
+            <option value="Archived">Archived</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Events Table */}
+      <div className="rounded-3xl bg-[#121216] border border-white/10 overflow-hidden shadow-xl">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-[#18181E] border-b border-white/10 text-[10px] font-mono uppercase tracking-wider text-slate-400">
+              <tr>
+                <th className="py-3.5 px-4 font-bold">Event Details</th>
+                <th className="py-3.5 px-4 font-bold">Date &amp; Venue</th>
+                <th className="py-3.5 px-4 font-bold">Seats</th>
+                <th className="py-3.5 px-4 font-bold">Brochure</th>
+                <th className="py-3.5 px-4 font-bold">Status</th>
+                <th className="py-3.5 px-4 font-bold text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5 text-slate-300">
+              {filteredEvents.length > 0 ? (
+                filteredEvents.map((evt) => (
+                  <tr key={evt.id} className="hover:bg-white/[0.02] transition-colors">
+                    <td className="py-4 px-4">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={evt.bannerImage || '/campus-main.jpeg'}
+                          alt=""
+                          className="w-12 h-10 object-cover rounded-lg border border-white/10 shrink-0"
+                        />
+                        <div>
+                          <div className="font-bold text-white text-sm">{evt.title}</div>
+                          <div className="text-[11px] text-slate-400 flex items-center gap-2 mt-0.5">
+                            <span className="font-mono text-slate-400">{evt.category}</span>
+                            <span>•</span>
+                            <span>{evt.level} Level</span>
+                            {evt.speaker && (
+                              <>
+                                <span>•</span>
+                                <span className="truncate max-w-[150px]">By {evt.speaker}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td className="py-4 px-4 space-y-1">
+                      <div className="flex items-center gap-1.5 text-white font-medium">
+                        <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                        <span>{evt.date}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-slate-400 text-[11px]">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                        <span className="truncate max-w-[140px]">{evt.venue}</span>
+                      </div>
+                    </td>
+
+                    <td className="py-4 px-4">
+                      <div className="font-mono font-bold text-white">
+                        {evt.seatsAvailable} / {evt.totalSeats}
+                      </div>
+                      <span className="text-[10px] text-slate-400">Available</span>
+                    </td>
+
+                    <td className="py-4 px-4">
+                      {evt.brochureUrl ? (
+                        <a
+                          href={evt.brochureUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white text-[11px] font-mono border border-white/10"
+                        >
+                          <FileText className="w-3.5 h-3.5 text-amber-400" />
+                          <span>PDF</span>
+                        </a>
+                      ) : (
+                        <span className="text-slate-400 text-[11px]">None</span>
+                      )}
+                    </td>
+
+                    <td className="py-4 px-4">
+                      <button
+                        onClick={() => handleTogglePublish(evt)}
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold border cursor-pointer transition-all ${
+                          evt.status === 'Published'
+                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30 hover:bg-emerald-500/25'
+                            : 'bg-slate-500/15 text-slate-300 border-slate-500/30 hover:bg-slate-500/25'
+                        }`}
+                      >
+                        {evt.status === 'Published' ? '● Published' : '○ Draft'}
+                      </button>
+                    </td>
+
+                    <td className="py-4 px-4 text-right space-x-1.5 whitespace-nowrap">
+                      <button
+                        onClick={() => handleDuplicate(evt)}
+                        title="Duplicate Event"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                      >
+                        <Copy className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => openEditModal(evt)}
+                        title="Edit Event"
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(evt.id, evt.title)}
+                        title="Delete Event"
+                        className="p-1.5 rounded-lg text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="py-12 text-center text-slate-400">
+                    {loading ? 'Loading events...' : 'No events match the search or filter.'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Create / Edit Modal */}
+      {showModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-2xl bg-[#121216] border border-white/15 rounded-3xl p-6 sm:p-8 space-y-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-white/10 pb-4">
+              <div>
+                <h3 className="text-lg font-bold text-white">
+                  {editingEvent ? 'Edit Event Details' : 'Create New Event / Workshop'}
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Fill in event schedule, seat limit, poster banner, and brochure link.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-slate-400 hover:text-white text-lg p-1"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitForm} className="space-y-4 text-xs">
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Event Title</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. GPTC PMNA State Hackathon 2026"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Category</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                    className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white"
+                  >
+                    <option value="Hackathon">Hackathon</option>
+                    <option value="Workshop">Workshop</option>
+                    <option value="Seminar">Seminar</option>
+                    <option value="Bootcamp">Bootcamp</option>
+                    <option value="Competition">Competition</option>
+                    <option value="State Program">State Program</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Level</label>
+                  <select
+                    value={formData.level}
+                    onChange={(e) => setFormData({ ...formData, level: e.target.value })}
+                    className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white"
+                  >
+                    <option value="College">College</option>
+                    <option value="State">State</option>
+                    <option value="National">National</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white"
+                  >
+                    <option value="Published">Published</option>
+                    <option value="Draft">Draft</option>
+                    <option value="Archived">Archived</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Date</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.date}
+                    onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                    className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Time Range</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="09:00 AM - 05:00 PM"
+                    value={formData.time}
+                    onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                    className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Venue</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Main Auditorium & ICFC Lab"
+                  value={formData.venue}
+                  onChange={(e) => setFormData({ ...formData, venue: e.target.value })}
+                  className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Description</label>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="Comprehensive event details..."
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full bg-[#18181D] border border-white/10 rounded-xl p-3 text-xs text-white"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Speaker / Mentor</label>
+                  <input
+                    type="text"
+                    placeholder="Er. Mohammed Shafi"
+                    value={formData.speaker}
+                    onChange={(e) => setFormData({ ...formData, speaker: e.target.value })}
+                    className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Total Seats Cap</label>
+                  <input
+                    type="number"
+                    required
+                    value={formData.totalSeats}
+                    onChange={(e) => setFormData({ ...formData, totalSeats: Number(e.target.value), seatsAvailable: Number(e.target.value) })}
+                    className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Banner Image URL</label>
+                  <input
+                    type="text"
+                    value={formData.bannerImage}
+                    onChange={(e) => setFormData({ ...formData, bannerImage: e.target.value })}
+                    className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Brochure PDF URL</label>
+                  <input
+                    type="text"
+                    placeholder="/brochures/hackathon-2026.pdf"
+                    value={formData.brochureUrl}
+                    onChange={(e) => setFormData({ ...formData, brochureUrl: e.target.value })}
+                    className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <label className="flex items-center gap-2 cursor-pointer text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={formData.registrationOpen}
+                    onChange={(e) => setFormData({ ...formData, registrationOpen: e.target.checked })}
+                    className="rounded text-white"
+                  />
+                  <span>Registration Open</span>
+                </label>
+
+                <label className="flex items-center gap-2 cursor-pointer text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={formData.certificateEligible}
+                    onChange={(e) => setFormData({ ...formData, certificateEligible: e.target.checked })}
+                    className="rounded text-white"
+                  />
+                  <span>Certificate Eligible</span>
+                </label>
+              </div>
+
+              <div className="flex gap-2 pt-4 border-t border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold text-xs"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 rounded-xl bg-white text-black hover:bg-slate-200 font-extrabold text-xs"
+                >
+                  {editingEvent ? 'Save Changes' : 'Create & Publish'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
