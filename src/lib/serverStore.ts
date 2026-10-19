@@ -1,6 +1,24 @@
 import fs from 'fs';
 import path from 'path';
 import { supabase } from '@/lib/supabase';
+import {
+  syncEventToSupabase,
+  deleteEventFromSupabase,
+  syncTeamMemberToSupabase,
+  deleteTeamMemberFromSupabase,
+  syncCertificateToSupabase,
+  deleteCertificateFromSupabase,
+  syncProjectToSupabase,
+  deleteProjectFromSupabase,
+  syncGalleryToSupabase,
+  deleteGalleryFromSupabase,
+  syncResourceToSupabase,
+  syncBlogToSupabase,
+  syncAnnouncementToSupabase,
+  syncStartupToSupabase,
+  syncSettingsToSupabase,
+  syncAuditLogToSupabase
+} from './supabaseSync';
 
 const DB_FILE = path.join(process.cwd(), 'src', 'data', 'db.json');
 
@@ -53,6 +71,7 @@ export function addAuditLog(action: string, user: { id?: string; name?: string; 
   db.auditLogs.unshift(logEntry);
   if (db.auditLogs.length > 500) db.auditLogs.pop();
   saveDb(db);
+  syncAuditLogToSupabase(logEntry).catch(() => {});
   return logEntry;
 }
 
@@ -160,6 +179,7 @@ export function updateSettings(newSettings: any, user: AuthUser) {
   const db = loadDb();
   db.settings = { ...db.settings, ...newSettings };
   saveDb(db);
+  syncSettingsToSupabase(db.settings).catch(() => {});
   addAuditLog('SETTINGS_UPDATE', user, 'Updated site CMS and Homepage settings');
   return db.settings;
 }
@@ -203,6 +223,7 @@ export function createEvent(eventData: any, user: AuthUser) {
   };
   db.events.unshift(newEvt);
   saveDb(db);
+  syncEventToSupabase(newEvt, false).catch(() => {});
   addAuditLog('EVENT_CREATE', user, `Created event: ${newEvt.title}`);
   return newEvt;
 }
@@ -213,6 +234,7 @@ export function updateEvent(id: string, updates: any, user: AuthUser) {
   if (idx === -1) return null;
   db.events[idx] = { ...db.events[idx], ...updates, updatedAt: new Date().toISOString() };
   saveDb(db);
+  syncEventToSupabase(db.events[idx], true).catch(() => {});
   addAuditLog('EVENT_UPDATE', user, `Updated event: ${db.events[idx].title}`);
   return db.events[idx];
 }
@@ -222,6 +244,7 @@ export function deleteEvent(id: string, user: AuthUser) {
   const item = (db.events || []).find((e: any) => e.id === id);
   db.events = (db.events || []).filter((e: any) => e.id !== id);
   saveDb(db);
+  deleteEventFromSupabase(id).catch(() => {});
   if (item) addAuditLog('EVENT_DELETE', user, `Deleted event: ${item.title}`);
   return true;
 }
@@ -311,6 +334,7 @@ export function createCertificate(certData: any, user: AuthUser) {
   };
   db.certificates.unshift(newCert);
   saveDb(db);
+  syncCertificateToSupabase(newCert, false).catch(() => {});
   addAuditLog('CERTIFICATE_ISSUE', user, `Issued certificate ${certIdStr} to ${newCert.participantName}`);
   return newCert;
 }
@@ -346,6 +370,7 @@ export function bulkCreateCertificates(records: any[], user: AuthUser) {
   });
 
   saveDb(db);
+  createdList.forEach((c) => syncCertificateToSupabase(c, false).catch(() => {}));
   addAuditLog('CERTIFICATES_BULK_ISSUE', user, `Batch issued ${createdList.length} certificates.`);
   return createdList;
 }
@@ -356,6 +381,7 @@ export function updateCertificate(id: string, updates: any, user: AuthUser) {
   if (idx === -1) return null;
   db.certificates[idx] = { ...db.certificates[idx], ...updates };
   saveDb(db);
+  syncCertificateToSupabase(db.certificates[idx], true).catch(() => {});
   addAuditLog('CERTIFICATE_UPDATE', user, `Updated certificate ${db.certificates[idx].certificateId}`);
   return db.certificates[idx];
 }
@@ -365,6 +391,7 @@ export function deleteCertificate(id: string, user: AuthUser) {
   const item = (db.certificates || []).find((c: any) => c.id === id || c.certificateId === id);
   db.certificates = (db.certificates || []).filter((c: any) => c.id !== id && c.certificateId !== id);
   saveDb(db);
+  deleteCertificateFromSupabase(id).catch(() => {});
   if (item) addAuditLog('CERTIFICATE_DELETE', user, `Deleted certificate ${item.certificateId}`);
   return true;
 }
@@ -454,6 +481,7 @@ export function createGalleryItem(data: any, user: AuthUser) {
   };
   db.gallery.unshift(newItem);
   saveDb(db);
+  syncGalleryToSupabase(newItem, false).catch(() => {});
   addAuditLog('GALLERY_UPLOAD', user, `Uploaded gallery item: ${newItem.title}`);
   return newItem;
 }
@@ -464,6 +492,7 @@ export function updateGalleryItem(id: string, updates: any, user: AuthUser) {
   if (idx === -1) return null;
   db.gallery[idx] = { ...db.gallery[idx], ...updates };
   saveDb(db);
+  syncGalleryToSupabase(db.gallery[idx], true).catch(() => {});
   addAuditLog('GALLERY_UPDATE', user, `Updated gallery item: ${db.gallery[idx].title}`);
   return db.gallery[idx];
 }
@@ -472,6 +501,7 @@ export function deleteGalleryItem(id: string, user: AuthUser) {
   const db = loadDb();
   db.gallery = (db.gallery || []).filter((g: any) => g.id !== id);
   saveDb(db);
+  deleteGalleryFromSupabase(id).catch(() => {});
   addAuditLog('GALLERY_DELETE', user, `Deleted gallery item ${id}`);
   return true;
 }
@@ -512,6 +542,7 @@ export function createProject(data: any, user: AuthUser) {
   };
   db.projects.unshift(newProj);
   saveDb(db);
+  syncProjectToSupabase(newProj, false).catch(() => {});
   addAuditLog('PROJECT_CREATE', user, `Created project: ${newProj.title}`);
   return newProj;
 }
@@ -522,6 +553,7 @@ export function updateProject(id: string, updates: any, user: AuthUser) {
   if (idx === -1) return null;
   db.projects[idx] = { ...db.projects[idx], ...updates };
   saveDb(db);
+  syncProjectToSupabase(db.projects[idx], true).catch(() => {});
   addAuditLog('PROJECT_UPDATE', user, `Updated project: ${db.projects[idx].title}`);
   return db.projects[idx];
 }
@@ -530,6 +562,7 @@ export function deleteProject(id: string, user: AuthUser) {
   const db = loadDb();
   db.projects = (db.projects || []).filter((p: any) => p.id !== id);
   saveDb(db);
+  deleteProjectFromSupabase(id).catch(() => {});
   addAuditLog('PROJECT_DELETE', user, `Deleted project: ${id}`);
   return true;
 }
@@ -858,6 +891,7 @@ export function createTeamMember(data: any, user: AuthUser) {
 
   db.teamMembers.push(newMember);
   saveDb(db);
+  syncTeamMemberToSupabase(newMember, false).catch(() => {});
   addAuditLog('TEAM_MEMBER_CREATE', user, `Added team member: ${newMember.name} (${newMember.role})`);
   return newMember;
 }
@@ -891,6 +925,7 @@ export function updateTeamMember(id: string, updates: any, user: AuthUser) {
   };
 
   saveDb(db);
+  syncTeamMemberToSupabase(db.teamMembers[idx], true).catch(() => {});
   addAuditLog('TEAM_MEMBER_UPDATE', user, `Updated team member: ${db.teamMembers[idx].name}`);
   return db.teamMembers[idx];
 }
@@ -902,6 +937,7 @@ export function deleteTeamMember(id: string, user: AuthUser) {
   const member = db.teamMembers.find((m: any) => m.id === id);
   db.teamMembers = db.teamMembers.filter((m: any) => m.id !== id);
   saveDb(db);
+  deleteTeamMemberFromSupabase(id).catch(() => {});
   if (member) {
     addAuditLog('TEAM_MEMBER_DELETE', user, `Deleted team member: ${member.name}`);
   }
@@ -1152,6 +1188,7 @@ export function createStartup(data: any, user: AuthUser) {
   };
   db.startups.unshift(newStartup);
   saveDb(db);
+  syncStartupToSupabase(newStartup, false).catch(() => {});
   addAuditLog('STARTUP_ADD', user, `Added startup: ${newStartup.name}`);
   return newStartup;
 }
@@ -1179,6 +1216,7 @@ export function createResource(data: any, user: AuthUser) {
   };
   db.resources.unshift(newRes);
   saveDb(db);
+  syncResourceToSupabase(newRes, false).catch(() => {});
   addAuditLog('RESOURCE_UPLOAD', user, `Uploaded resource: ${newRes.title}`);
   return newRes;
 }
@@ -1207,6 +1245,7 @@ export function createBlog(data: any, user: AuthUser) {
   };
   db.blogs.unshift(newBlog);
   saveDb(db);
+  syncBlogToSupabase(newBlog, false).catch(() => {});
   addAuditLog('BLOG_CREATE', user, `Created blog post: ${newBlog.title}`);
   return newBlog;
 }
@@ -1230,6 +1269,7 @@ export function createAnnouncement(data: any, user: AuthUser) {
   };
   db.announcements.unshift(newAnn);
   saveDb(db);
+  syncAnnouncementToSupabase(newAnn, false).catch(() => {});
   addAuditLog('ANNOUNCEMENT_CREATE', user, `Broadcast announcement: ${newAnn.title}`);
   return newAnn;
 }

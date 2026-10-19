@@ -17,13 +17,18 @@ export async function POST(req: NextRequest) {
     const file = formData.get('file') as File | null;
     const folder = (formData.get('folder') as string) || 'team';
 
+    const isDoc = ['documents', 'brochures', 'certificates'].includes(folder);
+    const allowedTypes = isDoc
+      ? [...ALLOWED_MIME_TYPES, 'application/pdf']
+      : ALLOWED_MIME_TYPES;
+
     if (!file) {
       return NextResponse.json({ success: false, error: 'No file provided' }, { status: 400 });
     }
 
-    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+    if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
-        { success: false, error: 'Invalid file format. Only JPG, PNG, and WebP images are allowed.' },
+        { success: false, error: `Invalid file format. ${isDoc ? 'Only JPG, PNG, WebP and PDF files' : 'Only JPG, PNG, and WebP images'} are allowed.` },
         { status: 400 }
       );
     }
@@ -37,9 +42,19 @@ export async function POST(req: NextRequest) {
 
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    const extension = path.extname(file.name) || '.jpg';
+    const extension = path.extname(file.name) || (file.type === 'application/pdf' ? '.pdf' : '.jpg');
     const cleanBase = path.basename(file.name, extension).replace(/[^a-zA-Z0-9_-]/g, '_');
     const filename = `${cleanBase}_${Date.now()}${extension}`;
+
+    const bucketMap: Record<string, string> = {
+      team: 'team-photos',
+      events: 'event-posters',
+      gallery: 'gallery',
+      documents: 'documents',
+      brochures: 'documents',
+      certificates: 'certificates'
+    };
+    const bucket = (formData.get('bucket') as string) || bucketMap[folder] || 'team-photos';
 
     let publicUrl = '';
 
@@ -47,7 +62,7 @@ export async function POST(req: NextRequest) {
     if (isSupabaseConfigured()) {
       try {
         const { data, error } = await supabase.storage
-          .from('team-photos')
+          .from(bucket)
           .upload(`${folder}/${filename}`, buffer, {
             contentType: file.type,
             upsert: true
@@ -55,7 +70,7 @@ export async function POST(req: NextRequest) {
 
         if (!error && data) {
           const { data: publicData } = supabase.storage
-            .from('team-photos')
+            .from(bucket)
             .getPublicUrl(`${folder}/${filename}`);
           publicUrl = publicData.publicUrl;
         }

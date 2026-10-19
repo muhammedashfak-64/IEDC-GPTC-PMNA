@@ -77,6 +77,28 @@
   ],
   "events": [
     {
+      "id": "evt-1792391821624",
+      "title": "AI & Quantum Computing Workshop 2026",
+      "category": "Workshop",
+      "level": "State",
+      "date": "2026-10-19",
+      "time": "09:00 AM - 05:00 PM",
+      "venue": "Main Seminar Hall",
+      "description": "Cutting-edge workshop on AI and Quantum Computing for students and innovators.",
+      "speaker": "Dr. K. S. Menon",
+      "totalSeats": 75,
+      "seatsAvailable": 75,
+      "bannerImage": "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&auto=format&fit=crop&q=80",
+      "brochureUrl": "",
+      "registrationOpen": true,
+      "certificateEligible": true,
+      "status": "Published",
+      "facultyCoordinator": "Prof. Muhammed Rashid",
+      "studentCoordinator": "Rahul V",
+      "createdBy": "usr-faculty-01",
+      "createdAt": "2026-10-19T06:37:01.624Z"
+    },
+    {
       "id": "evt-001",
       "title": "GPTC PMNA State Hackathon 2026",
       "category": "Hackathon",
@@ -878,6 +900,26 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "log-1792391821630-3nsa",
+      "userId": "usr-faculty-01",
+      "userName": "System / Anonymous",
+      "userRole": "faculty_coordinator",
+      "action": "EVENT_CREATE",
+      "details": "Created event: AI & Quantum Computing Workshop 2026",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T06:37:01.630Z"
+    },
+    {
+      "id": "log-1792391587424-z849",
+      "userId": "usr-faculty-01",
+      "userName": "System / Anonymous",
+      "userRole": "faculty_coordinator",
+      "action": "ADMIN_LOGIN_SUCCESS",
+      "details": "User Prof. Muhammed Rashid logged in via faculty_coordinator",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T06:33:07.424Z"
+    },
     {
       "id": "log-1792388671135-3e2s",
       "userId": "usr-studentlead-01",

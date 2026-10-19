@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   UserPersona,
   EventItem,
@@ -213,7 +213,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   ]);
 
-  const [blogs] = useState<BlogPost[]>([
+  const [blogs, setBlogs] = useState<BlogPost[]>([
     {
       id: 'blog-1',
       title: 'How IEDC GPTC PMNA Built a State-Level IoT Winner',
@@ -244,7 +244,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   ]);
 
-  const [learningResources] = useState<LearningResource[]>([
+  const [learningResources, setLearningResources] = useState<LearningResource[]>([
     {
       id: 'lr-1',
       title: 'ESP32 Firmware Programming Guide for Diploma Students',
@@ -257,7 +257,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   ]);
 
-  const [templates] = useState<ResourceTemplate[]>([
+  const [templates, setTemplates] = useState<ResourceTemplate[]>([
     {
       id: 'tpl-1',
       title: 'Official IEDC Innovation Pitch Deck Template (PPTX)',
@@ -266,6 +266,59 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       downloadUrl: '#'
     }
   ]);
+
+  // Synchronize collections with real database & public API endpoints
+  useEffect(() => {
+    // 1. Events
+    fetch('/api/public/events')
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setEvents(res.data);
+        }
+      })
+      .catch(() => {});
+
+    // 2. Projects
+    fetch('/api/public/projects')
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setProjects(res.data);
+        }
+      })
+      .catch(() => {});
+
+    // 3. Startups
+    fetch('/api/public/startups')
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setStartups(res.data);
+        }
+      })
+      .catch(() => {});
+
+    // 4. Resources
+    fetch('/api/public/resources')
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setLearningResources(res.data);
+        }
+      })
+      .catch(() => {});
+
+    // 5. Blogs
+    fetch('/api/public/blogs')
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setBlogs(res.data);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // Toast Helper
   const addToast = (title: string, message: string, type: ToastMessage['type'] = 'info') => {
