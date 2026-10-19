@@ -33,15 +33,14 @@
     "contact": {
       "email": "iedc@gptcpmna.edu.in",
       "phone": "+91 4933 227221",
-      "altPhone": "+91 9447 123456",
       "address": "Govt Polytechnic College, Angadippuram PO, Perinthalmanna, Malappuram, Kerala 679321"
     },
     "social": {
-      "website": "https://iedcgptcpmna.in",
       "github": "https://github.com/iedc-gptc-pmna",
       "linkedin": "https://linkedin.com/company/iedc-gptc-pmna",
-      "instagram": "https://instagram.com/iedc_gptcpmna"
-    }
+      "instagram": "https://www.instagram.com/iedc_gpc_pmna?utm_source=ig_web_button_share_sheet&mdxt=ZDNlZDc0MzIxNw=="
+    },
+    "supabaseAnonKey": "okm123"
   },
   "profiles": [
     {
@@ -202,6 +201,25 @@
   ],
   "certificates": [
     {
+      "id": "cert-1792403685453-j50k",
+      "certificateId": "IEDC-2026-41296",
+      "eventId": "evt-1792391821624",
+      "eventName": "Hands-on ESP32 IoT & Embedded Robotics Bootcamp",
+      "participantName": "MUHAMMED ASHFAK",
+      "registerNumber": "2401032236",
+      "phone": "6282159152",
+      "email": "2401032236@gptcpmna.edu.in",
+      "certificateType": "Participation",
+      "eventDate": "2026-10-19",
+      "issueDate": "2026-10-19",
+      "qrCodeUrl": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/IEDC-2026-41296",
+      "pdfStorageUrl": "C:\\Users\\USER\\Desktop\\3D\\3D WORKSHOP CERTIFICATE\\GPTC PMNA",
+      "status": "Published",
+      "downloadsCount": 3,
+      "issuedBy": "usr-faculty-01",
+      "issuedAt": "2026-10-19T09:54:45.453Z"
+    },
+    {
       "id": "cert-db-001",
       "certificateId": "IEDC-2026-89412",
       "eventId": "evt-001",
@@ -301,56 +319,7 @@
       "uploadedAt": "2026-07-12T11:30:00Z"
     }
   ],
-  "gallery": [
-    {
-      "id": "gal-001",
-      "title": "Smart Campus Prototype Demonstration",
-      "albumName": "Hackathon 2026",
-      "mediaType": "Image",
-      "mediaUrl": "https://images.unsplash.com/photo-1531482615713-2afd69097998?w=1000&auto=format&fit=crop&q=80",
-      "caption": "Students presenting autonomous rover telemetry to the evaluation jury.",
-      "altText": "Diploma students with robotics prototype",
-      "status": "Published",
-      "isCover": true,
-      "createdAt": "2026-08-25T16:00:00Z"
-    },
-    {
-      "id": "gal-002",
-      "title": "Hands-on ESP32 Soldering & Circuit Testing",
-      "albumName": "IoT Bootcamp",
-      "mediaType": "Image",
-      "mediaUrl": "https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=1000&auto=format&fit=crop&q=80",
-      "caption": "Participants assembling sensor nodes and breadboards in the Maker Space.",
-      "altText": "Soldering microcontroller circuits",
-      "status": "Published",
-      "isCover": true,
-      "createdAt": "2026-09-02T14:30:00Z"
-    },
-    {
-      "id": "gal-003",
-      "title": "IEDC State Summit Delegation",
-      "albumName": "State Events",
-      "mediaType": "Image",
-      "mediaUrl": "https://images.unsplash.com/photo-1515187029135-18ee286d815b?w=1000&auto=format&fit=crop&q=80",
-      "caption": "GPTC Perinthalmanna student leaders at Kerala Startup Mission headquarters.",
-      "altText": "State summit delegation group photo",
-      "status": "Published",
-      "isCover": true,
-      "createdAt": "2026-06-20T17:00:00Z"
-    },
-    {
-      "id": "gal-004",
-      "title": "Maker Space 3D Printing Facility",
-      "albumName": "Campus Facilities",
-      "mediaType": "Image",
-      "mediaUrl": "https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=1000&auto=format&fit=crop&q=80",
-      "caption": "Precision 3D printers and CNC cutting tools available at ICFC Lab.",
-      "altText": "3D printer in action",
-      "status": "Published",
-      "isCover": false,
-      "createdAt": "2026-05-15T11:00:00Z"
-    }
-  ],
+  "gallery": [],
   "projects": [
     {
       "id": "proj-001",
@@ -601,7 +570,7 @@
   "facultyCoordinators": [
     {
       "id": "fac-001",
-      "name": "Prof. Muhammed Rashid",
+      "name": "NAJLA",
       "designation": "Nodal Officer & Lecturer",
       "department": "Department of Electronics Engineering",
       "bio": "State-level certified innovation ambassador with 12+ years of academic and incubation mentoring experience empowering polytechnic engineers.",
@@ -613,9 +582,9 @@
     },
     {
       "id": "fac-002",
-      "name": "Prof. Anoop K",
+      "name": "ANUROOP",
       "designation": "Assistant Nodal Officer & Lecturer",
-      "department": "Department of Computer Engineering",
+      "department": "Department Of Electrical And Electronics Engineering",
       "bio": "Software architecture specialist and open-source advocate overseeing web, mobile, and cloud software development programs at IEDC.",
       "email": "anoop.k@gptcpmna.edu.in",
       "phone": "+91 9447 654321",
@@ -679,15 +648,15 @@
       "showContactPublicly": false,
       "graduationDate": "31/05/2027",
       "photoUrl": "",
-      "instagramUsername": "panshadh",
-      "instagramUrl": "https://instagram.com/panshadh",
+      "instagramUsername": "an_shad_d",
+      "instagramUrl": "https://instagram.com/an_shad_d",
       "linkedinUrl": "",
       "bio": "Student Lead-I driving campus innovation, robotics projects, and KSUM partnership programs.",
       "displayOrder": 1,
       "status": "Published",
       "verificationFlag": "",
       "createdAt": "2026-08-01T10:00:00Z",
-      "updatedAt": "2026-10-19T05:44:31.132Z"
+      "updatedAt": "2026-10-19T09:51:12.793Z"
     },
     {
       "id": "lead-02",
@@ -900,6 +869,116 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "log-1792431171148-61b7",
+      "userId": "usr-faculty-01",
+      "userName": "System / Anonymous",
+      "userRole": "faculty_coordinator",
+      "action": "GALLERY_DELETE",
+      "details": "Deleted gallery item gal-003",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T17:32:51.148Z"
+    },
+    {
+      "id": "log-1792431168121-3nrq",
+      "userId": "usr-faculty-01",
+      "userName": "System / Anonymous",
+      "userRole": "faculty_coordinator",
+      "action": "GALLERY_DELETE",
+      "details": "Deleted gallery item gal-004",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T17:32:48.121Z"
+    },
+    {
+      "id": "log-1792431164457-llhk",
+      "userId": "usr-faculty-01",
+      "userName": "System / Anonymous",
+      "userRole": "faculty_coordinator",
+      "action": "GALLERY_DELETE",
+      "details": "Deleted gallery item gal-002",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T17:32:44.457Z"
+    },
+    {
+      "id": "log-1792431160565-g183",
+      "userId": "usr-faculty-01",
+      "userName": "System / Anonymous",
+      "userRole": "faculty_coordinator",
+      "action": "GALLERY_DELETE",
+      "details": "Deleted gallery item gal-001",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T17:32:40.565Z"
+    },
+    {
+      "id": "log-1792403685457-wqle",
+      "userId": "usr-faculty-01",
+      "userName": "System / Anonymous",
+      "userRole": "faculty_coordinator",
+      "action": "CERTIFICATE_ISSUE",
+      "details": "Issued certificate IEDC-2026-41296 to MUHAMMED ASHFAK",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T09:54:45.457Z"
+    },
+    {
+      "id": "log-1792403472795-u32x",
+      "userId": "usr-faculty-01",
+      "userName": "System / Anonymous",
+      "userRole": "faculty_coordinator",
+      "action": "TEAM_MEMBER_UPDATE",
+      "details": "Updated team member: ANSHADH PK",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T09:51:12.795Z"
+    },
+    {
+      "id": "log-1792402950384-fman",
+      "userId": "usr-faculty-01",
+      "userName": "System / Anonymous",
+      "userRole": "faculty_coordinator",
+      "action": "FACULTY_COORDINATOR_UPDATE",
+      "details": "Updated faculty coordinator: ANUROOP",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T09:42:30.384Z"
+    },
+    {
+      "id": "log-1792402922984-7az3",
+      "userId": "usr-faculty-01",
+      "userName": "System / Anonymous",
+      "userRole": "faculty_coordinator",
+      "action": "FACULTY_COORDINATOR_UPDATE",
+      "details": "Updated faculty coordinator: ANUROOP",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T09:42:02.984Z"
+    },
+    {
+      "id": "log-1792402865874-v2sf",
+      "userId": "usr-faculty-01",
+      "userName": "System / Anonymous",
+      "userRole": "faculty_coordinator",
+      "action": "FACULTY_COORDINATOR_UPDATE",
+      "details": "Updated faculty coordinator: ANUROOP",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T09:41:05.874Z"
+    },
+    {
+      "id": "log-1792402842695-ovc7",
+      "userId": "usr-faculty-01",
+      "userName": "System / Anonymous",
+      "userRole": "faculty_coordinator",
+      "action": "FACULTY_COORDINATOR_UPDATE",
+      "details": "Updated faculty coordinator: NAJLA",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T09:40:42.695Z"
+    },
+    {
+      "id": "log-1792402625115-fv95",
+      "userId": "usr-faculty-01",
+      "userName": "System / Anonymous",
+      "userRole": "faculty_coordinator",
+      "action": "SETTINGS_UPDATE",
+      "details": "Updated site CMS and Homepage settings",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-19T09:37:05.115Z"
+    },
     {
       "id": "log-1792391821630-3nsa",
       "userId": "usr-faculty-01",
