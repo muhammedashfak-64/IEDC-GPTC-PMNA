@@ -372,6 +372,14 @@ export default function AdminEventsPage() {
                     </td>
 
                     <td className="py-4 px-4 text-right space-x-1.5 whitespace-nowrap">
+                      <Link
+                        href={`/admin/events/${evt.id}`}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#F98A5B]/15 hover:bg-[#F98A5B]/25 text-[#F98A5B] font-bold text-xs border border-[#F98A5B]/30 transition-all mr-2"
+                        title="Open Program Workspace (Attendance, Registrations, Certificates)"
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        <span>Manage Program</span>
+                      </Link>
                       <button
                         onClick={() => handleDuplicate(evt)}
                         title="Duplicate Event"

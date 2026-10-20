@@ -47,13 +47,13 @@ export default function CertificatesDownloadPage() {
     setRetrievedCert(null);
 
     try {
-      const res = await fetch('/api/public/certificates/download', {
+      const res = await fetch('/api/public/certificates/retrieve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          eventId: selectedEventId,
-          registerNumber: regNumber,
-          mobileNumber: mobileNumber
+          event_id: selectedEventId,
+          full_name: regNumber,
+          mobile_number: mobileNumber
         })
       });
       const data = await res.json();
@@ -61,10 +61,10 @@ export default function CertificatesDownloadPage() {
       if (res.ok && data.success && data.certificate) {
         setRetrievedCert(data.certificate);
       } else {
-        setErrorMsg(data.error || 'Invalid credentials or certificate not yet published.');
+        setErrorMsg(data.error || 'No published certificate was found for the supplied details.');
       }
     } catch (err: any) {
-      setErrorMsg('Verification server error. Please try again later.');
+      setErrorMsg('No published certificate was found for the supplied details.');
     } finally {
       setLoading(false);
     }
@@ -110,19 +110,22 @@ export default function CertificatesDownloadPage() {
             </div>
           </div>
 
-          {/* 2. Registration Number */}
+          {/* 2. Full Name */}
           <div>
             <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
-              2. Enter Register Number
+              2. Full Name (as registered)
             </label>
             <input
               type="text"
               required
-              placeholder="e.g. 21051234"
+              placeholder="e.g. ADARSH P or Muhammed Ashfak O"
               value={regNumber}
               onChange={(e) => setRegNumber(e.target.value)}
-              className="w-full bg-[#18181D] border border-white/10 focus:border-white/30 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none font-mono"
+              className="w-full bg-[#18181D] border border-white/10 focus:border-white/30 rounded-xl px-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none"
             />
+            <span className="text-[10px] text-slate-400 mt-1 block">
+              Flexible matching: Case and harmless spacing differences are handled automatically.
+            </span>
           </div>
 
           {/* 3. 10-Digit Mobile Password */}

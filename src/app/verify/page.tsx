@@ -1,122 +1,151 @@
 'use client';
 
-import React, { useState } from 'react';
-import { CertificateGenerator } from '@/components/CertificateGenerator';
-import { ShieldCheck, Search, QrCode, CheckCircle2, AlertTriangle, Lock, KeyRound, Download, Share2, FileCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  ShieldCheck,
+  Search,
+  CheckCircle2,
+  AlertTriangle,
+  Download,
+  Share2,
+  FileCheck,
+  User,
+  Phone,
+  Eye,
+  Award,
+  Sparkles,
+  ExternalLink
+} from 'lucide-react';
 import Link from 'next/link';
 
 export default function VerifyPage() {
-  const [selectedProgram, setSelectedProgram] = useState('GPTC PMNA Hackathon 2026');
-  const [regNumber, setRegNumber] = useState('21051234');
-  const [phonePassword, setPhonePassword] = useState('9847123456');
+  const [programsList, setProgramsList] = useState<any[]>([]);
+  const [selectedEventId, setSelectedEventId] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [mobileNumber, setMobileNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [authenticatedCert, setAuthenticatedCert] = useState<any>(null);
 
-  const programsList = [
-    'GPTC PMNA Hackathon 2026',
-    'Hands-on IoT & Embedded Robotics Bootcamp',
-    'State-Level Idea Fest 2026',
-    'YIP 5.0 Innovation Workshop'
-  ];
+  // Load programs from database
+  useEffect(() => {
+    fetch('/api/admin/events')
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success && json.data) {
+          const published = json.data.filter((e: any) => e.status === 'Published');
+          setProgramsList(published);
+          if (published.length > 0) {
+            setSelectedEventId(published[0].id);
+          }
+        }
+      })
+      .catch(console.error);
+  }, []);
 
-  const handleAuthSubmit = async (e: React.FormEvent) => {
+  const handleSearchSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrorMessage('');
     setAuthenticatedCert(null);
 
     try {
-      const res = await fetch('/api/certificates/verify', {
+      const res = await fetch('/api/public/certificates/retrieve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          register_number: regNumber,
-          password: phonePassword
+          event_id: selectedEventId,
+          full_name: fullName,
+          mobile_number: mobileNumber
         })
       });
 
       const json = await res.json();
 
       if (!res.ok || !json.success) {
-        setErrorMessage(json.error || 'Invalid Registration Number or Password.');
+        setErrorMessage(
+          json.error || 'No published certificate was found for the supplied details.'
+        );
       } else {
         setAuthenticatedCert(json.certificate);
       }
     } catch (err: any) {
-      setErrorMessage('Verification server error. Please try again.');
+      setErrorMessage('No published certificate was found for the supplied details.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-10 min-h-screen relative z-10">
+    <div className="py-12 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto space-y-10 min-h-screen relative z-10">
       {/* Header */}
       <div className="text-center space-y-3">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#F98A5B]/15 border border-[#F98A5B]/40 text-[#F98A5B] text-xs font-mono font-bold tracking-wider uppercase">
-          <ShieldCheck className="w-4 h-4" /> Official Certificate Verification & Download Portal
+          <ShieldCheck className="w-4 h-4" /> Official Certificate Portal
         </div>
         <h1 className="text-3xl sm:text-5xl font-black text-white">Student Certificate Portal</h1>
         <p className="text-slate-300 text-sm max-w-2xl mx-auto leading-relaxed">
-          Select your event program, enter your Registration Number and 10-digit registered Mobile Number password to access and download your verified certificate.
+          Select your program, enter your full name and registered 10-digit mobile number to retrieve and download your official certificate.
         </p>
       </div>
 
       {/* Program Selector & Credentials Form */}
       <div className="max-w-2xl mx-auto glass-iedc p-8 rounded-3xl border border-white/12 shadow-2xl space-y-6">
-        <form onSubmit={handleAuthSubmit} className="space-y-4">
-          
-          {/* Program Select */}
+        <form onSubmit={handleSearchSubmit} className="space-y-4">
+          {/* 1. Program Select */}
           <div>
             <label className="text-xs font-bold text-[#F98A5B] uppercase tracking-wider block mb-1.5">
-              1. Select Program / Workshop Event
+              1. Select Program / Event
             </label>
             <select
-              value={selectedProgram}
-              onChange={(e) => setSelectedProgram(e.target.value)}
-              className="w-full bg-[#0F0F10] border border-white/20 focus:border-[#F98A5B] rounded-xl px-4 py-3 text-xs text-white focus:outline-none"
+              value={selectedEventId}
+              onChange={(e) => setSelectedEventId(e.target.value)}
+              className="w-full bg-[#0F0F10] border border-white/20 focus:border-[#F98A5B] rounded-xl px-4 py-3 text-xs text-white focus:outline-none cursor-pointer"
             >
               {programsList.map((prog) => (
-                <option key={prog} value={prog} className="bg-[#0F0F10] text-white">
-                  {prog}
+                <option key={prog.id} value={prog.id} className="bg-[#0F0F10] text-white">
+                  {prog.title} ({prog.date})
                 </option>
               ))}
             </select>
           </div>
 
-          {/* Registration Number */}
+          {/* 2. Full Name (Flexible Name Matching) */}
           <div>
             <label className="text-xs font-bold text-[#EC3A74] uppercase tracking-wider block mb-1.5">
-              2. Enter Register Number
+              2. Full Name (as registered)
             </label>
             <div className="relative">
-              <FileCheck className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+              <User className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
               <input
                 type="text"
                 required
-                placeholder="e.g. 21051234"
-                value={regNumber}
-                onChange={(e) => setRegNumber(e.target.value)}
-                className="w-full bg-[#0F0F10] border border-white/20 focus:border-[#EC3A74] rounded-xl pl-10 pr-4 py-3 text-xs text-white focus:outline-none"
+                placeholder="e.g. Muhammed Ashfak O"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                className="w-full bg-[#0F0F10] border border-white/20 focus:border-[#EC3A74] rounded-xl pl-10 pr-4 py-3 text-xs text-white focus:outline-none placeholder:text-slate-500"
               />
             </div>
+            <span className="text-[10px] text-slate-400 mt-1 block">
+              Flexible matching: Case and spacing differences are handled automatically.
+            </span>
           </div>
 
-          {/* Password (10-Digit Mobile Number) */}
+          {/* 3. Registered Mobile Number */}
           <div>
             <label className="text-xs font-bold text-[#6249A3] uppercase tracking-wider block mb-1.5">
-              3. Enter Password (Registered 10-Digit Mobile Number)
+              3. Registered Mobile Number
             </label>
             <div className="relative">
-              <KeyRound className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+              <Phone className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
               <input
-                type="password"
+                type="tel"
                 required
-                placeholder="10-digit mobile number (e.g. 9847123456)"
-                value={phonePassword}
-                onChange={(e) => setPhonePassword(e.target.value)}
-                className="w-full bg-[#0F0F10] border border-white/20 focus:border-[#6249A3] rounded-xl pl-10 pr-4 py-3 text-xs text-white focus:outline-none"
+                placeholder="10-digit registered number (e.g. 9847123456)"
+                value={mobileNumber}
+                onChange={(e) => setMobileNumber(e.target.value)}
+                maxLength={10}
+                className="w-full bg-[#0F0F10] border border-white/20 focus:border-[#6249A3] rounded-xl pl-10 pr-4 py-3 text-xs text-white focus:outline-none font-mono placeholder:text-slate-500"
               />
             </div>
           </div>
@@ -124,80 +153,93 @@ export default function VerifyPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3.5 rounded-2xl btn-primary-iedc font-black text-xs shadow-xl flex items-center justify-center gap-2 cursor-pointer transition-transform hover:scale-[1.02]"
+            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#F98A5B] to-[#EC3A74] font-black text-xs text-white shadow-xl flex items-center justify-center gap-2 cursor-pointer transition-transform hover:scale-[1.01] disabled:opacity-50"
           >
             <ShieldCheck className="w-4 h-4 text-white" />
-            <span>{loading ? 'Authenticating Credentials...' : 'Authenticate & Download Certificate'}</span>
+            <span>{loading ? 'Verifying Details...' : 'Find & Retrieve My Certificate'}</span>
           </button>
         </form>
 
         <div className="text-[11px] text-slate-400 text-center bg-white/5 p-3 rounded-2xl border border-white/10">
-          Demo Test Reg Number: <span className="font-mono text-[#F98A5B] font-bold">21051234</span> · Password: <span className="font-mono text-[#F98A5B] font-bold">9847123456</span>
+          Sample Reference Participant: <span className="text-white font-bold">ADARSH P</span> · Mobile: <span className="font-mono text-[#F98A5B] font-bold">9847112233</span>
         </div>
       </div>
 
-      {/* Error Message Alert */}
+      {/* Error Message */}
       {errorMessage && (
-        <div className="max-w-2xl mx-auto glass-iedc p-6 rounded-3xl border border-rose-500/40 text-center space-y-2">
-          <AlertTriangle className="w-10 h-10 text-rose-400 mx-auto" />
-          <h3 className="text-base font-bold text-white">Authentication Failed</h3>
-          <p className="text-xs text-rose-200">{errorMessage}</p>
+        <div className="max-w-2xl mx-auto p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 shrink-0" />
+          <span>{errorMessage}</span>
         </div>
       )}
 
-      {/* Authenticated Certificate Result */}
+      {/* Authenticated Certificate Result Card */}
       {authenticatedCert && (
-        <div className="max-w-4xl mx-auto space-y-6">
-          <div className="glass-iedc p-6 sm:p-8 rounded-3xl border border-[#F98A5B]/40 space-y-6 shadow-2xl">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/15 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-[#F98A5B]/20 border border-[#F98A5B] flex items-center justify-center">
-                  <CheckCircle2 className="w-7 h-7 text-[#F98A5B]" />
-                </div>
-                <div>
-                  <span className="px-3 py-0.5 rounded-full bg-[#F98A5B]/20 text-[#F98A5B] text-[10px] font-mono font-bold">
-                    OFFICIAL VERIFIED CERTIFICATE
-                  </span>
-                  <h3 className="text-xl font-black text-white mt-0.5">{authenticatedCert.certificate_id}</h3>
-                  <p className="text-xs text-slate-300">Issued to {authenticatedCert.participant_name} ({authenticatedCert.register_number})</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Link
-                  href={`/verify/${authenticatedCert.certificate_id}`}
-                  className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-bold text-white flex items-center gap-1.5"
-                >
-                  <QrCode className="w-4 h-4 text-[#F98A5B]" /> QR Page
-                </Link>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(authenticatedCert.verification_url || window.location.href);
-                    alert('Certificate Verification Link Copied!');
-                  }}
-                  className="px-4 py-2 rounded-xl btn-primary-iedc text-xs font-bold text-white flex items-center gap-1.5"
-                >
-                  <Share2 className="w-4 h-4" /> Share Link
-                </button>
-              </div>
+        <div className="max-w-3xl mx-auto glass-iedc p-8 rounded-3xl border border-emerald-500/30 space-y-6 shadow-2xl animate-fade-in bg-emerald-500/[0.03]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 mb-2">
+                <CheckCircle2 className="w-3.5 h-3.5" /> Certificate Verified & Ready
+              </span>
+              <h2 className="text-2xl font-black text-white">{authenticatedCert.participantName}</h2>
+              <p className="text-xs text-slate-300 mt-1">{authenticatedCert.eventName}</p>
             </div>
 
-            {/* Certificate Preview Canvas */}
-            <CertificateGenerator
-              certificate={{
-                id: authenticatedCert.certificate_id,
-                certificateId: authenticatedCert.certificate_id,
-                participantName: authenticatedCert.participant_name,
-                registerNumber: authenticatedCert.register_number,
-                email: authenticatedCert.email || 'student@gptcpmna.edu.in',
-                eventName: authenticatedCert.event_name,
-                eventDate: authenticatedCert.event_date || '2026-08-25',
-                certificateType: authenticatedCert.certificate_type || 'Participation',
-                issueDate: authenticatedCert.event_date || '2026-08-25',
-                qrCodeUrl: authenticatedCert.qr_code_url,
-                status: 'Verified'
-              }}
-            />
+            <div className="flex items-center gap-2">
+              <a
+                href={authenticatedCert.downloadUrl}
+                download={`${authenticatedCert.participantName}_${authenticatedCert.certificateId}.pdf`}
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-extrabold text-xs flex items-center gap-2 shadow-lg hover:opacity-95 transition-all"
+              >
+                <Download className="w-4 h-4" /> Download Certificate (PDF)
+              </a>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs">
+            <div className="p-3 rounded-xl bg-white/5 border border-white/5">
+              <span className="text-slate-400 block text-[10px] uppercase font-mono">Certificate ID</span>
+              <span className="font-mono font-bold text-[#F98A5B] mt-0.5 block truncate">
+                {authenticatedCert.certificateId}
+              </span>
+            </div>
+
+            <div className="p-3 rounded-xl bg-white/5 border border-white/5">
+              <span className="text-slate-400 block text-[10px] uppercase font-mono">Role</span>
+              <span className="font-bold text-white mt-0.5 block">{authenticatedCert.certificateType}</span>
+            </div>
+
+            <div className="p-3 rounded-xl bg-white/5 border border-white/5">
+              <span className="text-slate-400 block text-[10px] uppercase font-mono">Event Date</span>
+              <span className="text-slate-200 mt-0.5 block">{authenticatedCert.eventDate}</span>
+            </div>
+
+            <div className="p-3 rounded-xl bg-white/5 border border-white/5">
+              <span className="text-slate-400 block text-[10px] uppercase font-mono">Issued On</span>
+              <span className="text-slate-200 mt-0.5 block">{authenticatedCert.issueDate}</span>
+            </div>
+          </div>
+
+          {/* Embedded Interactive PDF Preview */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-300">Official Certificate Preview</span>
+              <a
+                href={authenticatedCert.downloadUrl}
+                target="_blank"
+                className="text-xs font-bold text-[#F98A5B] hover:underline flex items-center gap-1"
+              >
+                Open Fullscreen <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+
+            <div className="aspect-[1.414/1] w-full rounded-2xl border border-white/15 bg-white/5 overflow-hidden shadow-2xl">
+              <iframe
+                src={`${authenticatedCert.downloadUrl}#toolbar=0&navpanes=0`}
+                className="w-full h-full border-0"
+                title="Your Certificate"
+              />
+            </div>
           </div>
         </div>
       )}

@@ -254,12 +254,63 @@ Muhammed Shafi, 21051237, 9847222333, shafi.m@gptcpmna.edu.in, Speaker`
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {selectedEventId !== 'All' && (
+            <>
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await fetch(`/api/admin/events/${selectedEventId}/certificates/zip`);
+                    if (!res.ok) throw new Error('Failed downloading ZIP.');
+                    const blob = await res.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `Certificates_${selectedEventId}.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+                    a.remove();
+                    window.URL.revokeObjectURL(url);
+                    addToast('ZIP Download Completed', 'success');
+                  } catch (e: any) {
+                    addToast(e.message, 'error');
+                  }
+                }}
+                className="px-3.5 py-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Download Event ZIP</span>
+              </button>
+
+              <button
+                onClick={async () => {
+                  try {
+                    const res = await fetch(`/api/admin/events/${selectedEventId}/certificates/publish`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ publish: true })
+                    });
+                    const json = await res.json();
+                    if (json.success) {
+                      addToast('Published all certificates for this event!', 'success');
+                      loadData();
+                    }
+                  } catch (e: any) {
+                    addToast(e.message, 'error');
+                  }
+                }}
+                className="px-3 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 font-bold text-xs transition-colors"
+              >
+                Publish All
+              </button>
+            </>
+          )}
+
           <button
             onClick={exportRecords}
             className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <Download className="w-3.5 h-3.5 text-slate-300" />
-            <span>Export Records</span>
+            <span>Export CSV</span>
           </button>
           <button
             onClick={() => setShowBulkModal(true)}

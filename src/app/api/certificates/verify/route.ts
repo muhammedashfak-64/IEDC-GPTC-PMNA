@@ -4,7 +4,29 @@ import { supabase } from '@/lib/supabase';
 // POST /api/certificates/verify - Authenticate certificate download using Reg Number + 10-digit Phone Password
 export async function POST(req: Request) {
   try {
-    const { register_number, password, certificate_id } = await req.json();
+    const { register_number, password, certificate_id, event_id, full_name, mobile_number } = await req.json();
+
+    // If client provided full_name and mobile_number, run name+phone retrieval
+    if (full_name && (mobile_number || password)) {
+      const phoneToUse = mobile_number || password;
+      const { retrieveStudentCertificate } = await import('@/lib/serverStore');
+      const result = retrieveStudentCertificate(event_id, full_name, phoneToUse);
+      if (!result.success || !result.certificate) {
+        return NextResponse.json(
+          { success: false, error: result.error || 'No published certificate was found for the supplied details.' },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json({
+        success: true,
+        verified: true,
+        message: 'Certificate Authentication Successful',
+        certificate: {
+          ...result.certificate,
+          verification_url: `http://localhost:3000/verify/${result.certificate.certificateId}`
+        }
+      });
+    }
 
     if (!register_number || !password) {
       return NextResponse.json(

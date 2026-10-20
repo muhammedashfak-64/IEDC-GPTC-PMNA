@@ -1,5 +1,7 @@
 import fs from 'fs';
 import path from 'path';
+import JSZip from 'jszip';
+import { generateSingleCertificatePdf } from './certificateGenerator';
 import { supabase } from '@/lib/supabase';
 import {
   syncEventToSupabase,
@@ -558,6 +560,409 @@ export function getPublicCertificateForVerification(certId: string) {
     issueDate: cert.issueDate,
     status: cert.status,
     qrCodeUrl: cert.qrCodeUrl
+  };
+}
+
+// -------------------------------------------------------------
+// ATTENDANCE & PARTICIPANT OPERATIONS
+// -------------------------------------------------------------
+export function markAttendance(
+  registrationId: string,
+  attendance: 'Present' | 'Absent',
+  user: AuthUser
+) {
+  const db = loadDb();
+  if (!db.registrations) db.registrations = [];
+
+  const index = db.registrations.findIndex((r: any) => r.id === registrationId);
+  if (index === -1) throw new Error('Registration not found.');
+
+  const isPresent = attendance === 'Present';
+  db.registrations[index].attendance = attendance;
+  db.registrations[index].status = isPresent ? 'Attended' : 'Confirmed';
+  db.registrations[index].attendedAt = isPresent ? new Date().toISOString() : null;
+  db.registrations[index].markedBy = user.full_name || user.username || 'Admin';
+  db.registrations[index].updatedAt = new Date().toISOString();
+
+  saveDb(db);
+  syncRegistrationToSupabase(db.registrations[index], true).catch(console.error);
+  addAuditLog(
+    'ATTENDANCE_MARK',
+    user,
+    `Marked ${db.registrations[index].studentName} as ${attendance}`
+  );
+
+  return db.registrations[index];
+}
+
+export function markBulkAttendance(
+  eventId: string,
+  registrationIds: string[],
+  attendance: 'Present' | 'Absent',
+  user: AuthUser
+) {
+  const db = loadDb();
+  if (!db.registrations) db.registrations = [];
+
+  const isPresent = attendance === 'Present';
+  const updatedList: any[] = [];
+
+  db.registrations.forEach((r: any) => {
+    if (r.eventId === eventId && (registrationIds.length === 0 || registrationIds.includes(r.id))) {
+      r.attendance = attendance;
+      r.status = isPresent ? 'Attended' : 'Confirmed';
+      r.attendedAt = isPresent ? new Date().toISOString() : null;
+      r.markedBy = user.full_name || user.username || 'Admin';
+      r.updatedAt = new Date().toISOString();
+      updatedList.push(r);
+    }
+  });
+
+  saveDb(db);
+  updatedList.forEach((r) => syncRegistrationToSupabase(r, true).catch(console.error));
+  addAuditLog(
+    'ATTENDANCE_BULK_MARK',
+    user,
+    `Batch marked ${updatedList.length} participants as ${attendance} for event ${eventId}`
+  );
+
+  return updatedList;
+}
+
+// -------------------------------------------------------------
+// PROGRAM LEADERS & ORGANIZERS MODULE
+// -------------------------------------------------------------
+export function getProgramLeaders(eventId?: string) {
+  const db = loadDb();
+  let list = db.programLeaders || [];
+  if (eventId && eventId !== 'All') {
+    list = list.filter((l: any) => l.eventId === eventId);
+  }
+  return list;
+}
+
+export function addProgramLeader(
+  data: {
+    eventId: string;
+    name: string;
+    role: string;
+    department?: string;
+    email?: string;
+    phone?: string;
+    certificateEligible?: boolean;
+  },
+  user: AuthUser
+) {
+  const db = loadDb();
+  if (!db.programLeaders) db.programLeaders = [];
+
+  const newLeader = {
+    id: `ldr-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+    eventId: data.eventId,
+    name: data.name.trim(),
+    role: data.role || 'Student Lead',
+    department: data.department || '',
+    email: data.email || '',
+    phone: (data.phone || '').trim().replace(/\D/g, ''),
+    certificateEligible: data.certificateEligible !== false,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  db.programLeaders.unshift(newLeader);
+  saveDb(db);
+  addAuditLog('PROGRAM_LEADER_ADD', user, `Added leader ${newLeader.name} (${newLeader.role})`);
+  return newLeader;
+}
+
+export function deleteProgramLeader(id: string, user: AuthUser) {
+  const db = loadDb();
+  if (!db.programLeaders) return false;
+  const target = db.programLeaders.find((l: any) => l.id === id);
+  if (!target) return false;
+  db.programLeaders = db.programLeaders.filter((l: any) => l.id !== id);
+  saveDb(db);
+  addAuditLog('PROGRAM_LEADER_DELETE', user, `Removed leader ${target.name} (${id})`);
+  return true;
+}
+
+// -------------------------------------------------------------
+// AUTOMATIC CERTIFICATE GENERATION FOR PROGRAMS
+// -------------------------------------------------------------
+export async function generateProgramCertificates(
+  eventId: string,
+  options: { includeLeaders?: boolean; regenerateExisting?: boolean } = {},
+  user: AuthUser
+) {
+  const db = loadDb();
+  const event = (db.events || []).find((e: any) => e.id === eventId);
+  if (!event) throw new Error('Event / Program not found.');
+
+  if (!db.certificates) db.certificates = [];
+  if (!db.registrations) db.registrations = [];
+  if (!db.programLeaders) db.programLeaders = [];
+
+  const programName = event.title;
+  const programDate = event.date;
+  const organizingBody = event.organizingBody || 'the IEDC Cell, Government Polytechnic College Perinthalmanna';
+  const customParagraph = event.certificateParagraph || undefined;
+  const templateConfig = event.templateConfig || undefined;
+
+  // 1. Eligible Participants: Registered for this event AND marked Present (or Attended)!
+  const eligibleRegistrations = db.registrations.filter((r: any) => {
+    if (r.eventId !== eventId) return false;
+    const isPresent = r.attendance === 'Present' || r.status === 'Attended';
+    return isPresent;
+  });
+
+  // 2. Eligible Leaders
+  const eligibleLeaders = options.includeLeaders !== false
+    ? db.programLeaders.filter((l: any) => l.eventId === eventId && l.certificateEligible !== false)
+    : [];
+
+  const results: any[] = [];
+  const failures: any[] = [];
+
+  // Helper to generate a single record
+  async function processRecipient(recipient: {
+    name: string;
+    phone: string;
+    email: string;
+    registerNumber: string;
+    role: string;
+    sourceType: 'participant' | 'leader';
+    sourceId: string;
+  }) {
+    let existingCert = db.certificates.find((c: any) =>
+      c.eventId === eventId &&
+      (c.registerNumber === recipient.registerNumber || (recipient.phone && c.phone === recipient.phone)) &&
+      c.participantName.trim().toUpperCase() === recipient.name.trim().toUpperCase()
+    );
+
+    if (existingCert && !options.regenerateExisting) {
+      results.push({ ...existingCert, alreadyExisted: true });
+      return;
+    }
+
+    const certId = existingCert?.certificateId || `IEDC-2026-${Math.floor(10000 + Math.random() * 90000)}`;
+
+    try {
+      const generated = await generateSingleCertificatePdf(
+        {
+          certificateId: certId,
+          recipientName: recipient.name,
+          programName,
+          programDate,
+          organizingBody,
+          customParagraph,
+          role: recipient.role,
+          customTemplatePath: event.certificateTemplateUrl && fs.existsSync(event.certificateTemplateUrl)
+            ? event.certificateTemplateUrl
+            : undefined
+        },
+        templateConfig
+      );
+
+      const certRecord = {
+        id: existingCert?.id || `cert-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+        certificateId: certId,
+        eventId,
+        eventName: programName,
+        participantName: recipient.name.trim().toUpperCase(),
+        registerNumber: recipient.registerNumber,
+        phone: recipient.phone,
+        email: recipient.email,
+        certificateType: recipient.role,
+        eventDate: programDate,
+        issueDate: new Date().toISOString().split('T')[0],
+        qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/${certId}`,
+        pdfStorageUrl: generated.publicUrl || `/certificates/${generated.fileName}`,
+        status: 'Draft',
+        downloadsCount: 0,
+        issuedBy: user.id || 'admin',
+        issuedAt: new Date().toISOString()
+      };
+
+      if (existingCert) {
+        const idx = db.certificates.findIndex((c: any) => c.id === existingCert.id);
+        if (idx !== -1) db.certificates[idx] = certRecord;
+      } else {
+        db.certificates.unshift(certRecord);
+      }
+
+      if (recipient.sourceType === 'participant') {
+        const regIdx = db.registrations.findIndex((r: any) => r.id === recipient.sourceId);
+        if (regIdx !== -1) {
+          db.registrations[regIdx].certificateId = certId;
+          db.registrations[regIdx].certificateGenerated = true;
+        }
+      }
+
+      syncCertificateToSupabase(certRecord, !!existingCert).catch(console.error);
+      results.push(certRecord);
+    } catch (err: any) {
+      console.error(`Failed generating cert for ${recipient.name}:`, err);
+      failures.push({ name: recipient.name, error: err.message });
+    }
+  }
+
+  for (const reg of eligibleRegistrations) {
+    await processRecipient({
+      name: reg.studentName,
+      phone: (reg.phone || '').trim().replace(/\D/g, ''),
+      email: reg.email || '',
+      registerNumber: reg.registerNumber || reg.id,
+      role: 'Participant',
+      sourceType: 'participant',
+      sourceId: reg.id
+    });
+  }
+
+  for (const ldr of eligibleLeaders) {
+    await processRecipient({
+      name: ldr.name,
+      phone: (ldr.phone || '').trim().replace(/\D/g, ''),
+      email: ldr.email || '',
+      registerNumber: `LEAD-${ldr.id.slice(-4)}`,
+      role: ldr.role || 'Student Lead',
+      sourceType: 'leader',
+      sourceId: ldr.id
+    });
+  }
+
+  saveDb(db);
+  addAuditLog(
+    'CERTIFICATES_PROGRAM_GENERATE',
+    user,
+    `Generated ${results.length} certificates for event "${programName}" (${failures.length} failed)`
+  );
+
+  return {
+    totalEligibleParticipants: eligibleRegistrations.length,
+    totalEligibleLeaders: eligibleLeaders.length,
+    generatedCount: results.length,
+    failedCount: failures.length,
+    failures,
+    certificates: results
+  };
+}
+
+export function publishProgramCertificates(eventId: string, publish: boolean, user: AuthUser) {
+  const db = loadDb();
+  if (!db.certificates) db.certificates = [];
+
+  const newStatus = publish ? 'Published' : 'Draft';
+  let count = 0;
+
+  db.certificates.forEach((c: any) => {
+    if (c.eventId === eventId) {
+      c.status = newStatus;
+      c.updatedAt = new Date().toISOString();
+      count++;
+      syncCertificateToSupabase(c, true).catch(() => {});
+    }
+  });
+
+  const evtIdx = (db.events || []).findIndex((e: any) => e.id === eventId);
+  if (evtIdx !== -1) {
+    db.events[evtIdx].certificateStatus = newStatus;
+    db.events[evtIdx].updatedAt = new Date().toISOString();
+    syncEventToSupabase(db.events[evtIdx], true).catch(() => {});
+  }
+
+  saveDb(db);
+  addAuditLog(
+    'CERTIFICATES_PUBLISH_TOGGLE',
+    user,
+    `${publish ? 'Published' : 'Unpublished'} ${count} certificates for event ${eventId}`
+  );
+
+  return { count, status: newStatus };
+}
+
+export async function generateProgramCertificatesZip(eventId: string) {
+  const db = loadDb();
+  const certs = (db.certificates || []).filter((c: any) => c.eventId === eventId);
+  if (certs.length === 0) throw new Error('No certificates found for this program.');
+
+  const zip = new JSZip();
+  let addedCount = 0;
+
+  for (const c of certs) {
+    const fileName = `${c.certificateId}.pdf`;
+    const localPath = path.join(process.cwd(), 'public', 'certificates', fileName);
+    if (fs.existsSync(localPath)) {
+      const fileData = fs.readFileSync(localPath);
+      const safeRecipient = c.participantName.replace(/[^a-zA-Z0-9_\- ]/g, '').trim();
+      const zipEntryName = `${safeRecipient || 'Participant'}_${c.certificateId}.pdf`;
+      zip.file(zipEntryName, fileData);
+      addedCount++;
+    }
+  }
+
+  if (addedCount === 0) {
+    throw new Error('Certificate PDF files have not been generated yet. Please generate certificates first.');
+  }
+
+  const zipBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
+  return {
+    buffer: zipBuffer,
+    fileName: `Certificates_${eventId}_${new Date().toISOString().split('T')[0]}.zip`,
+    count: addedCount
+  };
+}
+
+export function retrieveStudentCertificate(eventId: string, fullName: string, mobileNumber: string) {
+  const db = loadDb();
+  if (!fullName?.trim() || !mobileNumber?.trim()) {
+    return { success: false, error: 'Full name and registered mobile number are required.' };
+  }
+
+  const cleanInputName = fullName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cleanInputPhone = mobileNumber.replace(/\D/g, '').slice(-10);
+
+  if (cleanInputPhone.length < 10) {
+    return { success: false, error: 'Please enter a valid 10-digit mobile number.' };
+  }
+
+  const match = (db.certificates || []).find((c: any) => {
+    if (eventId && eventId !== 'All' && c.eventId !== eventId && c.eventName !== eventId) {
+      return false;
+    }
+    if (c.status !== 'Published') return false;
+
+    const certNormName = (c.participantName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const nameMatches = certNormName === cleanInputName;
+
+    const certPhone = String(c.phone || '').replace(/\D/g, '').slice(-10);
+    const phoneMatches = certPhone ? certPhone === cleanInputPhone : false;
+
+    return nameMatches && phoneMatches;
+  });
+
+  if (!match) {
+    return {
+      success: false,
+      error: 'No published certificate was found for the supplied details.'
+    };
+  }
+
+  match.downloadsCount = (match.downloadsCount || 0) + 1;
+  saveDb(db);
+  syncCertificateToSupabase(match, true).catch(() => {});
+
+  return {
+    success: true,
+    certificate: {
+      certificateId: match.certificateId,
+      participantName: match.participantName,
+      eventName: match.eventName,
+      eventDate: match.eventDate,
+      certificateType: match.certificateType,
+      issueDate: match.issueDate,
+      downloadUrl: match.pdfStorageUrl || `/certificates/${match.certificateId}.pdf`,
+      status: match.status
+    }
   };
 }
 
