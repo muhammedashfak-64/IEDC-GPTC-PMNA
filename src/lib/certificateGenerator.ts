@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import sharp from 'sharp';
 import { supabaseAdmin, isSupabaseAdminConfigured } from './supabaseAdmin';
@@ -41,12 +42,22 @@ export async function resolveTemplateFile(templatePathOrUrl?: string): Promise<s
       const res = await fetch(trimmed);
       if (res.ok) {
         const buffer = Buffer.from(await res.arrayBuffer());
-        const cacheDir = path.join(process.cwd(), 'public', 'uploads', 'certificate-templates');
-        if (!fs.existsSync(cacheDir)) {
-          fs.mkdirSync(cacheDir, { recursive: true });
+        let cachePath: string;
+        try {
+          const cacheDir = path.join(process.cwd(), 'public', 'uploads', 'certificate-templates');
+          if (!fs.existsSync(cacheDir)) {
+            fs.mkdirSync(cacheDir, { recursive: true });
+          }
+          cachePath = path.join(cacheDir, filename);
+          fs.writeFileSync(cachePath, buffer);
+        } catch {
+          const tmpDir = path.join(os.tmpdir(), 'certificate-templates');
+          if (!fs.existsSync(tmpDir)) {
+            fs.mkdirSync(tmpDir, { recursive: true });
+          }
+          cachePath = path.join(tmpDir, filename);
+          fs.writeFileSync(cachePath, buffer);
         }
-        const cachePath = path.join(cacheDir, filename);
-        fs.writeFileSync(cachePath, buffer);
         return cachePath;
       }
     } catch (err: any) {
@@ -547,13 +558,25 @@ export async function generateSingleCertificatePdf(
   const fileName = `${params.certificateId}.pdf`;
   const storagePath = `certificates/${fileName}`;
 
-  // 9. Save local mirror copy in public/certificates/
-  const localOutputDir = path.join(process.cwd(), 'public', 'certificates');
-  if (!fs.existsSync(localOutputDir)) {
-    fs.mkdirSync(localOutputDir, { recursive: true });
+  // 9. Save local mirror copy in public/certificates/ or /tmp/certificates/
+  let localFilePath: string | null = null;
+  try {
+    const localOutputDir = path.join(process.cwd(), 'public', 'certificates');
+    if (!fs.existsSync(localOutputDir)) {
+      fs.mkdirSync(localOutputDir, { recursive: true });
+    }
+    localFilePath = path.join(localOutputDir, fileName);
+    fs.writeFileSync(localFilePath, pdfBytes);
+  } catch (fsErr) {
+    try {
+      const tmpDir = path.join(os.tmpdir(), 'certificates');
+      if (!fs.existsSync(tmpDir)) {
+        fs.mkdirSync(tmpDir, { recursive: true });
+      }
+      localFilePath = path.join(tmpDir, fileName);
+      fs.writeFileSync(localFilePath, pdfBytes);
+    } catch {}
   }
-  const localFilePath = path.join(localOutputDir, fileName);
-  fs.writeFileSync(localFilePath, pdfBytes);
 
   // 10. Upload to Supabase Storage if configured
   let publicUrl = `/certificates/${fileName}`;
@@ -566,7 +589,7 @@ export async function generateSingleCertificatePdf(
           upsert: true
         });
       const timeoutPromise = new Promise<{ error: any }>((resolve) =>
-        setTimeout(() => resolve({ error: new Error('Upload timed out after 5s') }), 5000)
+        setTimeout(() => resolve({ error: new Error('Upload timed out after 20s') }), 20000)
       );
       const { error: uploadErr } = await Promise.race([uploadPromise, timeoutPromise]);
 
@@ -748,12 +771,22 @@ export async function generateSingleCertificatePng(
   const fileName = `${params.certificateId}.png`;
   const storagePath = `certificates/${fileName}`;
 
-  const localOutputDir = path.join(process.cwd(), 'public', 'certificates');
-  if (!fs.existsSync(localOutputDir)) {
-    fs.mkdirSync(localOutputDir, { recursive: true });
+  try {
+    const localOutputDir = path.join(process.cwd(), 'public', 'certificates');
+    if (!fs.existsSync(localOutputDir)) {
+      fs.mkdirSync(localOutputDir, { recursive: true });
+    }
+    const localFilePath = path.join(localOutputDir, fileName);
+    fs.writeFileSync(localFilePath, pngBytes);
+  } catch (fsErr) {
+    try {
+      const tmpDir = path.join(os.tmpdir(), 'certificates');
+      if (!fs.existsSync(tmpDir)) {
+        fs.mkdirSync(tmpDir, { recursive: true });
+      }
+      fs.writeFileSync(path.join(tmpDir, fileName), pngBytes);
+    } catch {}
   }
-  const localFilePath = path.join(localOutputDir, fileName);
-  fs.writeFileSync(localFilePath, pngBytes);
 
   let publicUrl = `/certificates/${fileName}`;
   if (isSupabaseAdminConfigured()) {
@@ -765,7 +798,7 @@ export async function generateSingleCertificatePng(
           upsert: true
         });
       const timeoutPromise = new Promise<{ error: any }>((resolve) =>
-        setTimeout(() => resolve({ error: new Error('Upload timed out after 5s') }), 5000)
+        setTimeout(() => resolve({ error: new Error('Upload timed out after 20s') }), 20000)
       );
       const { error: uploadErr } = await Promise.race([uploadPromise, timeoutPromise]);
       if (!uploadErr) {

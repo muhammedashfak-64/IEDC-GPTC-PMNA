@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import crypto from 'crypto';
 import JSZip from 'jszip';
 import { generateSingleCertificatePdf, generateSingleCertificatePng, resolveTemplateFile } from './certificateGenerator';
@@ -47,15 +48,24 @@ let memoryDb: any = null;
 let lastDbMtime = 0;
 
 export function loadDb(): any {
+  if (memoryDb) return memoryDb;
+  try {
+    const tmpFile = path.join(os.tmpdir(), 'iedc_db.json');
+    if (fs.existsSync(tmpFile)) {
+      const raw = fs.readFileSync(tmpFile, 'utf-8');
+      memoryDb = JSON.parse(raw);
+      return memoryDb;
+    }
+  } catch {}
+
   try {
     if (fs.existsSync(DB_FILE)) {
-      const stat = fs.statSync(DB_FILE);
-      if (memoryDb && stat.mtimeMs === lastDbMtime) {
-        return memoryDb;
-      }
       const raw = fs.readFileSync(DB_FILE, 'utf-8');
       memoryDb = JSON.parse(raw);
-      lastDbMtime = stat.mtimeMs;
+      try {
+        const stat = fs.statSync(DB_FILE);
+        lastDbMtime = stat.mtimeMs;
+      } catch {}
       return memoryDb;
     }
   } catch (err) {
@@ -79,7 +89,10 @@ export function saveDb(db: any) {
       // ignore
     }
   } catch (err) {
-    console.error('Error saving db.json:', err);
+    try {
+      const tmpFile = path.join(os.tmpdir(), 'iedc_db.json');
+      fs.writeFileSync(tmpFile, JSON.stringify(db, null, 2), 'utf-8');
+    } catch {}
   }
 }
 
@@ -1038,8 +1051,12 @@ export async function ensureCertificatePdfExists(cert: any): Promise<string> {
     const localOutputDir = path.join(process.cwd(), 'public', 'certificates');
     const localFilePath = path.join(localOutputDir, pdfFileName);
 
-    if (fs.existsSync(localFilePath) && fs.statSync(localFilePath).size > 1000) {
-      return `/certificates/${pdfFileName}`;
+    const tmpFilePath = path.join(os.tmpdir(), 'certificates', pdfFileName);
+    if (
+      (fs.existsSync(localFilePath) && fs.statSync(localFilePath).size > 1000) ||
+      (fs.existsSync(tmpFilePath) && fs.statSync(tmpFilePath).size > 1000)
+    ) {
+      return `/api/public/certificates/${certId}/pdf`;
     }
 
     const db = loadDb();

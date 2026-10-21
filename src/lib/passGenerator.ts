@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 import QRCode from 'qrcode';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 import sharp from 'sharp';
@@ -534,26 +535,45 @@ export async function ensurePassFiles(
   reg: PassRegistrationData,
   event: PassEventData
 ): Promise<{ pdfUrl: string; pngUrl: string }> {
-  const passesDir = path.join(process.cwd(), 'public', 'passes');
-  if (!fs.existsSync(passesDir)) {
-    fs.mkdirSync(passesDir, { recursive: true });
-  }
+  try {
+    const passesDir = path.join(process.cwd(), 'public', 'passes');
+    if (!fs.existsSync(passesDir)) {
+      fs.mkdirSync(passesDir, { recursive: true });
+    }
 
-  const pdfPath = path.join(passesDir, `${reg.id}.pdf`);
-  const pngPath = path.join(passesDir, `${reg.id}.png`);
+    const pdfPath = path.join(passesDir, `${reg.id}.pdf`);
+    const pngPath = path.join(passesDir, `${reg.id}.png`);
 
-  if (!fs.existsSync(pdfPath)) {
-    const pdfBuf = await generatePassPdf(reg, event);
-    fs.writeFileSync(pdfPath, pdfBuf);
-  }
+    if (!fs.existsSync(pdfPath)) {
+      const pdfBuf = await generatePassPdf(reg, event);
+      fs.writeFileSync(pdfPath, pdfBuf);
+    }
 
-  if (!fs.existsSync(pngPath)) {
-    const pngBuf = await generatePassPng(reg, event);
-    fs.writeFileSync(pngPath, pngBuf);
+    if (!fs.existsSync(pngPath)) {
+      const pngBuf = await generatePassPng(reg, event);
+      fs.writeFileSync(pngPath, pngBuf);
+    }
+  } catch (fsErr) {
+    try {
+      const tmpPasses = path.join(os.tmpdir(), 'passes');
+      if (!fs.existsSync(tmpPasses)) {
+        fs.mkdirSync(tmpPasses, { recursive: true });
+      }
+      const tmpPdf = path.join(tmpPasses, `${reg.id}.pdf`);
+      const tmpPng = path.join(tmpPasses, `${reg.id}.png`);
+      if (!fs.existsSync(tmpPdf)) {
+        const pdfBuf = await generatePassPdf(reg, event);
+        fs.writeFileSync(tmpPdf, pdfBuf);
+      }
+      if (!fs.existsSync(tmpPng)) {
+        const pngBuf = await generatePassPng(reg, event);
+        fs.writeFileSync(tmpPng, pngBuf);
+      }
+    } catch {}
   }
 
   return {
-    pdfUrl: `/passes/${reg.id}.pdf`,
-    pngUrl: `/passes/${reg.id}.png`
+    pdfUrl: `/api/public/registrations/${reg.id}/pass/pdf`,
+    pngUrl: `/api/public/registrations/${reg.id}/pass/png`
   };
 }

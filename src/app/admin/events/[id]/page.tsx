@@ -102,9 +102,9 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
   const [generationSummary, setGenerationSummary] = useState<any>(null);
   const [previewCert, setPreviewCert] = useState<any>(null);
   const [downloadingZip, setDownloadingZip] = useState(false);
-  const [liveSamplePdf, setLiveSamplePdf] = useState('/templates/test_generated_certificate.pdf');
-  const [participationSamplePdf, setParticipationSamplePdf] = useState('/templates/test_generated_certificate.pdf');
-  const [winnerSamplePdf, setWinnerSamplePdf] = useState('/templates/test_winner_certificate.pdf');
+  const [liveSamplePdf, setLiveSamplePdf] = useState('/api/admin/certificates/sample-preview?type=participation');
+  const [participationSamplePdf, setParticipationSamplePdf] = useState('/api/admin/certificates/sample-preview?type=participation');
+  const [winnerSamplePdf, setWinnerSamplePdf] = useState('/api/admin/certificates/sample-preview?type=winner');
   const [previewTarget, setPreviewTarget] = useState<'participation' | 'winner'>('participation');
   const [sampleGenerating, setSampleGenerating] = useState(false);
   const [certTemplateTab, setCertTemplateTab] = useState<'participation' | 'winner'>('participation');

@@ -24,7 +24,7 @@ export default function CertificateTemplatesPage() {
   const [newTitle, setNewTitle] = useState('');
   const [newTemplateUrl, setNewTemplateUrl] = useState('');
   const [generatingPreview, setGeneratingPreview] = useState(false);
-  const [livePdfUrl, setLivePdfUrl] = useState('/templates/test_generated_certificate.pdf');
+  const [livePdfUrl, setLivePdfUrl] = useState('/api/admin/certificates/sample-preview?type=participation');
 
   // Preview Form Controls
   const [previewName, setPreviewName] = useState('MUHAMMED ASHFAK O');

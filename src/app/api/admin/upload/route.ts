@@ -3,6 +3,7 @@ import { requireAdminAuth } from '@/lib/adminAuthHelper';
 import { supabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabaseAdmin';
 import fs from 'fs';
 import path from 'path';
+import os from 'os';
 
 // Allowed MIME Types
 const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg', 'image/svg+xml', 'image/gif'];
@@ -147,7 +148,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 2. Local fallback mirror (ensures offline development resilience)
+    // 2. Local fallback mirror (ensures offline development resilience and serverless /tmp access)
     try {
       const uploadDir = path.join(process.cwd(), 'public', 'uploads', folder);
       if (!fs.existsSync(uploadDir)) {
@@ -160,7 +161,17 @@ export async function POST(req: NextRequest) {
         fileUrl = `/uploads/${folder}/${filename}`;
       }
     } catch (fsErr) {
-      console.warn('Local file fallback write error:', fsErr);
+      try {
+        const tmpUploadDir = path.join(os.tmpdir(), 'uploads', folder);
+        if (!fs.existsSync(tmpUploadDir)) {
+          fs.mkdirSync(tmpUploadDir, { recursive: true });
+        }
+        const tmpFilePath = path.join(tmpUploadDir, filename);
+        fs.writeFileSync(tmpFilePath, buffer);
+        if (!fileUrl) {
+          fileUrl = `/uploads/${folder}/${filename}`;
+        }
+      } catch {}
     }
 
     return NextResponse.json({
