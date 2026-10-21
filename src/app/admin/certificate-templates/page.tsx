@@ -54,6 +54,7 @@ export default function CertificateTemplatesPage() {
     photoHeight: 95
   });
 
+  const [loadingTemplates, setLoadingTemplates] = useState(true);
   const [templates, setTemplates] = useState<any[]>([
     {
       id: 'tpl-master-vector',
@@ -77,14 +78,47 @@ export default function CertificateTemplatesPage() {
     }
   ]);
 
-  const activeTemplate = templates.find((t) => t.isActive) || templates[0];
-
-  const handleSetActive = (id: string) => {
-    setTemplates((prev) => prev.map((t) => ({ ...t, isActive: t.id === id })));
-    addToast('Active Template Updated', 'success');
+  const fetchTemplates = async () => {
+    try {
+      setLoadingTemplates(true);
+      const res = await fetch('/api/admin/certificate-templates');
+      const json = await res.json();
+      if (res.ok && json.success && Array.isArray(json.data) && json.data.length > 0) {
+        setTemplates(json.data);
+      }
+    } catch (e) {
+      console.error('Failed to load templates:', e);
+    } finally {
+      setLoadingTemplates(false);
+    }
   };
 
-  const handleAddTemplate = (e: React.FormEvent) => {
+  useEffect(() => {
+    fetchTemplates();
+  }, []);
+
+  const activeTemplate = templates.find((t) => t.isActive) || templates[0];
+
+  const handleSetActive = async (id: string) => {
+    try {
+      const res = await fetch('/api/admin/certificate-templates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setTemplates((prev) => prev.map((t) => ({ ...t, isActive: t.id === id })));
+        addToast('Active Template Updated & Persisted', 'success');
+      } else {
+        throw new Error(json.error || 'Failed to update active template');
+      }
+    } catch (err: any) {
+      addToast(err.message, 'error');
+    }
+  };
+
+  const handleAddTemplate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) {
       addToast('Template title is required.', 'error');
@@ -95,22 +129,29 @@ export default function CertificateTemplatesPage() {
       return;
     }
 
-    const newTpl = {
-      id: `tpl-${Date.now()}`,
-      title: newTitle.trim(),
-      type: newTemplateUrl.endsWith('.pdf') ? 'PDF Master' : 'Image Master',
-      pdfUrl: newTemplateUrl,
-      cleanUrl: newTemplateUrl,
-      previewPdf: newTemplateUrl,
-      isActive: false,
-      description: 'Custom uploaded reference certificate design.'
-    };
-
-    setTemplates([newTpl, ...templates]);
-    setShowModal(false);
-    setNewTitle('');
-    setNewTemplateUrl('');
-    addToast(`Uploaded certificate template "${newTpl.title}"`, 'success');
+    try {
+      const res = await fetch('/api/admin/certificate-templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newTitle.trim(),
+          url: newTemplateUrl,
+          isActive: true
+        })
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        addToast(`Uploaded and activated certificate template "${newTitle.trim()}"`, 'success');
+        setShowModal(false);
+        setNewTitle('');
+        setNewTemplateUrl('');
+        fetchTemplates();
+      } else {
+        throw new Error(json.error || 'Failed saving template to database');
+      }
+    } catch (err: any) {
+      addToast(err.message, 'error');
+    }
   };
 
   const handleRegeneratePreview = async () => {
@@ -127,14 +168,15 @@ export default function CertificateTemplatesPage() {
           awardCategory: awardCategory,
           customParagraph: customDescription || undefined,
           templateConfig: activeConfig,
-          certificateTemplateUrl: activeTemplate.cleanUrl
+          certificateTemplateUrl: activeTemplate?.cleanUrl || activeTemplate?.pdfUrl
         })
       });
 
       const json = await res.json();
       if (res.ok && json.success) {
-        setLivePdfUrl(json.pdfUrl);
-        addToast('Preview updated using master PDF engine!', 'success');
+        const cacheBusted = `${json.pdfUrl}${json.pdfUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+        setLivePdfUrl(cacheBusted);
+        addToast('Preview updated using active template engine!', 'success');
       } else {
         throw new Error(json.error || 'Failed generating sample preview.');
       }

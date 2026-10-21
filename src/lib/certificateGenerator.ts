@@ -1,7 +1,61 @@
 import fs from 'fs';
 import path from 'path';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import sharp from 'sharp';
 import { supabaseAdmin, isSupabaseAdminConfigured } from './supabaseAdmin';
+
+/**
+ * Safely resolves a certificate template path from a local file, public/ asset, or remote Supabase storage URL.
+ * Automatically downloads and caches remote URLs to public/uploads/certificate-templates/ for local rendering.
+ */
+export async function resolveTemplateFile(templatePathOrUrl?: string): Promise<string | undefined> {
+  if (!templatePathOrUrl || typeof templatePathOrUrl !== 'string') return undefined;
+  const trimmed = templatePathOrUrl.trim();
+  if (!trimmed) return undefined;
+
+  // 1. Direct path check
+  if (fs.existsSync(trimmed)) {
+    return trimmed;
+  }
+
+  // 2. Relative to public/
+  const candidateInPublic = path.join(process.cwd(), 'public', trimmed.replace(/^\//, ''));
+  if (fs.existsSync(candidateInPublic)) {
+    return candidateInPublic;
+  }
+
+  // 3. Match filename in public/uploads/certificate-templates/ or public/templates/
+  const cleanUrl = trimmed.split('?')[0];
+  const filename = path.basename(cleanUrl);
+  if (filename) {
+    const candidateUploads = path.join(process.cwd(), 'public', 'uploads', 'certificate-templates', filename);
+    if (fs.existsSync(candidateUploads)) return candidateUploads;
+
+    const candidateTemplates = path.join(process.cwd(), 'public', 'templates', filename);
+    if (fs.existsSync(candidateTemplates)) return candidateTemplates;
+  }
+
+  // 4. If remote HTTP / HTTPS (Supabase Storage URL)
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    try {
+      const res = await fetch(trimmed);
+      if (res.ok) {
+        const buffer = Buffer.from(await res.arrayBuffer());
+        const cacheDir = path.join(process.cwd(), 'public', 'uploads', 'certificate-templates');
+        if (!fs.existsSync(cacheDir)) {
+          fs.mkdirSync(cacheDir, { recursive: true });
+        }
+        const cachePath = path.join(cacheDir, filename);
+        fs.writeFileSync(cachePath, buffer);
+        return cachePath;
+      }
+    } catch (err: any) {
+      console.warn('Failed to fetch certificate template from URL:', trimmed, err.message);
+    }
+  }
+
+  return undefined;
+}
 
 export interface CertificateGenerateParams {
   certificateId: string;
@@ -277,17 +331,11 @@ export async function generateSingleCertificatePdf(
   let width: number;
   let height: number;
 
-  let resolvedCustomPath = params.customTemplatePath;
-  if (resolvedCustomPath && !fs.existsSync(/*turbopackIgnore: true*/ resolvedCustomPath)) {
-    const candidateInPublic = path.join(process.cwd(), 'public', resolvedCustomPath.replace(/^\//, ''));
-    if (fs.existsSync(candidateInPublic)) {
-      resolvedCustomPath = candidateInPublic;
-    }
-  }
+  let resolvedCustomPath = await resolveTemplateFile(params.customTemplatePath);
 
   const isCustomImage =
     resolvedCustomPath &&
-    fs.existsSync(/*turbopackIgnore: true*/ resolvedCustomPath) &&
+    fs.existsSync(resolvedCustomPath) &&
     (resolvedCustomPath.endsWith('.png') || resolvedCustomPath.endsWith('.jpg') || resolvedCustomPath.endsWith('.jpeg'));
 
   if (isCustomImage && resolvedCustomPath) {
@@ -297,26 +345,18 @@ export async function generateSingleCertificatePdf(
     height = 595.5;
     page = pdfDoc.addPage([width, height]);
 
-    const imgBytes = fs.readFileSync(/*turbopackIgnore: true*/ resolvedCustomPath);
+    const imgBytes = fs.readFileSync(resolvedCustomPath);
     const bgImage = resolvedCustomPath.endsWith('.png')
       ? await pdfDoc.embedPng(imgBytes)
       : await pdfDoc.embedJpg(imgBytes);
 
     page.drawImage(bgImage, { x: 0, y: 0, width, height });
-
-    // Clean whiteout over recipient name & paragraph if an existing populated template was uploaded
-    page.drawRectangle({
-      x: 110,
-      y: 190,
-      width: width - 220,
-      height: 155,
-      color: rgb(1, 1, 1)
-    });
+    // Exact template preservation: No destructive whiteout rectangle. Background, borders, textures, and signatures remain 100% intact.
   } else {
     // Vector PDF Master: clean_master_template.pdf or reference_certificate.pdf
     let templateBytes: Buffer;
-    if (resolvedCustomPath && fs.existsSync(/*turbopackIgnore: true*/ resolvedCustomPath) && resolvedCustomPath.endsWith('.pdf')) {
-      templateBytes = fs.readFileSync(/*turbopackIgnore: true*/ resolvedCustomPath);
+    if (resolvedCustomPath && fs.existsSync(resolvedCustomPath) && resolvedCustomPath.endsWith('.pdf')) {
+      templateBytes = fs.readFileSync(resolvedCustomPath);
     } else if (fs.existsSync(masterCleanPath)) {
       templateBytes = fs.readFileSync(masterCleanPath);
     } else if (fs.existsSync(referencePath)) {
@@ -339,14 +379,16 @@ export async function generateSingleCertificatePdf(
 
   // 2. Type B Header Replacement (if Certificate of Achievement / Winner)
   if (isTypeB) {
-    // Cleanly cover the original "— OF PARTICIPATION —" and "THIS CERTIFICATE IS PRESENTED TO" lines
-    page.drawRectangle({
-      x: 180,
-      y: 350,
-      width: width - 360,
-      height: 75,
-      color: rgb(1, 1, 1)
-    });
+    // Only cleanly cover the default line if using the vector PDF master where "— OF PARTICIPATION —" is pre-printed
+    if (!isCustomImage && !resolvedCustomPath?.endsWith('.pdf')) {
+      page.drawRectangle({
+        x: 180,
+        y: 350,
+        width: width - 360,
+        height: 75,
+        color: rgb(1, 1, 1)
+      });
+    }
 
     const subTitle = params.certificateSubtitle || '— OF ACHIEVEMENT —';
     const subWidth = fontBold.widthOfTextAtSize(subTitle, 13);
@@ -543,6 +585,13 @@ export async function generateSingleCertificatePdf(
     }
   }
 
+  // 11. Ensure companion high-resolution PNG is also rendered and cached
+  try {
+    await generateSingleCertificatePng(params, config);
+  } catch (pngErr: any) {
+    console.warn(`Companion PNG generation notice for ${params.certificateId}:`, pngErr?.message);
+  }
+
   return {
     pdfBytes,
     fileName,
@@ -550,3 +599,189 @@ export async function generateSingleCertificatePdf(
     publicUrl
   };
 }
+
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+/**
+ * Generate a high-resolution PNG certificate matching the exact template and typography.
+ */
+export async function generateSingleCertificatePng(
+  params: CertificateGenerateParams,
+  config: Partial<CertificateConfig> = {}
+): Promise<{ pngBytes: Buffer; fileName: string; storagePath: string; publicUrl?: string }> {
+  let resolvedTemplatePath = await resolveTemplateFile(params.customTemplatePath);
+
+  const masterPngPath = path.join(
+    process.cwd(),
+    'public',
+    'uploads',
+    'certificate-templates',
+    'IEDC_PARTICIPATE_CERTICICATE_1792467393382.png'
+  );
+
+  if (
+    !resolvedTemplatePath ||
+    (!resolvedTemplatePath.endsWith('.png') &&
+      !resolvedTemplatePath.endsWith('.jpg') &&
+      !resolvedTemplatePath.endsWith('.jpeg'))
+  ) {
+    resolvedTemplatePath = masterPngPath;
+  }
+
+  if (!fs.existsSync(resolvedTemplatePath)) {
+    // Fallback to any available certificate image in uploads/certificate-templates
+    const tplDir = path.join(process.cwd(), 'public', 'uploads', 'certificate-templates');
+    if (fs.existsSync(tplDir)) {
+      const files = fs.readdirSync(tplDir);
+      const imgFile = files.find((f) => f.endsWith('.png') || f.endsWith('.jpg') || f.endsWith('.jpeg'));
+      if (imgFile) {
+        resolvedTemplatePath = path.join(tplDir, imgFile);
+      }
+    }
+  }
+
+  if (!resolvedTemplatePath || !fs.existsSync(resolvedTemplatePath)) {
+    throw new Error('Certificate image template not found on server.');
+  }
+
+  const meta = await sharp(resolvedTemplatePath).metadata();
+  const imgWidth = meta.width || 1920;
+  const imgHeight = meta.height || 1358;
+  const scale = imgWidth / 842.25;
+
+  // Normalized values
+  const nameY = (595.5 - normalizeNumber(config.nameY, DEFAULT_CERT_CONFIG.nameY)) * scale;
+  const nameFontSize = normalizeNumber(config.nameFontSize, DEFAULT_CERT_CONFIG.nameFontSize, 10, 60) * scale;
+  const nameRgb = normalizeColorToRgb(config.nameColor, [139 / 255, 0, 0]);
+  const nameHex =
+    '#' + nameRgb.map((c) => Math.round(c * 255).toString(16).padStart(2, '0')).join('');
+
+  const paraY = (595.5 - normalizeNumber(config.paraY, DEFAULT_CERT_CONFIG.paraY)) * scale;
+  const paraFontSize = normalizeNumber(config.paraFontSize, DEFAULT_CERT_CONFIG.paraFontSize, 8, 30) * scale;
+  const paraLineSpacing = normalizeNumber(config.paraLineSpacing, DEFAULT_CERT_CONFIG.paraLineSpacing, 10, 50) * scale;
+  const paraRgb = normalizeColorToRgb(config.paraColor, [31 / 255, 41 / 255, 55 / 255]);
+  const paraHex =
+    '#' + paraRgb.map((c) => Math.round(c * 255).toString(16).padStart(2, '0')).join('');
+
+  const isTypeB =
+    params.certificateType?.toLowerCase().includes('achievement') ||
+    params.certificateType?.toLowerCase().includes('winner') ||
+    params.certificateType?.toLowerCase().includes('prize') ||
+    (params.role && params.role.toLowerCase().includes('winner'));
+
+  let paraText = params.customParagraph || '';
+  if (!paraText.trim()) {
+    const orgBody = params.organizingBody || 'the IEDC Cell, Government Polytechnic College Perinthalmanna';
+    if (isTypeB) {
+      const awardCat = params.awardCategory || params.role || 'Winner';
+      paraText = `In recognition of your outstanding achievement as ${awardCat} in the ${params.programName}, organized by ${orgBody}, held on ${params.programDate}.`;
+    } else {
+      paraText = `In recognition of your active participation and valuable contribution to the ${params.programName}, organized by ${orgBody}, held on ${params.programDate}.`;
+    }
+  }
+
+  // Soft-wrap text lines for SVG
+  const rawLines = paraText.split(/\r?\n/);
+  const paraLines: string[] = [];
+  const maxCharsPerLine = Math.floor(normalizeNumber(config.paraMaxWidth, 580) / 7.2);
+  for (const raw of rawLines) {
+    if (!raw.trim()) {
+      paraLines.push('');
+      continue;
+    }
+    const words = raw.split(/\s+/);
+    let cur = '';
+    for (const w of words) {
+      if ((cur + ' ' + w).trim().length <= maxCharsPerLine) {
+        cur = (cur + ' ' + w).trim();
+      } else {
+        if (cur) paraLines.push(cur);
+        cur = w;
+      }
+    }
+    if (cur) paraLines.push(cur);
+  }
+
+  const certIdY = (595.5 - normalizeNumber(config.certIdY, 45)) * scale;
+  const recipientName = params.recipientName.trim().toUpperCase();
+
+  const svgLines = paraLines
+    .map((line, idx) => {
+      const lineY = paraY + idx * paraLineSpacing;
+      return `<text x="${imgWidth / 2}" y="${lineY}" class="para">${escapeXml(line)}</text>`;
+    })
+    .join('\n');
+
+  const svgContent = `
+    <svg width="${imgWidth}" height="${imgHeight}" xmlns="http://www.w3.org/2000/svg">
+      <style>
+        .name { fill: ${nameHex}; font-size: ${nameFontSize}px; font-family: Helvetica, Arial, sans-serif; font-weight: bold; text-anchor: middle; }
+        .para { fill: ${paraHex}; font-size: ${paraFontSize}px; font-family: Helvetica, Arial, sans-serif; text-anchor: middle; }
+        .cert-id { fill: #9CA3AF; font-size: ${9 * scale}px; font-family: Helvetica, Arial, sans-serif; text-anchor: middle; font-weight: bold; }
+      </style>
+      <text x="${imgWidth / 2}" y="${nameY}" class="name">${escapeXml(recipientName)}</text>
+      ${svgLines}
+      ${
+        config.showCertId !== false && params.certificateId
+          ? `<text x="${imgWidth / 2}" y="${certIdY}" class="cert-id">CERTIFICATE ID: ${escapeXml(
+              params.certificateId
+            )}</text>`
+          : ''
+      }
+    </svg>
+  `;
+
+  const svgPng = await sharp(Buffer.from(svgContent)).resize(imgWidth, imgHeight).png().toBuffer();
+  const pngBytes = await sharp(resolvedTemplatePath)
+    .resize(1920, 1358)
+    .composite([{ input: await sharp(svgPng).resize(1920, 1358).png().toBuffer() }])
+    .png({ quality: 95, compressionLevel: 8 })
+    .toBuffer();
+
+  const fileName = `${params.certificateId}.png`;
+  const storagePath = `certificates/${fileName}`;
+
+  const localOutputDir = path.join(process.cwd(), 'public', 'certificates');
+  if (!fs.existsSync(localOutputDir)) {
+    fs.mkdirSync(localOutputDir, { recursive: true });
+  }
+  const localFilePath = path.join(localOutputDir, fileName);
+  fs.writeFileSync(localFilePath, pngBytes);
+
+  let publicUrl = `/certificates/${fileName}`;
+  if (isSupabaseAdminConfigured()) {
+    try {
+      const uploadPromise = supabaseAdmin.storage
+        .from('certificates')
+        .upload(fileName, pngBytes, {
+          contentType: 'image/png',
+          upsert: true
+        });
+      const timeoutPromise = new Promise<{ error: any }>((resolve) =>
+        setTimeout(() => resolve({ error: new Error('Upload timed out after 5s') }), 5000)
+      );
+      const { error: uploadErr } = await Promise.race([uploadPromise, timeoutPromise]);
+      if (!uploadErr) {
+        const { data: urlData } = supabaseAdmin.storage.from('certificates').getPublicUrl(fileName);
+        if (urlData?.publicUrl) publicUrl = urlData.publicUrl;
+      }
+    } catch (e: any) {
+      console.warn('Supabase PNG storage upload warning:', e.message);
+    }
+  }
+
+  return {
+    pngBytes,
+    fileName,
+    storagePath,
+    publicUrl
+  };
+}
+

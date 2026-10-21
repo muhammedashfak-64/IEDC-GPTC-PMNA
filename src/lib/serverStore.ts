@@ -1,7 +1,8 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 import JSZip from 'jszip';
-import { generateSingleCertificatePdf } from './certificateGenerator';
+import { generateSingleCertificatePdf, generateSingleCertificatePng, resolveTemplateFile } from './certificateGenerator';
 import { supabase } from '@/lib/supabase';
 import {
   syncEventToSupabase,
@@ -358,12 +359,36 @@ export function getRegistrations(eventId?: string) {
     list = list.filter((r: any) => r.eventId === eventId);
   }
 
-  // Enrich with event details if missing
+  // Enrich with event details and backfill passToken / qrPayload if absent
   const eventsMap = new Map((db.events || []).map((e: any) => [e.id, e.title]));
-  return list.map((r: any) => ({
-    ...r,
-    eventTitle: r.eventTitle || eventsMap.get(r.eventId) || 'Campus Event'
-  }));
+  let hasBackfills = false;
+
+  const enriched = list.map((r: any) => {
+    let passToken = r.passToken;
+    let qrPayload = r.qrPayload;
+    if (!passToken) {
+      passToken = `pass_${Buffer.from(r.id || r.registrationCode || 'reg').toString('hex').slice(0, 24)}`;
+      r.passToken = passToken;
+      hasBackfills = true;
+    }
+    if (!qrPayload) {
+      qrPayload = `IEDCPASS:${r.eventId}:${r.registrationCode || r.id}:${passToken}`;
+      r.qrPayload = qrPayload;
+      hasBackfills = true;
+    }
+    return {
+      ...r,
+      passToken,
+      qrPayload,
+      eventTitle: r.eventTitle || eventsMap.get(r.eventId) || 'Campus Event'
+    };
+  });
+
+  if (hasBackfills) {
+    try { saveDb(db); } catch {}
+  }
+
+  return enriched;
 }
 
 // Concurrency lock map for serialized atomic event registrations
@@ -606,12 +631,17 @@ function doRegisterStudentForEvent(data: {
     }
   }
 
-  // 6. Generate Registration Record
+  // 6. Generate Registration Record with Unique Pass Token & QR Code Payload
   const codeNum = Math.floor(10000 + Math.random() * 90000);
   const registrationCode = `REG-2026-${codeNum}`;
+  const passToken = `pass_${crypto.randomBytes(12).toString('hex')}`;
+  const qrPayload = `IEDCPASS:${data.eventId}:${registrationCode}:${passToken}`;
+
   const newRegistration = {
     id: `reg-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
     registrationCode,
+    passToken,
+    qrPayload,
     eventId: data.eventId,
     eventTitle: event.title,
     studentName: data.studentName.trim(),
@@ -626,6 +656,11 @@ function doRegisterStudentForEvent(data: {
     course: data.course?.trim() || '',
     additionalNotes: data.additionalNotes || '',
     status,
+    attendance: null,
+    attendanceMethod: null,
+    attendedAt: null,
+    markedBy: null,
+    markedById: null,
     waitlistPosition,
     consent: data.consent !== false,
     registeredAt: new Date().toISOString(),
@@ -1028,17 +1063,9 @@ export async function ensureCertificatePdfExists(cert: any): Promise<string> {
       ? (event?.winnerCertificateTitle ? `— ${event.winnerCertificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : '— OF ACHIEVEMENT —')
       : (event?.certificateTitle ? `— ${event.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : undefined);
 
-    let resolvedTemplatePath: string | undefined = undefined;
-    if (event?.certificateTemplateUrl) {
-      if (fs.existsSync(event.certificateTemplateUrl)) {
-        resolvedTemplatePath = event.certificateTemplateUrl;
-      } else {
-        const localPath = path.join(process.cwd(), 'public', event.certificateTemplateUrl.replace(/^\//, ''));
-        if (fs.existsSync(localPath)) {
-          resolvedTemplatePath = localPath;
-        }
-      }
-    }
+    const activeGlobalTemplate = (db.certificateTemplates || []).find((t: any) => t.isActive);
+    const templateToUse = event?.certificateTemplateUrl || activeGlobalTemplate?.cleanUrl || undefined;
+    const resolvedTemplatePath = await resolveTemplateFile(templateToUse);
 
     const result = await generateSingleCertificatePdf({
       certificateId: certId,
@@ -1227,7 +1254,9 @@ export function markAttendance(
   db.registrations[index].attendance = attendance;
   db.registrations[index].status = isPresent ? 'Attended' : 'Confirmed';
   db.registrations[index].attendedAt = isPresent ? new Date().toISOString() : null;
+  db.registrations[index].attendanceMethod = 'MANUAL';
   db.registrations[index].markedBy = user.full_name || user.username || 'Admin';
+  db.registrations[index].markedById = user.id;
   db.registrations[index].updatedAt = new Date().toISOString();
 
   saveDb(db);
@@ -1273,6 +1302,152 @@ export function markBulkAttendance(
   );
 
   return updatedList;
+}
+
+/**
+ * Validates a scanned QR pass token and atomically marks attendance.
+ * Enforces event binding, prevents duplicates, and logs scan metadata.
+ */
+export function scanPassAttendance(
+  targetEventId: string,
+  scannedCodeOrToken: string,
+  user: AuthUser
+) {
+  const db = loadDb();
+  if (!db.registrations) db.registrations = [];
+  if (!db.events) db.events = [];
+
+  const raw = String(scannedCodeOrToken || '').trim();
+  if (!raw) {
+    const err: any = new Error('INVALID OR UNRECOGNIZED PASS');
+    err.code = 'INVALID_PASS';
+    throw err;
+  }
+
+  // Parse QR payload formats:
+  // 1. "IEDCPASS:eventId:regCode:passToken"
+  // 2. JSON: {"type":"IEDC_EVENT_PASS","eventId":"...","token":"...","regCode":"..."}
+  // 3. Raw passToken or registrationCode or id
+  let scannedEventId = '';
+  let scannedToken = '';
+  let scannedRegCode = '';
+
+  if (raw.startsWith('IEDCPASS:')) {
+    const parts = raw.split(':');
+    scannedEventId = parts[1] || '';
+    scannedRegCode = parts[2] || '';
+    scannedToken = parts[3] || '';
+  } else if (raw.startsWith('{') && raw.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(raw);
+      scannedEventId = parsed.eventId || '';
+      scannedToken = parsed.token || parsed.passToken || '';
+      scannedRegCode = parsed.regCode || parsed.registrationCode || '';
+    } catch {
+      // not JSON
+    }
+  }
+
+  // Fallback if raw is just registrationCode or passToken or regId
+  if (!scannedToken && !scannedRegCode) {
+    scannedToken = raw;
+  }
+
+  // Find registration in DB
+  const regIndex = db.registrations.findIndex((r: any) => {
+    if (scannedToken && r.passToken && r.passToken === scannedToken) return true;
+    if (scannedRegCode && r.registrationCode && r.registrationCode === scannedRegCode) return true;
+    if (raw && (r.registrationCode === raw || r.id === raw || r.passToken === raw)) return true;
+    return false;
+  });
+
+  if (regIndex === -1) {
+    const err: any = new Error('INVALID OR UNRECOGNIZED PASS');
+    err.code = 'INVALID_PASS';
+    throw err;
+  }
+
+  const registration = db.registrations[regIndex];
+
+  // 1. Verify that the pass belongs to the selected event
+  if (registration.eventId !== targetEventId) {
+    const err: any = new Error('THIS PASS DOES NOT BELONG TO THE SELECTED EVENT');
+    err.code = 'WRONG_EVENT';
+    err.eventTitle = registration.eventTitle;
+    throw err;
+  }
+
+  // 2. Verify that registration is valid and not cancelled or rejected
+  if (registration.status === 'Cancelled' || registration.status === 'Rejected') {
+    const err: any = new Error('THIS REGISTRATION IS NOT VALID');
+    err.code = 'INVALID_REGISTRATION';
+    throw err;
+  }
+
+  // 3. Check current attendance status (Duplicate Scan Prevention)
+  const isAlreadyPresent = registration.attendance === 'Present' || registration.status === 'Attended';
+  if (isAlreadyPresent) {
+    return {
+      success: true,
+      alreadyMarked: true,
+      code: 'ALREADY_MARKED',
+      message: 'ALREADY MARKED PRESENT',
+      attendedAt: registration.attendedAt || registration.updatedAt,
+      markedBy: registration.markedBy || 'Admin',
+      attendanceMethod: registration.attendanceMethod || 'QR',
+      data: {
+        id: registration.id,
+        studentName: registration.studentName,
+        registrationCode: registration.registrationCode,
+        registerNumber: registration.registerNumber,
+        department: registration.department,
+        academicYear: registration.academicYear,
+        attendance: 'Present',
+        status: registration.status,
+        eventTitle: registration.eventTitle
+      }
+    };
+  }
+
+  // 4. Mark attendance atomically
+  const nowIso = new Date().toISOString();
+  db.registrations[regIndex].attendance = 'Present';
+  db.registrations[regIndex].status = 'Attended';
+  db.registrations[regIndex].attendedAt = nowIso;
+  db.registrations[regIndex].attendanceMethod = 'QR';
+  db.registrations[regIndex].markedBy = user.full_name || user.username || 'Admin';
+  db.registrations[regIndex].markedById = user.id;
+  db.registrations[regIndex].updatedAt = nowIso;
+
+  saveDb(db);
+  syncRegistrationToSupabase(db.registrations[regIndex], true).catch(console.error);
+
+  addAuditLog(
+    'ATTENDANCE_QR_SCAN',
+    user,
+    `QR Scan: Marked ${registration.studentName} (${registration.registrationCode}) present for event ${targetEventId}`
+  );
+
+  return {
+    success: true,
+    alreadyMarked: false,
+    code: 'ATTENDANCE_MARKED',
+    message: 'ATTENDANCE MARKED SUCCESSFULLY',
+    attendedAt: nowIso,
+    markedBy: db.registrations[regIndex].markedBy,
+    attendanceMethod: 'QR',
+    data: {
+      id: registration.id,
+      studentName: registration.studentName,
+      registrationCode: registration.registrationCode,
+      registerNumber: registration.registerNumber,
+      department: registration.department,
+      academicYear: registration.academicYear,
+      attendance: 'Present',
+      status: 'Attended',
+      eventTitle: registration.eventTitle
+    }
+  };
 }
 
 // -------------------------------------------------------------
@@ -1337,7 +1512,12 @@ export function deleteProgramLeader(id: string, user: AuthUser) {
 // -------------------------------------------------------------
 export async function generateProgramCertificates(
   eventId: string,
-  options: { includeLeaders?: boolean; regenerateExisting?: boolean } = {},
+  options: {
+    includeLeaders?: boolean;
+    regenerateExisting?: boolean;
+    singleRegistrationId?: string;
+    singleCertificateId?: string;
+  } = {},
   user: AuthUser
 ) {
   const db = loadDb();
@@ -1355,14 +1535,21 @@ export async function generateProgramCertificates(
   const templateConfig = event.templateConfig || undefined;
 
   // 1. Eligible Participants: Registered for this event AND marked Present (or Attended)!
-  const eligibleRegistrations = db.registrations.filter((r: any) => {
+  // If event does not track attendance (requiresAttendance === false), confirmed registrations are eligible.
+  let eligibleRegistrations = db.registrations.filter((r: any) => {
     if (r.eventId !== eventId) return false;
-    const isPresent = r.attendance === 'Present' || r.status === 'Attended';
-    return isPresent;
+    if (r.attendance === 'Absent' || r.status === 'Cancelled') return false;
+    if (r.attendance === 'Present' || r.status === 'Attended') return true;
+    if (event.requiresAttendance === false && (r.status === 'Confirmed' || !r.status)) return true;
+    return false;
   });
 
+  if (options.singleRegistrationId) {
+    eligibleRegistrations = eligibleRegistrations.filter((r: any) => r.id === options.singleRegistrationId);
+  }
+
   // 2. Eligible Leaders
-  const eligibleLeaders = options.includeLeaders !== false
+  let eligibleLeaders = options.includeLeaders !== false && !options.singleRegistrationId
     ? db.programLeaders.filter((l: any) => l.eventId === eventId && l.certificateEligible !== false)
     : [];
 
@@ -1379,11 +1566,28 @@ export async function generateProgramCertificates(
     sourceType: 'participant' | 'leader';
     sourceId: string;
   }) {
-    let existingCert = db.certificates.find((c: any) =>
-      c.eventId === eventId &&
-      (c.registerNumber === recipient.registerNumber || (recipient.phone && c.phone === recipient.phone)) &&
-      c.participantName.trim().toUpperCase() === recipient.name.trim().toUpperCase()
-    );
+    // 1. Stable lookup: first by registrationId / sourceId, then phone + normalized name
+    let existingCert = db.certificates.find((c: any) => {
+      if (c.eventId !== eventId) return false;
+      if (c.registrationId && recipient.sourceType === 'participant' && c.registrationId === recipient.sourceId) {
+        return true;
+      }
+      if (c.leaderId && recipient.sourceType === 'leader' && c.leaderId === recipient.sourceId) {
+        return true;
+      }
+      const normCertName = (c.participantName || '').trim().toUpperCase();
+      const normRecipName = (recipient.name || '').trim().toUpperCase();
+      const cleanPhoneCert = String(c.phone || '').replace(/\D/g, '').slice(-10);
+      const cleanPhoneRecip = String(recipient.phone || '').replace(/\D/g, '').slice(-10);
+
+      if (cleanPhoneCert && cleanPhoneRecip && cleanPhoneCert === cleanPhoneRecip && normCertName === normRecipName) {
+        return true;
+      }
+      if (recipient.registerNumber && recipient.registerNumber !== 'N/A' && c.registerNumber === recipient.registerNumber && normCertName === normRecipName) {
+        return true;
+      }
+      return false;
+    });
 
     if (existingCert && !options.regenerateExisting) {
       await ensureCertificatePdfExists(existingCert);
@@ -1392,18 +1596,9 @@ export async function generateProgramCertificates(
     }
 
     const certId = existingCert?.certificateId || `IEDC-2026-${Math.floor(10000 + Math.random() * 90000)}`;
-
-    let resolvedTemplatePath: string | undefined = undefined;
-    if (event.certificateTemplateUrl) {
-      if (fs.existsSync(event.certificateTemplateUrl)) {
-        resolvedTemplatePath = event.certificateTemplateUrl;
-      } else {
-        const localPath = path.join(process.cwd(), 'public', event.certificateTemplateUrl.replace(/^\//, ''));
-        if (fs.existsSync(localPath)) {
-          resolvedTemplatePath = localPath;
-        }
-      }
-    }
+    const activeGlobalTemplate = (db.certificateTemplates || []).find((t: any) => t.isActive);
+    const templateToUse = event.certificateTemplateUrl || activeGlobalTemplate?.cleanUrl || undefined;
+    const resolvedTemplatePath = await resolveTemplateFile(templateToUse);
 
     try {
       const isWinner =
@@ -1450,6 +1645,8 @@ export async function generateProgramCertificates(
         certificateId: certId,
         eventId,
         eventName: programName,
+        registrationId: recipient.sourceType === 'participant' ? recipient.sourceId : undefined,
+        leaderId: recipient.sourceType === 'leader' ? recipient.sourceId : undefined,
         participantName: recipient.name.trim().toUpperCase(),
         registerNumber: recipient.registerNumber,
         phone: recipient.phone,
@@ -1459,6 +1656,7 @@ export async function generateProgramCertificates(
         issueDate: new Date().toISOString().split('T')[0],
         qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/${certId}`,
         pdfStorageUrl: generated.publicUrl || `/certificates/${generated.fileName}`,
+        pngStorageUrl: `/certificates/${certId}.png`,
         status: initialStatus,
         downloadsCount: existingCert?.downloadsCount || 0,
         issuedBy: user.id || 'admin',
@@ -1568,37 +1766,46 @@ export function publishProgramCertificates(eventId: string, publish: boolean, us
   return { count, status: newStatus };
 }
 
-export async function generateProgramCertificatesZip(eventId: string) {
+export async function generateProgramCertificatesZip(
+  eventId: string,
+  format: 'pdf' | 'png' = 'pdf',
+  certificateIds?: string[]
+) {
   const db = loadDb();
-  const certs = (db.certificates || []).filter((c: any) => c.eventId === eventId);
-  if (certs.length === 0) throw new Error('No certificates found for this program.');
+  let certs = (db.certificates || []).filter((c: any) => c.eventId === eventId);
+  if (certificateIds && certificateIds.length > 0) {
+    const idSet = new Set(certificateIds);
+    certs = certs.filter((c: any) => idSet.has(c.id) || idSet.has(c.certificateId));
+  }
+  if (certs.length === 0) throw new Error('No certificates found for this selection.');
 
   const zip = new JSZip();
   let addedCount = 0;
+  const ext = format === 'png' ? 'png' : 'pdf';
 
   for (const c of certs) {
-    const fileName = `${c.certificateId}.pdf`;
+    const fileName = `${c.certificateId}.${ext}`;
     const localPath = path.join(process.cwd(), 'public', 'certificates', fileName);
     if (!fs.existsSync(localPath)) {
       await ensureCertificatePdfExists(c);
     }
     if (fs.existsSync(localPath)) {
       const fileData = fs.readFileSync(localPath);
-      const safeRecipient = (c.participantName || 'Participant').replace(/[^a-zA-Z0-9_\- ]/g, '').trim();
-      const zipEntryName = `${safeRecipient}_${c.certificateId}.pdf`;
+      const safeRecipient = (c.participantName || 'Participant').replace(/[^a-zA-Z0-9]/g, '_').toUpperCase();
+      const zipEntryName = `Certificate_${safeRecipient}_IEDC.${ext}`;
       zip.file(zipEntryName, fileData);
       addedCount++;
     }
   }
 
   if (addedCount === 0) {
-    throw new Error('Certificate PDF files have not been generated yet. Please generate certificates first.');
+    throw new Error(`No certificate ${ext.toUpperCase()} files found. Please generate certificates first.`);
   }
 
   const zipBuffer = await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
   return {
     buffer: zipBuffer,
-    fileName: `Certificates_${eventId}_${new Date().toISOString().split('T')[0]}.zip`,
+    fileName: `Certificates_${eventId}_${ext.toUpperCase()}_${new Date().toISOString().split('T')[0]}.zip`,
     count: addedCount
   };
 }
@@ -1673,6 +1880,8 @@ export async function retrieveStudentCertificate(eventId: string, fullName: stri
       certificateType: match.certificateType,
       issueDate: match.issueDate,
       downloadUrl: `/certificates/${match.certificateId}.pdf`,
+      pdfDownloadUrl: `/certificates/${match.certificateId}.pdf`,
+      pngDownloadUrl: `/certificates/${match.certificateId}.png`,
       status: match.status
     }
   };
@@ -2589,7 +2798,104 @@ export function createBrochure(data: any, user: AuthUser) {
 
 export function getCertificateTemplates() {
   const db = loadDb();
-  return db.certificateTemplates || [];
+  if (!db.certificateTemplates || db.certificateTemplates.length === 0) {
+    db.certificateTemplates = [
+      {
+        id: 'tpl-master-vector',
+        title: 'Official IEDC Master Certificate (Vector Reference)',
+        type: 'Vector PDF Master',
+        pdfUrl: '/templates/reference_certificate.pdf',
+        cleanUrl: '/templates/clean_master_template.pdf',
+        previewPdf: '/templates/test_generated_certificate.pdf',
+        isActive: true,
+        version: 1,
+        createdAt: new Date().toISOString(),
+        description: 'Preserves exact borders, logos, Principal Abdul Kader KT & Coordinator Anuroop P signatures, and typography.'
+      },
+      {
+        id: 'tpl-master-image',
+        title: 'Original Certificate Template High-Res Image (Reference A)',
+        type: 'High-Res PNG Master',
+        pdfUrl: '/uploads/certificate-templates/IEDC_PARTICIPATE_CERTICICATE_1792467393382.png',
+        cleanUrl: '/uploads/certificate-templates/IEDC_PARTICIPATE_CERTICICATE_1792467393382.png',
+        previewPdf: '/templates/test_generated_certificate.pdf',
+        isActive: false,
+        version: 1,
+        createdAt: new Date().toISOString(),
+        description: 'Master image template (6250x4419) with genuine page proportions and geometry.'
+      }
+    ];
+    saveDb(db);
+  }
+  return db.certificateTemplates;
+}
+
+export function saveCertificateTemplate(templateData: any, user: AuthUser) {
+  const db = loadDb();
+  if (!db.certificateTemplates) db.certificateTemplates = [];
+
+  const id = templateData.id || `tpl-${Date.now()}`;
+  const isImage = !templateData.url?.toLowerCase().endsWith('.pdf');
+  const newTpl = {
+    id,
+    title: String(templateData.title || 'Custom Certificate Template').trim(),
+    type: isImage ? 'Image Master' : 'PDF Master',
+    pdfUrl: templateData.url,
+    cleanUrl: templateData.url,
+    previewPdf: templateData.url,
+    isActive: Boolean(templateData.isActive),
+    version: (db.certificateTemplates.length || 0) + 1,
+    description: templateData.description || 'Custom uploaded certificate template.',
+    uploadedBy: user.full_name || user.username || 'Admin',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+
+  if (newTpl.isActive) {
+    db.certificateTemplates.forEach((t: any) => { t.isActive = false; });
+  }
+
+  const existingIdx = db.certificateTemplates.findIndex((t: any) => t.id === id);
+  if (existingIdx !== -1) {
+    db.certificateTemplates[existingIdx] = { ...db.certificateTemplates[existingIdx], ...newTpl };
+  } else {
+    db.certificateTemplates.unshift(newTpl);
+  }
+
+  saveDb(db);
+  addAuditLog('CERTIFICATE_TEMPLATE_SAVE', user, `Saved certificate template "${newTpl.title}" (active: ${newTpl.isActive})`);
+  return newTpl;
+}
+
+export function setActiveCertificateTemplate(templateId: string, user: AuthUser) {
+  const db = loadDb();
+  if (!db.certificateTemplates) db.certificateTemplates = [];
+
+  const found = db.certificateTemplates.find((t: any) => t.id === templateId);
+  if (!found) throw new Error('Template not found');
+
+  db.certificateTemplates.forEach((t: any) => {
+    t.isActive = t.id === templateId;
+    t.updatedAt = new Date().toISOString();
+  });
+
+  saveDb(db);
+  addAuditLog('CERTIFICATE_TEMPLATE_SET_ACTIVE', user, `Set active certificate template to "${found.title}"`);
+  return found;
+}
+
+export function deleteCertificateTemplate(templateId: string, user: AuthUser) {
+  const db = loadDb();
+  if (!db.certificateTemplates) return false;
+  const idx = db.certificateTemplates.findIndex((t: any) => t.id === templateId);
+  if (idx === -1) return false;
+  const removed = db.certificateTemplates.splice(idx, 1)[0];
+  if (removed.isActive && db.certificateTemplates.length > 0) {
+    db.certificateTemplates[0].isActive = true;
+  }
+  saveDb(db);
+  addAuditLog('CERTIFICATE_TEMPLATE_DELETE', user, `Deleted certificate template "${removed.title}"`);
+  return true;
 }
 
 export function getIdeas() {

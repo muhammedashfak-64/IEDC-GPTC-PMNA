@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
 
     // Validate type based on context
     const allowsVideo = ['gallery'].includes(folder);
-    const allowsDoc = ['documents', 'brochures', 'certificates', 'resources', 'projects'].includes(folder);
+    const allowsDoc = ['documents', 'brochures', 'certificates', 'certificate-templates', 'resources', 'projects'].includes(folder);
 
     let isValidType = isImage;
     if (allowsDoc && isDoc) isValidType = true;
@@ -106,6 +106,7 @@ export async function POST(req: NextRequest) {
       blogs: 'website-assets',
       announcements: 'website-assets',
       certificates: 'certificates',
+      'certificate-templates': 'website-assets',
       documents: 'documents',
       brochures: 'documents'
     };

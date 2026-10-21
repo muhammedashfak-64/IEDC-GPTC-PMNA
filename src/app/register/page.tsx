@@ -23,7 +23,8 @@ import {
   Phone,
   Building,
   GraduationCap,
-  Lock
+  Lock,
+  Search
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 
@@ -58,6 +59,46 @@ function RegisterFormContent() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [registeredData, setRegisteredData] = useState<any | null>(null);
   const [copiedId, setCopiedId] = useState(false);
+
+  // Pass Retrieval Mode State
+  const [activeTab, setActiveTab] = useState<'register' | 'lookup'>(
+    searchParams.get('lookup') === '1' ? 'lookup' : 'register'
+  );
+  const [lookupPhone, setLookupPhone] = useState('');
+  const [lookupCode, setLookupCode] = useState('');
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+
+  const handleLookupPass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLookupError(null);
+    if (!selectedEventId && !lookupCode.trim()) {
+      setLookupError('Please select an event or enter your Registration Code.');
+      return;
+    }
+    setLookupLoading(true);
+    try {
+      const res = await fetch('/api/public/registrations/retrieve-pass', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: selectedEventId,
+          phone: lookupPhone,
+          registrationCode: lookupCode
+        })
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error || 'No matching pass found.');
+      }
+      setRegisteredData(json.data);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err: any) {
+      setLookupError(err.message || 'Failed to retrieve pass.');
+    } finally {
+      setLookupLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetch('/api/public/events')
@@ -253,7 +294,13 @@ function RegisterFormContent() {
           {/* QR Code & Student Details */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-center">
             <div className="p-4 rounded-2xl bg-white p-3 flex flex-col items-center justify-center shrink-0 w-fit mx-auto">
-              <QRCode value={registeredData.registrationCode} size={130} />
+              <QRCode
+                value={
+                  registeredData.qrPayload ||
+                  `IEDCPASS:${registeredData.eventId}:${registeredData.registrationCode}:${registeredData.passToken || registeredData.id}`
+                }
+                size={130}
+              />
               <span className="text-[9px] font-mono text-black font-bold mt-2">SCAN FOR CHECK-IN</span>
             </div>
 
@@ -305,12 +352,28 @@ function RegisterFormContent() {
 
         {/* Pass Actions */}
         <div className="flex flex-wrap items-center justify-center gap-3">
+          <a
+            href={`/api/public/registrations/${registeredData.id}/pass/pdf`}
+            download={`IEDC_Pass_${(registeredData.studentName || 'Student').replace(/\s+/g, '_')}.pdf`}
+            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#F98A5B] to-[#EC3A74] hover:opacity-90 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-[#F98A5B]/20 transition-all cursor-pointer"
+          >
+            <Download className="w-4 h-4" />
+            <span>Download Pass (PDF)</span>
+          </a>
+          <a
+            href={`/api/public/registrations/${registeredData.id}/pass/png`}
+            download={`IEDC_Pass_${(registeredData.studentName || 'Student').replace(/\s+/g, '_')}.png`}
+            className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <Download className="w-4 h-4 text-[#F98A5B]" />
+            <span>Download Pass (PNG)</span>
+          </a>
           <button
             onClick={handlePrint}
             className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer"
           >
             <Printer className="w-4 h-4 text-[#F98A5B]" />
-            <span>Print Pass / Save PDF</span>
+            <span>Print Pass</span>
           </button>
           <button
             onClick={openWhatsAppShare}
@@ -322,6 +385,7 @@ function RegisterFormContent() {
           <button
             onClick={() => {
               setRegisteredData(null);
+              setActiveTab('register');
               setFormData({
                 studentName: '',
                 registerNumber: '',
@@ -342,7 +406,7 @@ function RegisterFormContent() {
           </button>
           <Link
             href="/events"
-            className="px-5 py-2.5 rounded-xl bg-[#F98A5B] hover:bg-[#F98A5B]/90 text-black font-bold text-xs flex items-center gap-1.5 transition-colors"
+            className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs flex items-center gap-1.5 transition-colors"
           >
             <span>Back to All Events</span>
             <ChevronRight className="w-3.5 h-3.5" />
@@ -365,19 +429,131 @@ function RegisterFormContent() {
           <span>Back to Events Catalog</span>
         </Link>
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[#F98A5B] text-xs font-mono">
-          <Ticket className="w-3.5 h-3.5" /> STUDENT EVENT REGISTRATION
+          <Ticket className="w-3.5 h-3.5" /> STUDENT EVENT REGISTRATION &amp; PASSES
         </div>
-        <h1 className="text-3xl sm:text-4xl font-black text-white">Event Registration Form</h1>
+        <h1 className="text-3xl sm:text-4xl font-black text-white">Event Registration &amp; Passes</h1>
         <p className="text-neutral-400 text-sm">
-          Register independently for campus bootcamps, technical workshops, and hackathons hosted by IEDC GPTC
-          Perinthalmanna.
+          Register for campus bootcamps, technical workshops, and hackathons hosted by IEDC GPTC
+          Perinthalmanna, or retrieve your official entry pass.
         </p>
       </div>
 
+      {/* Mode Switcher Tabs */}
+      <div className="flex rounded-2xl bg-[#121216] p-1.5 border border-white/10 max-w-md">
+        <button
+          type="button"
+          onClick={() => setActiveTab('register')}
+          className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            activeTab === 'register'
+              ? 'bg-[#F98A5B] text-black shadow-md shadow-[#F98A5B]/20'
+              : 'text-neutral-400 hover:text-white'
+          }`}
+        >
+          <Ticket className="w-4 h-4" />
+          <span>New Registration</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('lookup')}
+          className={`flex-1 py-2.5 px-4 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+            activeTab === 'lookup'
+              ? 'bg-[#F98A5B] text-black shadow-md shadow-[#F98A5B]/20'
+              : 'text-neutral-400 hover:text-white'
+          }`}
+        >
+          <Search className="w-4 h-4" />
+          <span>Retrieve Existing Pass</span>
+        </button>
+      </div>
+
+      {/* Pass Retrieval Card View */}
+      {activeTab === 'lookup' && (
+        <form
+          onSubmit={handleLookupPass}
+          className="p-6 sm:p-8 rounded-3xl bg-[#121216] border border-white/10 space-y-6 shadow-xl"
+        >
+          <div className="border-b border-white/10 pb-4">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <Search className="w-5 h-5 text-[#F98A5B]" /> Retrieve Your Event Entry Pass
+            </h2>
+            <p className="text-xs text-neutral-400 mt-1">
+              Already registered? Enter your details below to download your official PDF or PNG QR pass.
+            </p>
+          </div>
+
+          {lookupError && (
+            <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{lookupError}</span>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
+                Select Program / Event
+              </label>
+              <select
+                value={selectedEventId}
+                onChange={(e) => setSelectedEventId(e.target.value)}
+                className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-4 py-3 text-sm text-white focus:outline-none"
+              >
+                <option value="">-- Select Event --</option>
+                {events.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.title} — {e.date}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
+                  Registered Mobile Number
+                </label>
+                <input
+                  type="tel"
+                  value={lookupPhone}
+                  onChange={(e) => setLookupPhone(e.target.value)}
+                  placeholder="e.g. 9876543210"
+                  className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-4 py-3 text-sm text-white focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
+                  OR Pass ID / Registration Code
+                </label>
+                <input
+                  type="text"
+                  value={lookupCode}
+                  onChange={(e) => setLookupCode(e.target.value.toUpperCase())}
+                  placeholder="e.g. REG-2026-12345"
+                  className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-4 py-3 text-sm text-white focus:outline-none uppercase font-mono"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={lookupLoading}
+              className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-[#F98A5B] to-[#EC3A74] hover:opacity-90 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-[#F98A5B]/20 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Search className="w-4 h-4" />
+              <span>{lookupLoading ? 'Locating Pass...' : 'Find and Download Pass'}</span>
+            </button>
+          </div>
+        </form>
+      )}
+
       {/* Main Registration Box */}
-      <form onSubmit={handleSubmit} className="p-6 sm:p-8 rounded-3xl bg-[#121216] border border-white/10 space-y-6 shadow-xl">
-        {/* Step 1: Event Selection */}
-        <div className="space-y-3">
+      {activeTab === 'register' && (
+        <form onSubmit={handleSubmit} className="p-6 sm:p-8 rounded-3xl bg-[#121216] border border-white/10 space-y-6 shadow-xl">
+          {/* Step 1: Event Selection */}
+          <div className="space-y-3">
           <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block">
             Select Event / Workshop <span className="text-red-400">*</span>
           </label>
@@ -778,6 +954,7 @@ function RegisterFormContent() {
           )}
         </button>
       </form>
+      )}
     </div>
   );
 }

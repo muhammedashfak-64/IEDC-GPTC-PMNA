@@ -13,7 +13,9 @@ import {
   Download,
   Calendar,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  Eye,
+  Image as ImageIcon
 } from 'lucide-react';
 
 export default function CertificatesDownloadPage() {
@@ -23,21 +25,25 @@ export default function CertificatesDownloadPage() {
   const [fullName, setFullName] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
   const [loading, setLoading] = useState(false);
+  const [eventsLoading, setEventsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [retrievedCert, setRetrievedCert] = useState<any>(null);
 
   useEffect(() => {
-    fetch('/api/public/events')
+    // Only fetch programs with official published certificates
+    setEventsLoading(true);
+    fetch('/api/public/events?hasCertificates=true')
       .then((r) => r.json())
       .then((json) => {
-        if (json.success && json.data) {
+        if (json.success && Array.isArray(json.data)) {
           setEvents(json.data);
           if (json.data.length > 0) {
             setSelectedEventId(json.data[0].id);
           }
         }
       })
-      .catch(console.error);
+      .catch((err) => console.error('Error loading events with certificates:', err))
+      .finally(() => setEventsLoading(false));
   }, []);
 
   const handleDownloadSubmit = async (e: React.FormEvent) => {
@@ -45,7 +51,11 @@ export default function CertificatesDownloadPage() {
     setErrorMsg('');
     setRetrievedCert(null);
 
-    // Validation
+    if (!selectedEventId) {
+      setErrorMsg('Please select a program or workshop.');
+      return;
+    }
+
     const cleanName = fullName.trim();
     if (!cleanName) {
       setErrorMsg('Please enter your full name as registered.');
@@ -102,7 +112,7 @@ export default function CertificatesDownloadPage() {
       {/* Download Credentials Form */}
       <div className="max-w-xl mx-auto bg-[#121216] p-6 sm:p-8 rounded-3xl border border-white/15 shadow-2xl space-y-6 backdrop-blur-xl">
         <form onSubmit={handleDownloadSubmit} className="space-y-4">
-          {/* 1. Program Event Selector */}
+          {/* 1. Program Event Selector - Only events with published certificates */}
           <div>
             <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
               1. Select Event / Workshop
@@ -111,15 +121,25 @@ export default function CertificatesDownloadPage() {
               <select
                 value={selectedEventId}
                 onChange={(e) => setSelectedEventId(e.target.value)}
-                className="w-full bg-[#18181D] border border-white/10 focus:border-white/30 rounded-xl px-4 py-3 text-xs text-white focus:outline-none appearance-none cursor-pointer"
+                disabled={eventsLoading || events.length === 0}
+                className="w-full bg-[#18181D] border border-white/10 focus:border-white/30 rounded-xl px-4 py-3 text-xs text-white focus:outline-none appearance-none cursor-pointer disabled:opacity-50"
               >
-                {events.map((evt) => (
-                  <option key={evt.id} value={evt.id} className="bg-[#121216] text-white">
-                    {evt.title} ({evt.date})
-                  </option>
-                ))}
+                {events.length === 0 ? (
+                  <option value="">{eventsLoading ? 'Loading programs...' : 'No published programs available'}</option>
+                ) : (
+                  events.map((evt) => (
+                    <option key={evt.id} value={evt.id} className="bg-[#121216] text-white">
+                      {evt.title} ({evt.date})
+                    </option>
+                  ))
+                )}
               </select>
             </div>
+            {events.length === 0 && !eventsLoading && (
+              <span className="text-[11px] text-amber-400 mt-1 block">
+                No published certificates are currently available for retrieval. Please check back later.
+              </span>
+            )}
           </div>
 
           {/* 2. Full Name Input (Initially Blank, No registration numbers) */}
@@ -132,7 +152,7 @@ export default function CertificatesDownloadPage() {
               <input
                 type="text"
                 required
-                autoComplete="name"
+                autoComplete="off"
                 placeholder="Enter your full name as registered"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
@@ -155,9 +175,9 @@ export default function CertificatesDownloadPage() {
                 type="tel"
                 inputMode="tel"
                 required
-                autoComplete="tel"
+                autoComplete="off"
                 maxLength={10}
-                placeholder="Enter your registered mobile number"
+                placeholder="Enter your registered 10-digit mobile number"
                 value={mobileNumber}
                 onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
                 className="w-full bg-[#18181D] border border-white/10 focus:border-white/30 rounded-xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none font-mono"
@@ -170,7 +190,7 @@ export default function CertificatesDownloadPage() {
 
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || events.length === 0}
             className="w-full py-3.5 rounded-xl bg-white hover:bg-slate-200 text-black font-extrabold text-xs shadow-lg flex items-center justify-center gap-2 cursor-pointer transition-transform hover:scale-[1.01] disabled:opacity-50"
           >
             <ShieldCheck className="w-4 h-4" />
@@ -190,7 +210,7 @@ export default function CertificatesDownloadPage() {
         </div>
       )}
 
-      {/* Verified Certificate Display & Official PDF Download */}
+      {/* Verified Certificate Display & Official PDF / PNG Downloads */}
       {retrievedCert && (
         <div className="max-w-4xl mx-auto space-y-6 pt-4">
           <div className="bg-[#121216] border border-white/20 p-6 sm:p-8 rounded-3xl shadow-2xl space-y-6">
@@ -211,14 +231,33 @@ export default function CertificatesDownloadPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              {/* Download Actions: View, PDF, PNG, QR */}
+              <div className="flex flex-wrap items-center gap-2">
                 <a
                   href={`/api/public/certificates/${retrievedCert.certificateId}/pdf`}
-                  download={`${retrievedCert.certificateId}.pdf`}
+                  target="_blank"
+                  className="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-bold text-white flex items-center gap-1.5 transition-colors"
+                >
+                  <Eye className="w-4 h-4 text-sky-400" />
+                  <span>View</span>
+                </a>
+
+                <a
+                  href={`/api/public/certificates/${retrievedCert.certificateId}/pdf`}
+                  download={`Certificate_${retrievedCert.participantName?.replace(/\s+/g, '_')}_IEDC.pdf`}
                   className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#F98A5B] to-[#EC3A74] text-white text-xs font-extrabold flex items-center gap-2 shadow-lg hover:scale-[1.02] transition-transform cursor-pointer"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Download Official PDF</span>
+                  <span>Download PDF</span>
+                </a>
+
+                <a
+                  href={`/api/public/certificates/${retrievedCert.certificateId}/png`}
+                  download={`Certificate_${retrievedCert.participantName?.replace(/\s+/g, '_')}_IEDC.png`}
+                  className="px-3.5 py-2.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 text-xs font-bold text-purple-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <ImageIcon className="w-4 h-4 text-purple-400" />
+                  <span>Download PNG</span>
                 </a>
 
                 <Link
@@ -227,7 +266,7 @@ export default function CertificatesDownloadPage() {
                   className="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-bold text-white flex items-center gap-1.5 transition-colors"
                 >
                   <QrCode className="w-4 h-4 text-amber-300" />
-                  <span>Public QR Link</span>
+                  <span>Verify Record</span>
                 </Link>
               </div>
             </div>

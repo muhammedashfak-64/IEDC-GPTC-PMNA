@@ -44,9 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="bg-[#0F0F10] text-[#ECECEC] min-h-screen flex flex-col antialiased selection:bg-slate-300 selection:text-black relative font-sans">
         <AppProvider>
-          {showIntro && !isAdminRoute ? (
-            <IntroAnimation onComplete={handleIntroComplete} />
-          ) : isAdminRoute ? (
+          {isAdminRoute ? (
             // Dedicated Private Admin Backend Area - Zero public components
             <div className="min-h-screen bg-[#09090B] text-slate-100 flex flex-col font-sans">
               {children}
@@ -54,6 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           ) : (
             // Dedicated Public Frontend Area
             <div className="flex flex-col min-h-screen relative">
+              {showIntro && <IntroAnimation onComplete={handleIntroComplete} />}
               <ParticleBackground />
 
               {/* Subtle Watermark Logo */}

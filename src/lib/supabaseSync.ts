@@ -421,10 +421,28 @@ export async function syncRegistrationToSupabase(reg: any, isUpdate = false) {
       updated_at: new Date().toISOString()
     };
 
+    const fullRow = {
+      ...row,
+      pass_token: reg.passToken || null,
+      qr_payload: reg.qrPayload || null,
+      attendance_status: reg.attendance || (reg.status === 'Attended' ? 'Present' : 'Absent'),
+      attended_at: reg.attendedAt || null,
+      marked_by: reg.markedBy || null,
+      attendance_method: reg.attendanceMethod || null
+    };
+
     if (isUpdate) {
-      return supabaseAdmin.from('registrations').upsert(row, { onConflict: 'id' });
+      const res = await supabaseAdmin.from('registrations').upsert(fullRow, { onConflict: 'id' });
+      if (res?.error && res.error.message?.includes('column')) {
+        return supabaseAdmin.from('registrations').upsert(row, { onConflict: 'id' });
+      }
+      return res;
     }
-    return supabaseAdmin.from('registrations').insert(row);
+    const insertRes = await supabaseAdmin.from('registrations').insert(fullRow);
+    if (insertRes?.error && insertRes.error.message?.includes('column')) {
+      return supabaseAdmin.from('registrations').insert(row);
+    }
+    return insertRes;
   });
 }
 

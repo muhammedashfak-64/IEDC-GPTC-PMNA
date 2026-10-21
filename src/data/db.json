@@ -496,7 +496,7 @@
       "description": "DRONE ",
       "speaker": "",
       "totalSeats": 100,
-      "seatsAvailable": 97,
+      "seatsAvailable": 93,
       "bannerImage": "https://roboprenr.com/media/images/Drone-Workshop-Image.jpg",
       "brochureUrl": "https://roboprenr.com/media/images/Drone-Workshop-Image.jpg",
       "registrationOpen": true,
@@ -506,7 +506,7 @@
       "studentCoordinator": "Rahul V",
       "createdBy": "usr-faculty-01",
       "createdAt": "2026-10-20T02:26:41.770Z",
-      "updatedAt": "2026-10-21T06:56:36.779Z",
+      "updatedAt": "2026-10-21T08:55:15.265Z",
       "templateConfig": {
         "nameY": 305,
         "nameFontSize": 34,
@@ -637,6 +637,38 @@
     }
   ],
   "registrations": [
+    {
+      "id": "reg-1792572900901-8qcm",
+      "registrationCode": "REG-2026-49488",
+      "passToken": "pass_d6084621f388c5ce0ecbb116",
+      "qrPayload": "IEDCPASS:evt-1792463201770:REG-2026-49488:pass_d6084621f388c5ce0ecbb116",
+      "eventId": "evt-1792463201770",
+      "eventTitle": "DRONE WORKSHOP",
+      "studentName": "RAHUL KRISHNA P",
+      "registerNumber": "GPTC-2026-EE-99",
+      "email": "rahul.test@gptcpmna.edu.in",
+      "phone": "9777123456",
+      "department": "Electronics Engineering",
+      "academicYear": "Second Year",
+      "collegeName": "Govt Polytechnic College Perinthalmanna",
+      "participationCategory": "Internal",
+      "district": "",
+      "course": "",
+      "additionalNotes": "",
+      "status": "Attended",
+      "attendance": "Present",
+      "attendanceMethod": "MANUAL",
+      "attendedAt": "2026-10-21T08:55:11.023Z",
+      "markedBy": "Main Administrator",
+      "markedById": "usr-admin-test",
+      "waitlistPosition": null,
+      "consent": true,
+      "registeredAt": "2026-10-21T08:55:00.901Z",
+      "createdAt": "2026-10-21T08:55:00.902Z",
+      "updatedAt": "2026-10-21T08:55:11.023Z",
+      "certificateId": "IEDC-2026-21922",
+      "certificateGenerated": true
+    },
     {
       "id": "reg-1792519112975-fy91",
       "registrationCode": "REG-2026-39735",
@@ -1552,6 +1584,28 @@
   ],
   "certificates": [
     {
+      "id": "cert-1792572625899-93g0",
+      "certificateId": "IEDC-2026-21922",
+      "eventId": "evt-1792463201770",
+      "eventName": "DRONE WORKSHOP",
+      "registrationId": "reg-1792572900901-8qcm",
+      "participantName": "RAHUL KRISHNA P",
+      "registerNumber": "GPTC-2026-EE-99",
+      "phone": "9777123456",
+      "email": "rahul.test@gptcpmna.edu.in",
+      "certificateType": "Participant",
+      "eventDate": "2026-10-20",
+      "issueDate": "2026-10-21",
+      "qrCodeUrl": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/IEDC-2026-21922",
+      "pdfStorageUrl": "/certificates/IEDC-2026-21922.pdf",
+      "pngStorageUrl": "/certificates/IEDC-2026-21922.png",
+      "status": "Published",
+      "downloadsCount": 5,
+      "issuedBy": "usr-admin-test",
+      "issuedAt": "2026-10-21T08:55:12.097Z",
+      "updatedAt": "2026-10-21T08:55:15.265Z"
+    },
+    {
       "id": "cert-1792507269700-xxk9",
       "certificateId": "IEDC-2026-86111",
       "eventId": "evt-1792507055299",
@@ -1576,6 +1630,7 @@
       "certificateId": "IEDC-2026-43968",
       "eventId": "evt-1792463201770",
       "eventName": "DRONE WORKSHOP",
+      "registrationId": "reg-1792493721769-qddf",
       "participantName": "ANSHADH PK",
       "registerNumber": "24010322235",
       "phone": "7034265962",
@@ -1584,17 +1639,20 @@
       "eventDate": "2026-10-20",
       "issueDate": "2026-10-21",
       "qrCodeUrl": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/IEDC-2026-43968",
-      "pdfStorageUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/certificates/IEDC-2026-43968.pdf",
+      "pdfStorageUrl": "/certificates/IEDC-2026-43968.pdf",
+      "pngStorageUrl": "/certificates/IEDC-2026-43968.png",
       "status": "Published",
       "downloadsCount": 7,
-      "issuedBy": "usr-mainadmin-01",
-      "issuedAt": "2026-10-21T06:45:37.191Z"
+      "issuedBy": "usr-admin-test",
+      "issuedAt": "2026-10-21T08:55:14.241Z",
+      "updatedAt": "2026-10-21T08:55:15.265Z"
     },
     {
       "id": "cert-1792500537399-zqxb",
       "certificateId": "IEDC-2026-43345",
       "eventId": "evt-1792463201770",
       "eventName": "DRONE WORKSHOP",
+      "registrationId": "reg-1792498112837-6ngo",
       "participantName": "FAHEEMA FARHANATH",
       "registerNumber": "24O1032226",
       "phone": "8137815384",
@@ -1603,17 +1661,20 @@
       "eventDate": "2026-10-20",
       "issueDate": "2026-10-21",
       "qrCodeUrl": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/IEDC-2026-43345",
-      "pdfStorageUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/certificates/IEDC-2026-43345.pdf",
+      "pdfStorageUrl": "/certificates/IEDC-2026-43345.pdf",
+      "pngStorageUrl": "/certificates/IEDC-2026-43345.png",
       "status": "Published",
-      "downloadsCount": 3,
-      "issuedBy": "usr-mainadmin-01",
-      "issuedAt": "2026-10-21T06:45:32.133Z"
+      "downloadsCount": 6,
+      "issuedBy": "usr-admin-test",
+      "issuedAt": "2026-10-21T08:55:13.154Z",
+      "updatedAt": "2026-10-21T08:55:15.265Z"
     },
     {
       "id": "cert-1792496374240-tksr",
       "certificateId": "IEDC-2026-58845",
       "eventId": "evt-1792463201770",
       "eventName": "DRONE WORKSHOP",
+      "registrationId": "reg-1792463300157-a637",
       "participantName": "MUHAMMED ASHFAK O",
       "registerNumber": "2401032236",
       "phone": "6282159152",
@@ -1622,11 +1683,13 @@
       "eventDate": "2026-10-20",
       "issueDate": "2026-10-21",
       "qrCodeUrl": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/IEDC-2026-58845",
-      "pdfStorageUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/certificates/IEDC-2026-58845.pdf",
+      "pdfStorageUrl": "/certificates/IEDC-2026-58845.pdf",
+      "pngStorageUrl": "/certificates/IEDC-2026-58845.png",
       "status": "Published",
       "downloadsCount": 7,
-      "issuedBy": "usr-mainadmin-01",
-      "issuedAt": "2026-10-21T06:45:41.205Z"
+      "issuedBy": "usr-admin-test",
+      "issuedAt": "2026-10-21T08:55:15.256Z",
+      "updatedAt": "2026-10-21T08:55:15.265Z"
     },
     {
       "id": "cert-1792483518096-7l97",
@@ -1823,13 +1886,70 @@
   ],
   "certificateTemplates": [
     {
+      "id": "tpl-1792572911034",
+      "title": "Statewide AI & Robotics Custom Template 2026",
+      "type": "Image Master",
+      "pdfUrl": "/uploads/certificate-templates/IEDC_PARTICIPATE_CERTICICATE_1792467393382.png",
+      "cleanUrl": "/uploads/certificate-templates/IEDC_PARTICIPATE_CERTICICATE_1792467393382.png",
+      "previewPdf": "/uploads/certificate-templates/IEDC_PARTICIPATE_CERTICICATE_1792467393382.png",
+      "isActive": true,
+      "version": 6,
+      "description": "Tested active high-resolution custom template.",
+      "uploadedBy": "Main Administrator",
+      "createdAt": "2026-10-21T08:55:11.034Z",
+      "updatedAt": "2026-10-21T08:55:11.040Z"
+    },
+    {
+      "id": "tpl-1792572850474",
+      "title": "Statewide AI & Robotics Custom Template 2026",
+      "type": "Image Master",
+      "pdfUrl": "/uploads/certificate-templates/IEDC_PARTICIPATE_CERTICICATE_1792467393382.png",
+      "cleanUrl": "/uploads/certificate-templates/IEDC_PARTICIPATE_CERTICICATE_1792467393382.png",
+      "previewPdf": "/uploads/certificate-templates/IEDC_PARTICIPATE_CERTICICATE_1792467393382.png",
+      "isActive": false,
+      "version": 5,
+      "description": "Tested active high-resolution custom template.",
+      "uploadedBy": "Main Administrator",
+      "createdAt": "2026-10-21T08:54:10.474Z",
+      "updatedAt": "2026-10-21T08:55:11.040Z"
+    },
+    {
+      "id": "tpl-1792572800841",
+      "title": "Statewide AI & Robotics Custom Template 2026",
+      "type": "Image Master",
+      "pdfUrl": "/uploads/certificate-templates/IEDC_PARTICIPATE_CERTICICATE_1792467393382.png",
+      "cleanUrl": "/uploads/certificate-templates/IEDC_PARTICIPATE_CERTICICATE_1792467393382.png",
+      "previewPdf": "/uploads/certificate-templates/IEDC_PARTICIPATE_CERTICICATE_1792467393382.png",
+      "isActive": false,
+      "version": 4,
+      "description": "Tested active high-resolution custom template.",
+      "uploadedBy": "Main Administrator",
+      "createdAt": "2026-10-21T08:53:20.841Z",
+      "updatedAt": "2026-10-21T08:55:11.040Z"
+    },
+    {
+      "id": "tpl-1792572624776",
+      "title": "Statewide AI & Robotics Custom Template 2026",
+      "type": "Image Master",
+      "pdfUrl": "/uploads/certificate-templates/IEDC_PARTICIPATE_CERTICICATE_1792467393382.png",
+      "cleanUrl": "/uploads/certificate-templates/IEDC_PARTICIPATE_CERTICICATE_1792467393382.png",
+      "previewPdf": "/uploads/certificate-templates/IEDC_PARTICIPATE_CERTICICATE_1792467393382.png",
+      "isActive": false,
+      "version": 3,
+      "description": "Tested active high-resolution custom template.",
+      "uploadedBy": "Main Administrator",
+      "createdAt": "2026-10-21T08:50:24.776Z",
+      "updatedAt": "2026-10-21T08:55:11.040Z"
+    },
+    {
       "id": "tpl-001",
       "title": "Official State Hackathon Template 2026",
       "backgroundImageUrl": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80",
       "fontColor": "#FFFFFF",
       "borderColor": "#F98A5B",
-      "isActive": true,
-      "createdAt": "2026-06-01T10:00:00Z"
+      "isActive": false,
+      "createdAt": "2026-06-01T10:00:00Z",
+      "updatedAt": "2026-10-21T08:55:11.040Z"
     },
     {
       "id": "tpl-002",
@@ -1838,7 +1958,8 @@
       "fontColor": "#F3F4F6",
       "borderColor": "#EC3A74",
       "isActive": false,
-      "createdAt": "2026-06-15T12:00:00Z"
+      "createdAt": "2026-06-15T12:00:00Z",
+      "updatedAt": "2026-10-21T08:55:11.040Z"
     }
   ],
   "brochures": [
@@ -2602,6 +2723,336 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "log-1792572915267-h8li",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "CERTIFICATES_PUBLISH_TOGGLE",
+      "details": "Published 4 certificates for event evt-1792463201770",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:55:15.267Z"
+    },
+    {
+      "id": "log-1792572915262-6xe9",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "CERTIFICATES_PUBLISH_TOGGLE",
+      "details": "Unpublished 4 certificates for event evt-1792463201770",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:55:15.262Z"
+    },
+    {
+      "id": "log-1792572915258-j6go",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "CERTIFICATES_PROGRAM_GENERATE",
+      "details": "Generated 4 certificates for event \"DRONE WORKSHOP\" (0 failed)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:55:15.258Z"
+    },
+    {
+      "id": "log-1792572911042-6g25",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "CERTIFICATE_TEMPLATE_SET_ACTIVE",
+      "details": "Set active certificate template to \"Statewide AI & Robotics Custom Template 2026\"",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:55:11.042Z"
+    },
+    {
+      "id": "log-1792572911037-3glo",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "CERTIFICATE_TEMPLATE_SAVE",
+      "details": "Saved certificate template \"Statewide AI & Robotics Custom Template 2026\" (active: true)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:55:11.037Z"
+    },
+    {
+      "id": "log-1792572911027-1zc5",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "ATTENDANCE_MARK",
+      "details": "Marked RAHUL KRISHNA P as Present",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:55:11.027Z"
+    },
+    {
+      "id": "log-1792572911020-w5ts",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "ATTENDANCE_MARK",
+      "details": "Marked RAHUL KRISHNA P as Absent",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:55:11.020Z"
+    },
+    {
+      "id": "log-1792572911014-8btz",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "ATTENDANCE_QR_SCAN",
+      "details": "QR Scan: Marked RAHUL KRISHNA P (REG-2026-49488) present for event evt-1792463201770",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:55:11.014Z"
+    },
+    {
+      "id": "log-1792572854720-ah1c",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "CERTIFICATES_PROGRAM_GENERATE",
+      "details": "Generated 4 certificates for event \"DRONE WORKSHOP\" (0 failed)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:54:14.720Z"
+    },
+    {
+      "id": "log-1792572850483-7g2v",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "CERTIFICATE_TEMPLATE_SET_ACTIVE",
+      "details": "Set active certificate template to \"Statewide AI & Robotics Custom Template 2026\"",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:54:10.483Z"
+    },
+    {
+      "id": "log-1792572850478-4jou",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "CERTIFICATE_TEMPLATE_SAVE",
+      "details": "Saved certificate template \"Statewide AI & Robotics Custom Template 2026\" (active: true)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:54:10.478Z"
+    },
+    {
+      "id": "log-1792572850472-t8ht",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "ATTENDANCE_MARK",
+      "details": "Marked RAHUL KRISHNA P as Present",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:54:10.472Z"
+    },
+    {
+      "id": "log-1792572850467-0l97",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "ATTENDANCE_MARK",
+      "details": "Marked RAHUL KRISHNA P as Absent",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:54:10.467Z"
+    },
+    {
+      "id": "log-1792572850461-6ssu",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "ATTENDANCE_QR_SCAN",
+      "details": "QR Scan: Marked RAHUL KRISHNA P (REG-2026-29438) present for event evt-1792463201770",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:54:10.461Z"
+    },
+    {
+      "id": "log-1792572804957-55iu",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "CERTIFICATES_PUBLISH_TOGGLE",
+      "details": "Published 4 certificates for event evt-1792463201770",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:53:24.957Z"
+    },
+    {
+      "id": "log-1792572804951-d751",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "CERTIFICATES_PROGRAM_GENERATE",
+      "details": "Generated 4 certificates for event \"DRONE WORKSHOP\" (0 failed)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:53:24.951Z"
+    },
+    {
+      "id": "log-1792572800850-h4qi",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "CERTIFICATE_TEMPLATE_SET_ACTIVE",
+      "details": "Set active certificate template to \"Statewide AI & Robotics Custom Template 2026\"",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:53:20.850Z"
+    },
+    {
+      "id": "log-1792572800844-mjkj",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "CERTIFICATE_TEMPLATE_SAVE",
+      "details": "Saved certificate template \"Statewide AI & Robotics Custom Template 2026\" (active: true)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:53:20.844Z"
+    },
+    {
+      "id": "log-1792572800838-knrg",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "ATTENDANCE_MARK",
+      "details": "Marked RAHUL KRISHNA P as Present",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:53:20.838Z"
+    },
+    {
+      "id": "log-1792572800832-xu1l",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "ATTENDANCE_MARK",
+      "details": "Marked RAHUL KRISHNA P as Absent",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:53:20.832Z"
+    },
+    {
+      "id": "log-1792572800826-3oyh",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "ATTENDANCE_QR_SCAN",
+      "details": "QR Scan: Marked RAHUL KRISHNA P (REG-2026-40728) present for event evt-1792463201770",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:53:20.826Z"
+    },
+    {
+      "id": "log-1792572628944-skke",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "CERTIFICATES_PROGRAM_GENERATE",
+      "details": "Generated 4 certificates for event \"DRONE WORKSHOP\" (0 failed)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:50:28.944Z"
+    },
+    {
+      "id": "log-1792572624783-ekwy",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "CERTIFICATE_TEMPLATE_SET_ACTIVE",
+      "details": "Set active certificate template to \"Statewide AI & Robotics Custom Template 2026\"",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:50:24.783Z"
+    },
+    {
+      "id": "log-1792572624778-73a6",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "CERTIFICATE_TEMPLATE_SAVE",
+      "details": "Saved certificate template \"Statewide AI & Robotics Custom Template 2026\" (active: true)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:50:24.778Z"
+    },
+    {
+      "id": "log-1792572624774-qehp",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "ATTENDANCE_MARK",
+      "details": "Marked RAHUL KRISHNA P as Present",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:50:24.774Z"
+    },
+    {
+      "id": "log-1792572624769-742t",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "ATTENDANCE_MARK",
+      "details": "Marked RAHUL KRISHNA P as Absent",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:50:24.769Z"
+    },
+    {
+      "id": "log-1792572624764-2esp",
+      "userId": "usr-admin-test",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "ATTENDANCE_QR_SCAN",
+      "details": "QR Scan: Marked RAHUL KRISHNA P (REG-2026-97393) present for event evt-1792463201770",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:50:24.764Z"
+    },
+    {
+      "id": "log-1792570336469-w73s",
+      "userId": "admin-1",
+      "userName": "System / Anonymous",
+      "userRole": "Super Admin",
+      "action": "CERTIFICATES_PROGRAM_GENERATE",
+      "details": "Generated 1 certificates for event \"Eligibility Test Event\" (0 failed)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:12:16.469Z"
+    },
+    {
+      "id": "log-1792570335112-4ttg",
+      "userId": "admin-1",
+      "userName": "System / Anonymous",
+      "userRole": "Super Admin",
+      "action": "CERTIFICATES_PROGRAM_GENERATE",
+      "details": "Generated 1 certificates for event \"Eligibility Test Event\" (0 failed)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:12:15.112Z"
+    },
+    {
+      "id": "log-1792570256672-xc5x",
+      "userId": "admin-1",
+      "userName": "System / Anonymous",
+      "userRole": "Super Admin",
+      "action": "CERTIFICATES_PROGRAM_GENERATE",
+      "details": "Generated 1 certificates for event \"Eligibility Test Event\" (0 failed)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:10:56.672Z"
+    },
+    {
+      "id": "log-1792570255413-ys6l",
+      "userId": "admin-1",
+      "userName": "System / Anonymous",
+      "userRole": "Super Admin",
+      "action": "CERTIFICATES_PROGRAM_GENERATE",
+      "details": "Generated 1 certificates for event \"Eligibility Test Event\" (0 failed)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:10:55.413Z"
+    },
+    {
+      "id": "log-1792570216254-kha9",
+      "userId": "admin-1",
+      "userName": "System / Anonymous",
+      "userRole": "Super Admin",
+      "action": "CERTIFICATES_PROGRAM_GENERATE",
+      "details": "Generated 3 certificates for event \"DRONE WORKSHOP\" (0 failed)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:10:16.254Z"
+    },
+    {
+      "id": "log-1792570144113-20lg",
+      "userId": "admin-1",
+      "userName": "System / Anonymous",
+      "userRole": "Super Admin",
+      "action": "CERTIFICATES_PROGRAM_GENERATE",
+      "details": "Generated 3 certificates for event \"DRONE WORKSHOP\" (0 failed)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T08:09:04.113Z"
+    },
     {
       "id": "log-1792565903112-iscy",
       "userId": "usr-mainadmin-01",

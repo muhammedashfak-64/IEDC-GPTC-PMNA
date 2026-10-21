@@ -9,13 +9,20 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   const { id } = await params;
-  let options = { includeLeaders: true, regenerateExisting: false };
+  let options: {
+    includeLeaders?: boolean;
+    regenerateExisting?: boolean;
+    singleRegistrationId?: string;
+    singleCertificateId?: string;
+  } = { includeLeaders: true, regenerateExisting: false };
 
   try {
     const body = await req.json().catch(() => ({}));
     options = {
       includeLeaders: body.includeLeaders !== false,
-      regenerateExisting: !!body.regenerateExisting
+      regenerateExisting: !!body.regenerateExisting,
+      singleRegistrationId: body.singleRegistrationId || undefined,
+      singleCertificateId: body.singleCertificateId || undefined
     };
   } catch (e) {}
 

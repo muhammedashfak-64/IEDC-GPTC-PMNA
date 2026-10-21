@@ -51,6 +51,24 @@ export default function AdminRegistrationsPage() {
   // Modals & Details
   const [selectedRegistration, setSelectedRegistration] = useState<any | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === paginatedList.length && paginatedList.length > 0) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(paginatedList.map((r) => r.id)));
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const loadData = async () => {
     setLoading(true);
@@ -171,8 +189,16 @@ export default function AdminRegistrationsPage() {
   // -------------------------------------------------------------
   // EXCEL EXPORT (.XLSX)
   // -------------------------------------------------------------
-  const exportExcel = (exportAll = false) => {
-    const recordsToExport = exportAll ? registrations : filteredList;
+  const exportExcel = (mode: 'all' | 'filtered' | 'selected' = 'filtered') => {
+    let recordsToExport = filteredList;
+    if (mode === 'all') recordsToExport = registrations;
+    if (mode === 'selected') {
+      recordsToExport = registrations.filter((r) => selectedIds.has(r.id));
+      if (recordsToExport.length === 0) {
+        addToast('No Selection', 'Please select at least one participant using the checkboxes.', 'warning');
+        return;
+      }
+    }
 
     if (recordsToExport.length === 0) {
       addToast('No Data', 'No registration records available to export.', 'warning');
@@ -187,19 +213,16 @@ export default function AdminRegistrationsPage() {
     const cleanRows = recordsToExport.map((r, index) => ({
       'Sl No': index + 1,
       'Registration ID': r.registrationCode || r.id,
-      'Student Name': r.studentName,
-      'Register Number': r.registerNumber,
+      'Full Name': r.studentName,
+      'Admission Number': r.registerNumber || 'N/A',
       'Department': r.department,
       'Academic Year': r.academicYear || '2nd Year',
-      'Event / Program': r.eventTitle || 'Campus Event',
       'Email Address': r.email,
-      'Mobile / WhatsApp': r.phone || 'N/A',
-      'Institution': r.collegeName || 'Govt Polytechnic College Perinthalmanna',
-      'Status': r.status,
-      'Registered Date': r.registeredAt
-        ? new Date(r.registeredAt).toLocaleString('en-IN')
-        : 'N/A',
-      'Additional Notes': r.additionalNotes || ''
+      'Mobile Number': r.phone || 'N/A',
+      'Program / Event': r.eventTitle || 'Campus Event',
+      'Registration Date': r.registeredAt ? new Date(r.registeredAt).toLocaleString('en-IN') : 'N/A',
+      'Attendance Status': r.attendance || (r.status === 'Attended' ? 'Present' : 'Not Marked'),
+      'Status': r.status || 'Confirmed'
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(cleanRows);
@@ -207,35 +230,90 @@ export default function AdminRegistrationsPage() {
     // Set readable column widths
     worksheet['!cols'] = [
       { wch: 8 },  // Sl No
-      { wch: 18 }, // Reg ID
+      { wch: 20 }, // Reg ID
       { wch: 24 }, // Name
-      { wch: 16 }, // Reg No
+      { wch: 18 }, // Admission No
       { wch: 25 }, // Dept
       { wch: 15 }, // Year
-      { wch: 28 }, // Event
       { wch: 28 }, // Email
       { wch: 16 }, // Phone
-      { wch: 32 }, // Institution
-      { wch: 14 }, // Status
+      { wch: 28 }, // Event
       { wch: 22 }, // Date
-      { wch: 30 }  // Notes
+      { wch: 18 }, // Attendance
+      { wch: 14 }  // Status
     ];
 
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Registrations');
 
     const timestamp = new Date().toISOString().split('T')[0];
-    const filename = `IEDC_Registrations_${eventTitle.replace(/[^a-zA-Z0-9_-]/g, '_')}_${timestamp}.xlsx`;
+    const filename = `IEDC_Registrations_${eventTitle.replace(/[^a-zA-Z0-9_-]/g, '_')}_${mode.toUpperCase()}_${timestamp}.xlsx`;
 
     XLSX.writeFile(workbook, filename);
-    addToast('Excel Exported', `Downloaded ${recordsToExport.length} registrations as genuine .xlsx file.`, 'success');
+    addToast('Excel Exported', `Downloaded ${recordsToExport.length} registrations (${mode}) as genuine .xlsx file.`, 'success');
+  };
+
+  // -------------------------------------------------------------
+  // CSV EXPORT (.CSV)
+  // -------------------------------------------------------------
+  const exportCsv = (mode: 'all' | 'filtered' | 'selected' = 'filtered') => {
+    let recordsToExport = filteredList;
+    if (mode === 'all') recordsToExport = registrations;
+    if (mode === 'selected') {
+      recordsToExport = registrations.filter((r) => selectedIds.has(r.id));
+      if (recordsToExport.length === 0) {
+        addToast('No Selection', 'Please select at least one participant using the checkboxes.', 'warning');
+        return;
+      }
+    }
+
+    if (recordsToExport.length === 0) {
+      addToast('No Data', 'No registration records available to export.', 'warning');
+      return;
+    }
+
+    const cleanRows = recordsToExport.map((r, index) => ({
+      'Sl No': index + 1,
+      'Registration ID': r.registrationCode || r.id,
+      'Full Name': r.studentName,
+      'Admission Number': r.registerNumber || 'N/A',
+      'Department': r.department,
+      'Academic Year': r.academicYear || '2nd Year',
+      'Email Address': r.email,
+      'Mobile Number': r.phone || 'N/A',
+      'Program / Event': r.eventTitle || 'Campus Event',
+      'Registration Date': r.registeredAt ? new Date(r.registeredAt).toLocaleString('en-IN') : 'N/A',
+      'Attendance Status': r.attendance || (r.status === 'Attended' ? 'Present' : 'Not Marked'),
+      'Status': r.status || 'Confirmed'
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(cleanRows);
+    const csvContent = XLSX.utils.sheet_to_csv(worksheet);
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `IEDC_Registrations_${mode.toUpperCase()}_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    addToast('CSV Exported', `Exported ${recordsToExport.length} registrations to genuine CSV.`, 'success');
   };
 
   // -------------------------------------------------------------
   // PDF EXPORT (.PDF)
   // -------------------------------------------------------------
-  const exportPDF = (exportAll = false) => {
-    const recordsToExport = exportAll ? registrations : filteredList;
+  const exportPDF = (mode: 'all' | 'filtered' | 'selected' = 'filtered') => {
+    let recordsToExport = filteredList;
+    if (mode === 'all') recordsToExport = registrations;
+    if (mode === 'selected') {
+      recordsToExport = registrations.filter((r) => selectedIds.has(r.id));
+      if (recordsToExport.length === 0) {
+        addToast('No Selection', 'Please select at least one participant using the checkboxes.', 'warning');
+        return;
+      }
+    }
 
     if (recordsToExport.length === 0) {
       addToast('No Data', 'No registration records available to export.', 'warning');
@@ -388,32 +466,61 @@ export default function AdminRegistrationsPage() {
         </div>
 
         {/* Action Buttons: Excel & PDF */}
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          {selectedIds.size > 0 && (
+            <button
+              onClick={() => exportExcel('selected')}
+              className="px-3 py-2 rounded-xl bg-purple-600/25 hover:bg-purple-600/35 border border-purple-500/40 text-purple-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
+              title={`Download Excel workbook for ${selectedIds.size} selected records`}
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-purple-400" />
+              <span>Export Selected ({selectedIds.size})</span>
+            </button>
+          )}
+
           <button
-            onClick={() => exportExcel(false)}
-            className="px-4 py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer shadow-md"
+            onClick={() => exportExcel('filtered')}
+            className="px-3 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
             title={`Download Excel workbook for ${filteredList.length} filtered records`}
           >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-            <span>Download Excel ({filteredList.length})</span>
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Export Filtered ({filteredList.length})</span>
           </button>
 
           <button
-            onClick={() => exportPDF(false)}
-            className="px-4 py-2.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer shadow-md"
-            title={`Download PDF report for ${filteredList.length} filtered records`}
+            onClick={() => exportExcel('all')}
+            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-slate-200 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            title={`Download Excel workbook for all ${registrations.length} registrations`}
           >
-            <FileText className="w-4 h-4 text-blue-400" />
-            <span>Download PDF ({filteredList.length})</span>
+            <Download className="w-3.5 h-3.5 text-slate-400" />
+            <span>Export All ({registrations.length})</span>
+          </button>
+
+          <button
+            onClick={() => exportCsv(selectedIds.size > 0 ? 'selected' : 'filtered')}
+            className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-slate-200 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Download registrations as CSV"
+          >
+            <FileText className="w-3.5 h-3.5 text-amber-400" />
+            <span>CSV</span>
+          </button>
+
+          <button
+            onClick={() => exportPDF(selectedIds.size > 0 ? 'selected' : 'filtered')}
+            className="px-3 py-2 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
+            title="Download PDF printable report"
+          >
+            <FileText className="w-3.5 h-3.5 text-blue-400" />
+            <span>PDF</span>
           </button>
 
           <button
             onClick={loadData}
             disabled={loading}
-            className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
+            className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
             title="Refresh from Supabase"
           >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-[#F98A5B]' : ''}`} />
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#F98A5B]' : ''}`} />
           </button>
         </div>
       </div>
@@ -548,6 +655,15 @@ export default function AdminRegistrationsPage() {
           <table className="w-full text-left text-xs">
             <thead className="bg-[#18181E] border-b border-white/10 text-[10px] font-mono uppercase tracking-wider text-slate-400">
               <tr>
+                <th className="py-3.5 px-3 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    checked={paginatedList.length > 0 && paginatedList.every((r) => selectedIds.has(r.id))}
+                    onChange={toggleSelectAll}
+                    className="rounded border-slate-700 text-[#F98A5B] focus:ring-[#F98A5B] bg-[#18181D] cursor-pointer"
+                    title="Select all on this page"
+                  />
+                </th>
                 <th className="py-3.5 px-4 font-bold">Pass ID</th>
                 <th className="py-3.5 px-4 font-bold">Student Participant</th>
                 <th className="py-3.5 px-4 font-bold">Event &amp; Department</th>
@@ -559,7 +675,18 @@ export default function AdminRegistrationsPage() {
             <tbody className="divide-y divide-white/5 text-slate-300">
               {paginatedList.length > 0 ? (
                 paginatedList.map((reg) => (
-                  <tr key={reg.id} className="hover:bg-white/[0.02] transition-colors">
+                  <tr
+                    key={reg.id}
+                    className={`hover:bg-white/[0.02] transition-colors ${selectedIds.has(reg.id) ? 'bg-[#F98A5B]/[0.05]' : ''}`}
+                  >
+                    <td className="py-4 px-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(reg.id)}
+                        onChange={() => toggleSelectOne(reg.id)}
+                        className="rounded border-slate-700 text-[#F98A5B] focus:ring-[#F98A5B] bg-[#18181D] cursor-pointer"
+                      />
+                    </td>
                     {/* Pass ID */}
                     <td className="py-4 px-4 font-mono text-xs font-bold text-[#F98A5B] whitespace-nowrap">
                       {reg.registrationCode || reg.id}
@@ -653,7 +780,7 @@ export default function AdminRegistrationsPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-slate-500">
+                  <td colSpan={7} className="py-12 text-center text-slate-500">
                     <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
                     <p className="text-sm font-semibold">No registrations found matching your criteria</p>
                     <p className="text-xs mt-1">Try resetting the search keyword or selecting &quot;All Events&quot;.</p>

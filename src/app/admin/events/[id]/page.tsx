@@ -34,7 +34,8 @@ import {
   AlignLeft,
   AlignCenter,
   AlignRight,
-  Bold
+  Bold,
+  QrCode
 } from 'lucide-react';
 import FileUpload from '@/components/admin/FileUpload';
 import ProgramQuotaManager from '@/components/admin/ProgramQuotaManager';
@@ -47,7 +48,7 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
   const { addToast } = useAdmin();
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'overview' | 'attendance' | 'participants' | 'quotas' | 'leaders' | 'template' | 'certificates'>('attendance');
+  const [activeTab, setActiveTab] = useState<'overview' | 'attendance' | 'participants' | 'quotas' | 'leaders' | 'template' | 'certificates' | 'reports'>('attendance');
 
   // Program / Event State
   const [program, setProgram] = useState<any>(null);
@@ -55,6 +56,15 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
   const [leaders, setLeaders] = useState<any[]>([]);
   const [certificates, setCertificates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Selection States for bulk downloads & actions
+  const [selectedParticipantIds, setSelectedParticipantIds] = useState<Set<string>>(new Set());
+  const [selectedCertIds, setSelectedCertIds] = useState<Set<string>>(new Set());
+
+  // Certificate Filter States
+  const [certSearch, setCertSearch] = useState('');
+  const [certTypeFilter, setCertTypeFilter] = useState('All');
+  const [certStatusFilter, setCertStatusFilter] = useState('All');
 
   // Attendance & Filter States
   const [attendanceSearch, setAttendanceSearch] = useState('');
@@ -338,8 +348,31 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
     }
   };
 
-  // Generate Certificates
+  // Batch Generate Certificates
   const handleGenerateCertificates = async (regenerate = false) => {
+    const eligibleParticipants = registrations.filter(
+      (r) => program?.requiresAttendance === false || r.attendance === 'Present' || r.status === 'Attended'
+    );
+    const eligibleLeaders = leaders.filter((l) => l.certificateEligible !== false);
+    const totalEligible = eligibleParticipants.length + eligibleLeaders.length;
+
+    if (totalEligible === 0) {
+      addToast(
+        'No Eligible Participants',
+        'Mark at least one participant as Present before generating certificates.',
+        'warning'
+      );
+      return;
+    }
+
+    const confirmMsg = regenerate
+      ? `Regenerate certificates for all ${totalEligible} eligible participant${totalEligible === 1 ? '' : 's'} (${eligibleParticipants.length} attendees + ${eligibleLeaders.length} leaders)?`
+      : `Generate certificates for ${totalEligible} eligible participant${totalEligible === 1 ? '' : 's'} (${eligibleParticipants.length} attendees + ${eligibleLeaders.length} leaders)?`;
+
+    if (!window.confirm(confirmMsg)) {
+      return;
+    }
+
     setGenerating(true);
     setGenerationSummary(null);
 
@@ -360,7 +393,8 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
 
         const failed = json.failedCount || json.failed || 0;
         const succeeded = json.succeeded || json.generatedCount || 0;
-        const requested = json.requested || (json.totalEligibleParticipants + (json.totalEligibleLeaders || 0));
+        const skipped = json.skipped || 0;
+        const requested = json.requested || totalEligible;
 
         if (failed > 0 && succeeded > 0) {
           addToast(
@@ -377,7 +411,7 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
         } else {
           addToast(
             'Certificates Generated',
-            `Successfully generated all ${succeeded} certificates for eligible attendees.`,
+            `Successfully generated ${succeeded} certificates for eligible attendees (${skipped} existing unchanged).`,
             'success'
           );
         }
@@ -385,11 +419,71 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
       } else {
         const errDetail = json.failures?.[0]?.error || json.error || 'Generation failed';
         addToast('Certificate Generation Failed', errDetail, 'error');
+        setGenerationSummary({
+          success: false,
+          error: errDetail,
+          failures: json.failures || []
+        });
       }
     } catch (err: any) {
-      addToast(err.message, 'error');
+      addToast('Error', err.message, 'error');
     } finally {
       setGenerating(false);
+    }
+  };
+
+  // Single Certificate Regeneration
+  const handleRegenerateSingleCert = async (cert: any) => {
+    try {
+      addToast('Regenerating...', `Regenerating certificate for ${cert.participantName}`, 'info');
+      const res = await fetch(`/api/admin/events/${id}/certificates/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          regenerateExisting: true,
+          singleRegistrationId: cert.registrationId || undefined,
+          singleCertificateId: cert.certificateId
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        addToast('Regenerated', `Certificate regenerated for ${cert.participantName}`, 'success');
+        loadProgramData();
+      } else {
+        throw new Error(json.error || 'Failed to regenerate certificate');
+      }
+    } catch (err: any) {
+      addToast('Regeneration Failed', err.message, 'error');
+    }
+  };
+
+  // Toggle Publication for Single Certificate
+  const handleToggleSingleCertPublication = async (cert: any) => {
+    const nextStatus = cert.status === 'Published' ? 'Draft' : 'Published';
+    try {
+      const res = await fetch('/api/admin/certificates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: cert.id,
+          status: nextStatus
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setCertificates((prev) =>
+          prev.map((c) => (c.id === cert.id ? { ...c, status: nextStatus } : c))
+        );
+        addToast(
+          nextStatus === 'Published' ? 'Certificate Published' : 'Certificate Unpublished',
+          `Certificate for ${cert.participantName} is now ${nextStatus}`,
+          'success'
+        );
+      } else {
+        throw new Error(json.error || 'Failed to update publication status');
+      }
+    } catch (err: any) {
+      addToast('Update Failed', err.message, 'error');
     }
   };
 
@@ -531,85 +625,130 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
     }
   };
 
-  // Download ZIP
-  const handleDownloadZip = async () => {
+  // Download ZIP (supports PDF & PNG, All or Selected)
+  const handleDownloadCertificatesZip = async (format: 'pdf' | 'png' = 'pdf', useSelected = false) => {
+    let targetIds: string[] | undefined = undefined;
+    if (useSelected) {
+      if (selectedCertIds.size === 0) {
+        addToast('No Selection', 'Please select at least one certificate from the table.', 'warning');
+        return;
+      }
+      targetIds = Array.from(selectedCertIds);
+    }
+
     setDownloadingZip(true);
     try {
-      const res = await fetch(`/api/admin/events/${id}/certificates/zip`);
+      const url = `/api/admin/events/${id}/certificates/zip?format=${format}${
+        targetIds && targetIds.length > 0 ? `&ids=${encodeURIComponent(targetIds.join(','))}` : ''
+      }`;
+      const res = await fetch(url);
       if (!res.ok) {
         const json = await res.json().catch(() => ({}));
-        throw new Error(json.error || 'Failed to download ZIP file.');
+        throw new Error(json.error || `Failed to download ${format.toUpperCase()} ZIP.`);
       }
       const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
+      const downloadUrl = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = `Certificates_${program?.title?.replace(/[^a-zA-Z0-9_-]/g, '_') || id}.zip`;
+      a.href = downloadUrl;
+      const safeTitle = (program?.title || 'Program').replace(/[^a-zA-Z0-9_-]/g, '_');
+      a.download = `Certificates_${safeTitle}_${useSelected ? 'SELECTED_' : 'ALL_'}${format.toUpperCase()}.zip`;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      window.URL.revokeObjectURL(url);
-      addToast('ZIP download completed!', 'success');
+      window.URL.revokeObjectURL(downloadUrl);
+      addToast(
+        'ZIP Downloaded',
+        `Successfully downloaded ${useSelected ? selectedCertIds.size : certificates.length} ${format.toUpperCase()} certificates.`,
+        'success'
+      );
     } catch (err: any) {
-      addToast(err.message, 'error');
+      addToast('ZIP Download Failed', err.message, 'error');
     } finally {
       setDownloadingZip(false);
     }
   };
 
-  // Export Participants to Excel (With Department & Waitlist Sheets)
-  const handleExportExcel = () => {
+  // Backwards compatibility alias
+  const handleDownloadZip = () => handleDownloadCertificatesZip('pdf', false);
+
+  // Export Program-Specific Participants to Genuine Excel (.xlsx)
+  const handleExportParticipantsExcel = (mode: 'all' | 'filtered' | 'selected' | 'present' | 'absent' = 'filtered') => {
+    let list = registrations;
+    if (mode === 'filtered') {
+      const q = participantSearch.toLowerCase();
+      list = registrations.filter((r) => {
+        const matchDept = participantDeptFilter === 'All' || r.department === participantDeptFilter;
+        const matchSearch =
+          !q ||
+          (r.studentName || '').toLowerCase().includes(q) ||
+          (r.registerNumber || '').toLowerCase().includes(q) ||
+          (r.email || '').toLowerCase().includes(q) ||
+          (r.phone || '').includes(q);
+        return matchDept && matchSearch;
+      });
+    } else if (mode === 'selected') {
+      list = registrations.filter((r) => selectedParticipantIds.has(r.id));
+      if (list.length === 0) {
+        addToast('No Selection', 'Please select at least one participant using checkboxes.', 'warning');
+        return;
+      }
+    } else if (mode === 'present') {
+      list = registrations.filter((r) => r.attendance === 'Present' || r.status === 'Attended');
+    } else if (mode === 'absent') {
+      list = registrations.filter((r) => !(r.attendance === 'Present' || r.status === 'Attended'));
+    }
+
+    if (list.length === 0) {
+      addToast('No Data', `No participants found for ${mode} export.`, 'warning');
+      return;
+    }
+
+    const rows = list.map((r, i) => {
+      const isPresent = r.attendance === 'Present' || r.status === 'Attended';
+      const isEligible = program?.requiresAttendance === false || isPresent;
+      const cert = certificates.find((c) => c.registrationId === r.id || c.participantName === r.studentName);
+
+      return {
+        'Sl No': i + 1,
+        'Registration ID': r.registrationCode || r.id,
+        'Full Name': r.studentName,
+        'Admission Number': r.registerNumber || 'N/A',
+        'Department': r.department,
+        'Academic Year': r.academicYear || '2nd Year',
+        'Email Address': r.email,
+        'Mobile Number': r.phone || 'N/A',
+        'Attendance': isPresent ? 'Present' : 'Absent',
+        'Certificate Eligibility': isEligible ? 'Eligible' : 'Ineligible (Absent)',
+        'Certificate Status': cert ? `${cert.status} (${cert.certificateId})` : 'Not Generated',
+        'Registration Date': r.registeredAt ? new Date(r.registeredAt).toLocaleString('en-IN') : 'N/A'
+      };
+    });
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet['!cols'] = [
+      { wch: 8 },  // Sl No
+      { wch: 20 }, // Reg ID
+      { wch: 26 }, // Full Name
+      { wch: 18 }, // Admission No
+      { wch: 25 }, // Department
+      { wch: 15 }, // Year
+      { wch: 28 }, // Email
+      { wch: 16 }, // Phone
+      { wch: 14 }, // Attendance
+      { wch: 22 }, // Eligibility
+      { wch: 28 }, // Cert Status
+      { wch: 22 }  // Reg Date
+    ];
+
     const workbook = XLSX.utils.book_new();
-
-    // Sheet 1: All Participants
-    const allRows = registrations.map((r, i) => ({
-      '#': i + 1,
-      'Registration ID': r.registrationCode || r.id,
-      'Student Name': r.studentName,
-      'Admission Number': r.registerNumber,
-      College: r.collegeName || 'Govt Polytechnic College Perinthalmanna',
-      Category: r.participationCategory || (r.collegeName?.includes('Perinthalmanna') ? 'Internal' : 'External'),
-      Department: r.department,
-      'Academic Year': r.academicYear || '',
-      Email: r.email,
-      'Mobile Number': r.phone,
-      Status: r.status,
-      'Waitlist Position': r.waitlistPosition ? `#${r.waitlistPosition}` : '-',
-      Attendance: r.attendance || (r.status === 'Attended' ? 'Present' : 'Absent'),
-      'Attended At': r.attendedAt || '',
-      'Certificate ID': r.certificateId || '',
-      'Registered At': r.registeredAt || ''
-    }));
-    const wsAll = XLSX.utils.json_to_sheet(allRows);
-    XLSX.utils.book_append_sheet(workbook, wsAll, 'All Registrations');
-
-    // Sheet 2: Confirmed Only
-    const confirmedRows = allRows.filter((r) => r.Status === 'Confirmed' || r.Status === 'Attended');
-    if (confirmedRows.length > 0) {
-      const wsConfirmed = XLSX.utils.json_to_sheet(confirmedRows);
-      XLSX.utils.book_append_sheet(workbook, wsConfirmed, 'Confirmed Attendees');
-    }
-
-    // Sheet 3: Waiting List
-    const waitlistRows = allRows.filter((r) => r.Status === 'Waitlisted');
-    if (waitlistRows.length > 0) {
-      const wsWaitlist = XLSX.utils.json_to_sheet(waitlistRows);
-      XLSX.utils.book_append_sheet(workbook, wsWaitlist, 'Waiting List');
-    }
-
-    // Sheet 4: External Colleges (If Statewide)
-    const externalRows = allRows.filter((r) => r.Category === 'External');
-    if (externalRows.length > 0) {
-      const wsExternal = XLSX.utils.json_to_sheet(externalRows);
-      XLSX.utils.book_append_sheet(workbook, wsExternal, 'External Colleges');
-    }
-
-    XLSX.writeFile(
-      workbook,
-      `IEDC_${program?.title?.replace(/[^a-zA-Z0-9_-]/g, '_')}_Master_Report.xlsx`
-    );
-    addToast('Excel export downloaded', 'Includes confirmed, waitlist, and department breakdowns', 'success');
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Participants');
+    const safeTitle = (program?.title || 'Program').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `Participants_${safeTitle}_${mode.toUpperCase()}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(workbook, filename);
+    addToast('Excel Downloaded', `Exported ${list.length} participants (${mode}) to genuine .xlsx`, 'success');
   };
+
+  const handleExportExcel = () => handleExportParticipantsExcel('all');
 
   // Export Participants to PDF
   const handleExportPdf = () => {
@@ -706,6 +845,14 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
         {/* Global Action Toolbar */}
         <div className="flex flex-wrap items-center gap-2">
           <Link
+            href={`/admin/scanner?event=${id}`}
+            className="px-3.5 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 text-xs font-bold flex items-center gap-1.5 transition-all shadow-md shadow-purple-500/10 cursor-pointer"
+          >
+            <QrCode className="w-3.5 h-3.5 text-purple-400" />
+            <span>QR Scanner</span>
+          </Link>
+
+          <Link
             href={`/register?event=${id}`}
             target="_blank"
             className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs text-slate-300 flex items-center gap-1.5 transition-colors"
@@ -767,12 +914,13 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
       {/* Tabs Navigation */}
       <div className="flex border-b border-white/10 overflow-x-auto gap-2">
         {[
-          { id: 'attendance', label: `Attendance Marking (${presentCount}/${registrations.length})`, icon: CheckCircle2 },
-          { id: 'participants', label: `Participants (${registrations.length})`, icon: Users },
-          { id: 'quotas', label: 'Quotas & Seat Allocation', icon: Layers },
-          { id: 'leaders', label: `Leaders & Organizers (${leaders.length})`, icon: Award },
-          { id: 'template', label: 'Certificate Template', icon: Stamp },
-          { id: 'certificates', label: `Certificates (${certificates.length})`, icon: Award },
+          { id: 'attendance', label: `1. Attendance (${presentCount}/${registrations.length})`, icon: CheckCircle2 },
+          { id: 'participants', label: `2. Participants (${registrations.length})`, icon: Users },
+          { id: 'leaders', label: `3. Leaders & Organizers (${leaders.length})`, icon: Award },
+          { id: 'template', label: '4. Certificate Template', icon: Stamp },
+          { id: 'certificates', label: `5. Generated Certificates (${certificates.length})`, icon: Award },
+          { id: 'reports', label: '6. Reports & Downloads', icon: Download },
+          { id: 'quotas', label: 'Quotas & Seats', icon: Layers },
           { id: 'overview', label: 'Program Settings', icon: Sliders }
         ].map((tab) => {
           const Icon = tab.icon;
@@ -830,6 +978,13 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
             </div>
 
             <div className="flex items-center gap-2">
+              <Link
+                href={`/admin/scanner?event=${id}`}
+                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 text-white text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-purple-500/20 transition-all cursor-pointer"
+              >
+                <QrCode className="w-4 h-4" />
+                <span>Open QR Scanner</span>
+              </Link>
               <button
                 onClick={() => handleBulkAttendance('Present')}
                 className="px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1.5 transition-all"
@@ -944,140 +1099,268 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
       {/* ======================================================== */}
       {/* TAB 2: PARTICIPANTS MANAGEMENT & EXPORTS                */}
       {/* ======================================================== */}
-      {activeTab === 'participants' && (
-        <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 glass-iedc p-4 rounded-2xl border border-white/10">
-            <div className="flex items-center gap-3 flex-1">
-              <div className="relative flex-1 sm:w-64">
-                <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search student or email..."
-                  value={participantSearch}
-                  onChange={(e) => setParticipantSearch(e.target.value)}
-                  className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-[#F98A5B]"
-                />
+      {activeTab === 'participants' && (() => {
+        const filteredParticipantsList = registrations.filter((r) => {
+          const matchDept = participantDeptFilter === 'All' || r.department === participantDeptFilter;
+          const q = participantSearch.toLowerCase().trim();
+          const matchSearch =
+            !q ||
+            (r.studentName || '').toLowerCase().includes(q) ||
+            (r.registerNumber || '').toLowerCase().includes(q) ||
+            (r.email || '').toLowerCase().includes(q) ||
+            (r.phone || '').includes(q);
+          return matchDept && matchSearch;
+        });
+
+        const toggleSelectAllParticipants = () => {
+          if (selectedParticipantIds.size === filteredParticipantsList.length && filteredParticipantsList.length > 0) {
+            setSelectedParticipantIds(new Set());
+          } else {
+            setSelectedParticipantIds(new Set(filteredParticipantsList.map((r) => r.id)));
+          }
+        };
+
+        const toggleSelectOneParticipant = (regId: string) => {
+          setSelectedParticipantIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(regId)) next.delete(regId);
+            else next.add(regId);
+            return next;
+          });
+        };
+
+        return (
+          <div className="space-y-4">
+            {/* Filter & Export Toolbar */}
+            <div className="glass-iedc p-4 rounded-2xl border border-white/10 space-y-3">
+              <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="relative flex-1 sm:w-64">
+                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search student, reg no, or email..."
+                      value={participantSearch}
+                      onChange={(e) => setParticipantSearch(e.target.value)}
+                      className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-[#F98A5B]"
+                    />
+                  </div>
+
+                  <select
+                    value={participantDeptFilter}
+                    onChange={(e) => setParticipantDeptFilter(e.target.value)}
+                    className="bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                  >
+                    <option value="All">All Departments</option>
+                    <option value="Computer Engineering">Computer Engineering</option>
+                    <option value="Electronics Engineering">Electronics Engineering</option>
+                    <option value="Mechanical Engineering">Mechanical Engineering</option>
+                    <option value="Civil Engineering">Civil Engineering</option>
+                    <option value="Electrical Engineering">Electrical Engineering</option>
+                  </select>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setEditingParticipant(null);
+                    setParticipantForm({
+                      studentName: '',
+                      registerNumber: '',
+                      email: '',
+                      phone: '',
+                      department: 'Computer Engineering',
+                      academicYear: '2nd Year',
+                      collegeName: 'Govt Polytechnic College Perinthalmanna'
+                    });
+                    setShowAddParticipantModal(true);
+                  }}
+                  className="px-3 py-2 rounded-xl bg-gradient-to-r from-[#F98A5B] to-[#EC3A74] text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-md shadow-[#F98A5B]/20 cursor-pointer"
+                >
+                  <UserPlus className="w-4 h-4" /> Add Participant
+                </button>
               </div>
 
-              <select
-                value={participantDeptFilter}
-                onChange={(e) => setParticipantDeptFilter(e.target.value)}
-                className="bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
-              >
-                <option value="All">All Departments</option>
-                <option value="Computer Engineering">Computer Engineering</option>
-                <option value="Electronics Engineering">Electronics Engineering</option>
-                <option value="Mechanical Engineering">Mechanical Engineering</option>
-                <option value="Civil Engineering">Civil Engineering</option>
-                <option value="Electrical Engineering">Electrical Engineering</option>
-              </select>
+              {/* Dedicated Excel & PDF Export Buttons Bar */}
+              <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-white/5">
+                <span className="text-[10px] font-mono uppercase text-slate-400 font-bold mr-1">
+                  Export Options:
+                </span>
+
+                {selectedParticipantIds.size > 0 && (
+                  <button
+                    onClick={() => handleExportParticipantsExcel('selected')}
+                    className="px-3 py-1.5 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/40 text-purple-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                    title={`Export ${selectedParticipantIds.size} selected participants`}
+                  >
+                    <FileSpreadsheet className="w-3.5 h-3.5 text-purple-400" />
+                    <span>Download Selected ({selectedParticipantIds.size}) — Excel</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => handleExportParticipantsExcel('all')}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-white/10 text-slate-200 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Download all participants as genuine .xlsx"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Download All ({registrations.length}) — Excel</span>
+                </button>
+
+                <button
+                  onClick={() => handleExportParticipantsExcel('filtered')}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
+                  title="Download filtered participants as .xlsx"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Download Filtered ({filteredParticipantsList.length}) — Excel</span>
+                </button>
+
+                <button
+                  onClick={() => handleExportParticipantsExcel('present')}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Download present attendees as .xlsx"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Download Present ({presentCount}) — Excel</span>
+                </button>
+
+                <button
+                  onClick={() => handleExportParticipantsExcel('absent')}
+                  className="px-3 py-1.5 rounded-xl bg-rose-950/40 hover:bg-rose-900/50 border border-rose-500/40 text-rose-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Download absent participants as .xlsx"
+                >
+                  <XCircle className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Download Absent ({absentCount}) — Excel</span>
+                </button>
+
+                <button
+                  onClick={handleExportPdf}
+                  className="px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
+                  title="Download Participant List report as PDF"
+                >
+                  <FileText className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Download Participant List — PDF</span>
+                </button>
+              </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleExportExcel}
-                className="px-3 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1.5 transition-all"
-              >
-                <FileSpreadsheet className="w-4 h-4" /> Download Excel
-              </button>
-
-              <button
-                onClick={handleExportPdf}
-                className="px-3 py-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 text-xs font-bold flex items-center gap-1.5 transition-all"
-              >
-                <FileText className="w-4 h-4" /> Download PDF
-              </button>
-
-              <button
-                onClick={() => {
-                  setEditingParticipant(null);
-                  setParticipantForm({
-                    studentName: '',
-                    registerNumber: '',
-                    email: '',
-                    phone: '',
-                    department: 'Computer Engineering',
-                    academicYear: '2nd Year',
-                    collegeName: 'Govt Polytechnic College Perinthalmanna'
-                  });
-                  setShowAddParticipantModal(true);
-                }}
-                className="px-3 py-2 rounded-xl bg-gradient-to-r from-[#F98A5B] to-[#EC3A74] text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-[#F98A5B]/20"
-              >
-                <UserPlus className="w-4 h-4" /> Add Participant
-              </button>
-            </div>
-          </div>
-
-          {/* Participant Table */}
-          <div className="glass-iedc rounded-2xl border border-white/10 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-white/10 bg-white/5 text-slate-400 uppercase font-mono tracking-wider">
-                    <th className="py-3 px-4">#</th>
-                    <th className="py-3 px-4">Reg Code</th>
-                    <th className="py-3 px-4">Student Name</th>
-                    <th className="py-3 px-4">Admission No</th>
-                    <th className="py-3 px-4">Department</th>
-                    <th className="py-3 px-4">Email</th>
-                    <th className="py-3 px-4">Phone</th>
-                    <th className="py-3 px-4 text-center">Attendance</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5 text-slate-300">
-                  {registrations.map((reg, idx) => (
-                    <tr key={reg.id} className="hover:bg-white/5 transition-colors">
-                      <td className="py-3 px-4 text-slate-500 font-mono">{idx + 1}</td>
-                      <td className="py-3 px-4 font-mono text-[#F98A5B]">
-                        {reg.registrationCode || reg.id}
-                      </td>
-                      <td className="py-3 px-4 font-bold text-white">{reg.studentName}</td>
-                      <td className="py-3 px-4 font-mono text-slate-400">{reg.registerNumber}</td>
-                      <td className="py-3 px-4">{reg.department}</td>
-                      <td className="py-3 px-4 text-slate-400 truncate max-w-[150px]">{reg.email}</td>
-                      <td className="py-3 px-4 font-mono text-slate-400">{reg.phone}</td>
-                      <td className="py-3 px-4 text-center">
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            reg.attendance === 'Present' || reg.status === 'Attended'
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                              : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
-                          }`}
-                        >
-                          {reg.attendance || (reg.status === 'Attended' ? 'Present' : 'Absent')}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-right">
-                        <button
-                          onClick={() => {
-                            setEditingParticipant(reg);
-                            setParticipantForm({
-                              studentName: reg.studentName,
-                              registerNumber: reg.registerNumber,
-                              email: reg.email,
-                              phone: reg.phone,
-                              department: reg.department,
-                              academicYear: reg.academicYear || '2nd Year',
-                              collegeName: reg.collegeName || 'Govt Polytechnic College Perinthalmanna'
-                            });
-                            setShowAddParticipantModal(true);
-                          }}
-                          className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
-                          title="Edit spelling / phone"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-                      </td>
+            {/* Participant Table */}
+            <div className="glass-iedc rounded-2xl border border-white/10 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-white/10 bg-white/5 text-slate-400 uppercase font-mono tracking-wider">
+                      <th className="py-3 px-3 w-10 text-center">
+                        <input
+                          type="checkbox"
+                          checked={
+                            filteredParticipantsList.length > 0 &&
+                            filteredParticipantsList.every((r) => selectedParticipantIds.has(r.id))
+                          }
+                          onChange={toggleSelectAllParticipants}
+                          className="rounded border-slate-700 text-[#F98A5B] focus:ring-[#F98A5B] bg-[#18181D] cursor-pointer"
+                          title="Select all matching participants"
+                        />
+                      </th>
+                      <th className="py-3 px-3">#</th>
+                      <th className="py-3 px-4">Reg Code</th>
+                      <th className="py-3 px-4">Student Name</th>
+                      <th className="py-3 px-4">Admission No</th>
+                      <th className="py-3 px-4">Department</th>
+                      <th className="py-3 px-4">Email</th>
+                      <th className="py-3 px-4">Phone</th>
+                      <th className="py-3 px-4 text-center">Attendance</th>
+                      <th className="py-3 px-4">Certificate ID</th>
+                      <th className="py-3 px-4 text-right">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 text-slate-300">
+                    {filteredParticipantsList.length === 0 ? (
+                      <tr>
+                        <td colSpan={11} className="py-12 text-center text-slate-500">
+                          <Users className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                          <p className="text-sm font-semibold">No participants found matching the criteria.</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredParticipantsList.map((reg, idx) => {
+                        const cert = certificates.find(
+                          (c) => c.registrationId === reg.id || c.participantName === reg.studentName
+                        );
+                        const isSelected = selectedParticipantIds.has(reg.id);
+
+                        return (
+                          <tr
+                            key={reg.id}
+                            className={`hover:bg-white/5 transition-colors ${isSelected ? 'bg-[#F98A5B]/[0.05]' : ''}`}
+                          >
+                            <td className="py-3 px-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleSelectOneParticipant(reg.id)}
+                                className="rounded border-slate-700 text-[#F98A5B] focus:ring-[#F98A5B] bg-[#18181D] cursor-pointer"
+                              />
+                            </td>
+                            <td className="py-3 px-3 text-slate-500 font-mono">{idx + 1}</td>
+                            <td className="py-3 px-4 font-mono text-[#F98A5B]">
+                              {reg.registrationCode || reg.id}
+                            </td>
+                            <td className="py-3 px-4 font-bold text-white">{reg.studentName}</td>
+                            <td className="py-3 px-4 font-mono text-slate-400">{reg.registerNumber || 'N/A'}</td>
+                            <td className="py-3 px-4">{reg.department}</td>
+                            <td className="py-3 px-4 text-slate-400 truncate max-w-[150px]">{reg.email}</td>
+                            <td className="py-3 px-4 font-mono text-slate-400">{reg.phone || 'N/A'}</td>
+                            <td className="py-3 px-4 text-center">
+                              <span
+                                className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                  reg.attendance === 'Present' || reg.status === 'Attended'
+                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                                    : 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+                                }`}
+                              >
+                                {reg.attendance || (reg.status === 'Attended' ? 'Present' : 'Absent')}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 font-mono text-xs text-slate-400">
+                              {cert ? (
+                                <span className="text-[#F98A5B] font-bold">{cert.certificateId}</span>
+                              ) : (
+                                <span className="text-slate-500 italic">Not Generated</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-right">
+                              <button
+                                onClick={() => {
+                                  setEditingParticipant(reg);
+                                  setParticipantForm({
+                                    studentName: reg.studentName,
+                                    registerNumber: reg.registerNumber,
+                                    email: reg.email,
+                                    phone: reg.phone,
+                                    department: reg.department,
+                                    academicYear: reg.academicYear || '2nd Year',
+                                    collegeName: reg.collegeName || 'Govt Polytechnic College Perinthalmanna'
+                                  });
+                                  setShowAddParticipantModal(true);
+                                }}
+                                className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                                title="Edit participant details"
+                              >
+                                <Edit3 className="w-3.5 h-3.5" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ======================================================== */}
       {/* TAB: REGISTRATION QUOTAS & SEAT ALLOCATION               */}
@@ -1160,10 +1443,41 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                 </span>
               </div>
 
-              {/* Master Template Notice */}
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300">
-                <span className="font-bold text-white">Master Template: </span>
-                Official vector artwork with mosaic border cubes, institutional logos, and authentic signatures preserved.
+              {/* Master Template Notice & Active Indicator */}
+              <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-white">Active Template Status:</span>
+                  {program?.certificateTemplateUrl ? (
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-mono text-[10px] font-bold border border-emerald-500/30">
+                      CUSTOM UPLOAD ACTIVE
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 font-mono text-[10px] font-bold border border-blue-500/30">
+                      DEFAULT MASTER VECTOR
+                    </span>
+                  )}
+                </div>
+                {program?.certificateTemplateUrl ? (
+                  <div className="text-[11px] text-slate-400 break-all font-mono">
+                    File: {program.certificateTemplateUrl.split('/').pop()}
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-400">
+                    Official vector artwork with mosaic border cubes, institutional logos, and authentic signatures preserved.
+                  </p>
+                )}
+                {program?.certificateTemplateUrl && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProgram((p: any) => ({ ...p, certificateTemplateUrl: '' }));
+                      addToast('Reset to default master template (click Save Configuration to persist)', 'info');
+                    }}
+                    className="text-[10px] text-rose-400 hover:text-rose-300 underline font-mono cursor-pointer"
+                  >
+                    Reset to Default Master Template
+                  </button>
+                )}
               </div>
 
               {/* Custom Master Template Upload */}
@@ -1687,127 +2001,528 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
       {/* ======================================================== */}
       {/* TAB 5: CERTIFICATES & DISTRIBUTION                       */}
       {/* ======================================================== */}
-      {activeTab === 'certificates' && (
-        <div className="space-y-6">
-          {/* Action Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 glass-iedc p-5 rounded-2xl border border-white/10">
-            <div>
-              <h3 className="text-sm font-bold text-white">Certificate Issuance & Distribution</h3>
-              <p className="text-xs text-slate-400">
-                Generate individual certificates for students who attended and eligible leaders.
-              </p>
-            </div>
+      {activeTab === 'certificates' && (() => {
+        const filteredCerts = certificates.filter((c) => {
+          const q = certSearch.toLowerCase().trim();
+          const matchSearch =
+            !q ||
+            (c.participantName || '').toLowerCase().includes(q) ||
+            (c.certificateId || '').toLowerCase().includes(q) ||
+            (c.registrationId || '').toLowerCase().includes(q);
+          const matchType = certTypeFilter === 'All' || c.certificateType === certTypeFilter;
+          const matchStatus = certStatusFilter === 'All' || c.status === certStatusFilter;
+          return matchSearch && matchType && matchStatus;
+        });
 
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={() => handleGenerateCertificates(true)}
-                disabled={generating}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#F98A5B] to-[#EC3A74] text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-[#F98A5B]/20 disabled:opacity-50"
+        const toggleSelectAllCerts = () => {
+          if (selectedCertIds.size === filteredCerts.length && filteredCerts.length > 0) {
+            setSelectedCertIds(new Set());
+          } else {
+            setSelectedCertIds(new Set(filteredCerts.map((c) => c.id || c.certificateId)));
+          }
+        };
+
+        const toggleSelectOneCert = (id: string) => {
+          setSelectedCertIds((prev) => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+          });
+        };
+
+        return (
+          <div className="space-y-6">
+            {/* Generation Summary Box (when batch generated) */}
+            {generationSummary && (
+              <div
+                className={`p-4 rounded-2xl border ${
+                  (generationSummary.failedCount || generationSummary.failed || 0) > 0
+                    ? 'bg-rose-950/30 border-rose-500/40'
+                    : 'bg-emerald-950/30 border-emerald-500/40'
+                }`}
               >
-                <RefreshCw className={`w-3.5 h-3.5 ${generating ? 'animate-spin' : ''}`} />
-                {generating ? 'Generating...' : 'Regenerate All'}
-              </button>
+                <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                  <div className="flex items-center gap-2">
+                    <Award
+                      className={`w-5 h-5 ${
+                        (generationSummary.failedCount || generationSummary.failed || 0) > 0
+                          ? 'text-rose-400'
+                          : 'text-emerald-400'
+                      }`}
+                    />
+                    <h4 className="text-sm font-bold text-white">Certificate Generation Summary</h4>
+                  </div>
+                  <button
+                    onClick={() => setGenerationSummary(null)}
+                    className="text-xs text-slate-400 hover:text-white cursor-pointer"
+                  >
+                    Dismiss ✕
+                  </button>
+                </div>
 
-              {program?.certificateStatus === 'Published' ? (
-                <button
-                  onClick={() => handleTogglePublication(false)}
-                  className="px-4 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-bold transition-all"
-                >
-                  Unpublish Certificates
-                </button>
-              ) : (
-                <button
-                  onClick={() => handleTogglePublication(true)}
-                  className="px-4 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-all shadow-md"
-                >
-                  ✓ Publish Certificates to Students
-                </button>
-              )}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 text-xs">
+                  <div className="bg-white/5 p-2.5 rounded-xl border border-white/5">
+                    <span className="text-slate-400 block text-[10px] uppercase font-mono">Eligible Attendees</span>
+                    <span className="text-base font-bold text-white">
+                      {generationSummary.requested ||
+                        (generationSummary.totalEligibleParticipants || 0) +
+                          (generationSummary.totalEligibleLeaders || 0)}
+                    </span>
+                  </div>
+                  <div className="bg-white/5 p-2.5 rounded-xl border border-white/5">
+                    <span className="text-emerald-400 block text-[10px] uppercase font-mono">Successfully Generated</span>
+                    <span className="text-base font-bold text-emerald-300">
+                      {generationSummary.succeeded || generationSummary.generatedCount || 0}
+                    </span>
+                  </div>
+                  <div className="bg-white/5 p-2.5 rounded-xl border border-rose-500/20">
+                    <span className="text-rose-400 block text-[10px] uppercase font-mono">Failed</span>
+                    <span className="text-base font-bold text-rose-300">
+                      {generationSummary.failedCount || generationSummary.failed || 0}
+                    </span>
+                  </div>
+                  <div className="bg-white/5 p-2.5 rounded-xl border border-white/5">
+                    <span className="text-amber-400 block text-[10px] uppercase font-mono">Skipped (Existed)</span>
+                    <span className="text-base font-bold text-amber-300">{generationSummary.skipped || 0}</span>
+                  </div>
+                </div>
 
-              <button
-                onClick={handleDownloadZip}
-                disabled={downloadingZip || certificates.length === 0}
-                className="px-4 py-2 rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 text-blue-400 text-xs font-bold flex items-center gap-1.5 transition-all disabled:opacity-50"
-              >
-                <Download className="w-4 h-4" />
-                {downloadingZip ? 'Preparing ZIP...' : 'Download All as ZIP'}
-              </button>
-            </div>
-          </div>
+                {generationSummary.failures && generationSummary.failures.length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-rose-500/20 text-xs">
+                    <div className="font-bold text-rose-300 mb-1">Failed Records:</div>
+                    <ul className="space-y-1 text-slate-300">
+                      {generationSummary.failures.map((f: any, idx: number) => (
+                        <li key={idx} className="flex items-center gap-2 text-rose-200">
+                          <span className="text-rose-400">•</span>
+                          <span className="font-bold">{f.recipient}:</span> {f.error}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
 
-          {/* Certificates Table */}
-          <div className="glass-iedc rounded-2xl border border-white/10 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs">
-                <thead>
-                  <tr className="border-b border-white/10 bg-white/5 text-slate-400 uppercase font-mono tracking-wider">
-                    <th className="py-3 px-4">#</th>
-                    <th className="py-3 px-4">Certificate ID</th>
-                    <th className="py-3 px-4">Recipient Name</th>
-                    <th className="py-3 px-4">Role</th>
-                    <th className="py-3 px-4">Issued Date</th>
-                    <th className="py-3 px-4 text-center">Publication Status</th>
-                    <th className="py-3 px-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5 text-slate-300">
-                  {certificates.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="py-12 text-center text-slate-500">
-                        No certificates generated yet. Click &quot;Generate Certificates&quot; to produce PDFs for present participants.
-                      </td>
-                    </tr>
+            {/* Action Bar & Batch ZIP Toolbar */}
+            <div className="glass-iedc p-5 rounded-2xl border border-white/10 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-sm font-bold text-white">Generated Certificates Workspace</h3>
+                  <p className="text-xs text-slate-400">
+                    Verify, preview, publish, and bulk download generated PDF and PNG certificates.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => handleGenerateCertificates(false)}
+                    disabled={generating}
+                    className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#F98A5B] to-[#EC3A74] text-white text-xs font-bold flex items-center gap-1.5 shadow-md shadow-[#F98A5B]/20 disabled:opacity-50 cursor-pointer"
+                  >
+                    <Award className="w-3.5 h-3.5" />
+                    {generating ? 'Processing...' : 'Generate Certificates'}
+                  </button>
+
+                  <button
+                    onClick={() => handleGenerateCertificates(true)}
+                    disabled={generating}
+                    className="px-3 py-2 rounded-xl bg-white/10 hover:bg-white/15 border border-white/10 text-white text-xs font-bold flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${generating ? 'animate-spin' : ''}`} />
+                    {generating ? 'Regenerating...' : 'Regenerate All'}
+                  </button>
+
+                  {program?.certificateStatus === 'Published' ? (
+                    <button
+                      onClick={() => handleTogglePublication(false)}
+                      className="px-3 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-bold transition-all cursor-pointer"
+                    >
+                      Unpublish All
+                    </button>
                   ) : (
-                    certificates.map((cert, idx) => (
-                      <tr key={cert.id} className="hover:bg-white/5 transition-colors">
-                        <td className="py-3 px-4 text-slate-500 font-mono">{idx + 1}</td>
-                        <td className="py-3 px-4 font-mono font-bold text-[#F98A5B]">
-                          {cert.certificateId}
-                        </td>
-                        <td className="py-3 px-4 font-bold text-white">
-                          {cert.participantName}
-                        </td>
-                        <td className="py-3 px-4 text-slate-300">
-                          {cert.certificateType}
-                        </td>
-                        <td className="py-3 px-4 text-slate-400 font-mono">
-                          {cert.issueDate || cert.eventDate}
-                        </td>
-                        <td className="py-3 px-4 text-center">
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                              cert.status === 'Published'
-                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                                : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
-                            }`}
-                          >
-                            {cert.status}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
-                            <a
-                              href={cert.pdfStorageUrl || `/certificates/${cert.certificateId}.pdf`}
-                              target="_blank"
-                              className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors flex items-center gap-1 font-mono text-[11px]"
-                            >
-                              <Eye className="w-3.5 h-3.5" /> PDF
-                            </a>
-                            <a
-                              href={cert.pdfStorageUrl || `/certificates/${cert.certificateId}.pdf`}
-                              download={`${cert.participantName}_${cert.certificateId}.pdf`}
-                              className="p-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-emerald-400 transition-colors"
-                              title="Download PDF"
-                            >
-                              <Download className="w-3.5 h-3.5" />
-                            </a>
-                          </div>
+                    <button
+                      onClick={() => handleTogglePublication(true)}
+                      className="px-3 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-all shadow-md cursor-pointer"
+                    >
+                      ✓ Publish All to Students
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Bulk ZIP & Search Toolbar */}
+              <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 pt-3 border-t border-white/5">
+                {/* Search & Filter */}
+                <div className="flex flex-wrap items-center gap-2.5 flex-1">
+                  <div className="relative flex-1 sm:w-60 min-w-[200px]">
+                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                    <input
+                      type="text"
+                      placeholder="Search recipient or cert ID..."
+                      value={certSearch}
+                      onChange={(e) => setCertSearch(e.target.value)}
+                      className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-[#F98A5B]"
+                    />
+                  </div>
+
+                  <select
+                    value={certTypeFilter}
+                    onChange={(e) => setCertTypeFilter(e.target.value)}
+                    className="bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                  >
+                    <option value="All">All Types</option>
+                    <option value="Participation">Participation</option>
+                    <option value="Achievement">Achievement / Winner</option>
+                    <option value="Organizer">Organizer / Lead</option>
+                  </select>
+
+                  <select
+                    value={certStatusFilter}
+                    onChange={(e) => setCertStatusFilter(e.target.value)}
+                    className="bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                  >
+                    <option value="All">All Statuses</option>
+                    <option value="Published">Published</option>
+                    <option value="Draft">Draft</option>
+                  </select>
+                </div>
+
+                {/* Bulk ZIP Downloads */}
+                <div className="flex flex-wrap items-center gap-2">
+                  {selectedCertIds.size > 0 && (
+                    <>
+                      <button
+                        onClick={() => handleDownloadCertificatesZip('pdf', true)}
+                        disabled={downloadingZip}
+                        className="px-3 py-1.5 rounded-xl bg-purple-600/25 hover:bg-purple-600/35 border border-purple-500/40 text-purple-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
+                        title="Download selected certificates as PDFs ZIP"
+                      >
+                        <Download className="w-3.5 h-3.5 text-purple-400" />
+                        <span>Selected PDFs ZIP ({selectedCertIds.size})</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleDownloadCertificatesZip('png', true)}
+                        disabled={downloadingZip}
+                        className="px-3 py-1.5 rounded-xl bg-purple-600/25 hover:bg-purple-600/35 border border-purple-500/40 text-purple-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
+                        title="Download selected certificates as PNGs ZIP"
+                      >
+                        <Download className="w-3.5 h-3.5 text-purple-400" />
+                        <span>Selected PNGs ZIP ({selectedCertIds.size})</span>
+                      </button>
+                    </>
+                  )}
+
+                  <button
+                    onClick={() => handleDownloadCertificatesZip('pdf', false)}
+                    disabled={downloadingZip || certificates.length === 0}
+                    className="px-3 py-1.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md disabled:opacity-50"
+                    title="Download all certificates as PDFs in a ZIP file"
+                  >
+                    <Download className="w-3.5 h-3.5 text-blue-400" />
+                    <span>All PDFs ZIP ({certificates.length})</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleDownloadCertificatesZip('png', false)}
+                    disabled={downloadingZip || certificates.length === 0}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-md disabled:opacity-50"
+                    title="Download all certificates as PNGs in a ZIP file"
+                  >
+                    <Download className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>All PNGs ZIP ({certificates.length})</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Generated Certificates Table with 9 Required Columns */}
+            <div className="glass-iedc rounded-2xl border border-white/10 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="border-b border-white/10 bg-white/5 text-slate-400 uppercase font-mono tracking-wider">
+                      <th className="py-3 px-3 w-10 text-center">
+                        <input
+                          type="checkbox"
+                          checked={
+                            filteredCerts.length > 0 &&
+                            filteredCerts.every((c) => selectedCertIds.has(c.id || c.certificateId))
+                          }
+                          onChange={toggleSelectAllCerts}
+                          className="rounded border-slate-700 text-[#F98A5B] focus:ring-[#F98A5B] bg-[#18181D] cursor-pointer"
+                          title="Select all certificates"
+                        />
+                      </th>
+                      <th className="py-3 px-3">#</th>
+                      <th className="py-3 px-4 font-bold">Recipient Name</th>
+                      <th className="py-3 px-4 font-bold">Registration ID</th>
+                      <th className="py-3 px-4 font-bold">Certificate ID</th>
+                      <th className="py-3 px-4 font-bold">Certificate Type</th>
+                      <th className="py-3 px-4 text-center font-bold">Attendance</th>
+                      <th className="py-3 px-4 text-center font-bold">Generation Status</th>
+                      <th className="py-3 px-4 text-center font-bold">Publication Status</th>
+                      <th className="py-3 px-4 font-bold">Generated Date</th>
+                      <th className="py-3 px-4 text-right font-bold">Available Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 text-slate-300">
+                    {filteredCerts.length === 0 ? (
+                      <tr>
+                        <td colSpan={11} className="py-12 text-center text-slate-500">
+                          <Award className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                          <p className="text-sm font-semibold">No certificates generated yet.</p>
+                          <p className="text-xs mt-1">
+                            Click &quot;Generate Certificates&quot; above to create certificates for all eligible present attendees.
+                          </p>
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      filteredCerts.map((cert, idx) => {
+                        const certKey = cert.id || cert.certificateId;
+                        const isSelected = selectedCertIds.has(certKey);
+                        const reg = registrations.find(
+                          (r) => r.id === cert.registrationId || r.studentName === cert.participantName
+                        );
+                        const attendanceStatus = reg?.attendance || (reg?.status === 'Attended' ? 'Present' : 'Present');
+                        const safeName = (cert.participantName || 'Participant').replace(/[^a-zA-Z0-9]/g, '_').toUpperCase();
+
+                        return (
+                          <tr
+                            key={certKey}
+                            className={`hover:bg-white/5 transition-colors ${isSelected ? 'bg-[#F98A5B]/[0.05]' : ''}`}
+                          >
+                            <td className="py-3 px-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleSelectOneCert(certKey)}
+                                className="rounded border-slate-700 text-[#F98A5B] focus:ring-[#F98A5B] bg-[#18181D] cursor-pointer"
+                              />
+                            </td>
+                            <td className="py-3 px-3 text-slate-500 font-mono">{idx + 1}</td>
+                            <td className="py-3 px-4 font-bold text-white whitespace-nowrap">
+                              {cert.participantName}
+                            </td>
+                            <td className="py-3 px-4 font-mono text-slate-400 whitespace-nowrap">
+                              {cert.registrationId || reg?.registrationCode || reg?.id || 'N/A'}
+                            </td>
+                            <td className="py-3 px-4 font-mono font-bold text-[#F98A5B] whitespace-nowrap">
+                              {cert.certificateId}
+                            </td>
+                            <td className="py-3 px-4 text-slate-300">
+                              <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 font-medium text-[11px]">
+                                {cert.certificateType || 'Participation'}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                                {attendanceStatus}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-300 border border-blue-500/30">
+                                Ready (PDF+PNG)
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <button
+                                onClick={() => handleToggleSingleCertPublication(cert)}
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all cursor-pointer ${
+                                  cert.status === 'Published'
+                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20'
+                                    : 'bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20'
+                                }`}
+                                title="Click to toggle publication"
+                              >
+                                {cert.status === 'Published' ? 'Published' : 'Draft'}
+                              </button>
+                            </td>
+                            <td className="py-3 px-4 text-slate-400 font-mono text-[11px] whitespace-nowrap">
+                              {cert.issueDate || cert.createdAt || cert.eventDate || 'N/A'}
+                            </td>
+                            <td className="py-3 px-4 text-right whitespace-nowrap">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {/* Preview */}
+                                <a
+                                  href={cert.pdfStorageUrl || `/certificates/${cert.certificateId}.pdf`}
+                                  target="_blank"
+                                  className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors flex items-center gap-1 font-mono text-[11px]"
+                                  title="Preview PDF Certificate in new tab"
+                                >
+                                  <Eye className="w-3.5 h-3.5 text-blue-400" /> Preview
+                                </a>
+
+                                {/* Download PDF */}
+                                <a
+                                  href={cert.pdfStorageUrl || `/certificates/${cert.certificateId}.pdf`}
+                                  download={`Certificate_${safeName}_IEDC.pdf`}
+                                  className="px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-300 transition-colors flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                                  title="Download high-resolution PDF certificate"
+                                >
+                                  <Download className="w-3.5 h-3.5" /> PDF
+                                </a>
+
+                                {/* Download PNG */}
+                                <a
+                                  href={`/api/public/certificates/${cert.id || cert.certificateId}/png`}
+                                  download={`Certificate_${safeName}_IEDC.png`}
+                                  className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-300 transition-colors flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                                  title="Download companion PNG certificate"
+                                >
+                                  <Download className="w-3.5 h-3.5" /> PNG
+                                </a>
+
+                                {/* Regenerate */}
+                                <button
+                                  onClick={() => handleRegenerateSingleCert(cert)}
+                                  className="p-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-[#F98A5B] transition-colors cursor-pointer"
+                                  title="Regenerate this certificate"
+                                >
+                                  <RefreshCw className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ======================================================== */}
+      {/* TAB 6: REPORTS & DOWNLOADS                               */}
+      {/* ======================================================== */}
+      {activeTab === 'reports' && (
+        <div className="space-y-6">
+          <div className="glass-iedc p-5 rounded-2xl border border-white/10">
+            <h3 className="text-sm font-bold text-white">Reports &amp; Direct Downloads</h3>
+            <p className="text-xs text-slate-400 mt-1">
+              One-click instant exports for event registration records, attendance manifests, and certificate bundles.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* 1. All Participants Master Excel */}
+            <div className="glass-iedc p-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 space-y-3 flex flex-col justify-between">
+              <div>
+                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 mb-3">
+                  <FileSpreadsheet className="w-5 h-5" />
+                </div>
+                <h4 className="text-sm font-bold text-white">Full Participant Master (Excel)</h4>
+                <p className="text-xs text-slate-400 mt-1">
+                  Complete dataset of all {registrations.length} registered students including admission number, department, email, phone, attendance, and certificate ID.
+                </p>
+              </div>
+              <button
+                onClick={() => handleExportParticipantsExcel('all')}
+                className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-md"
+              >
+                <Download className="w-4 h-4" /> Download .XLSX ({registrations.length})
+              </button>
+            </div>
+
+            {/* 2. Present Participants Excel */}
+            <div className="glass-iedc p-5 rounded-2xl border border-blue-500/30 bg-blue-500/5 space-y-3 flex flex-col justify-between">
+              <div>
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 mb-3">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <h4 className="text-sm font-bold text-white">Present Attendees Only (Excel)</h4>
+                <p className="text-xs text-slate-400 mt-1">
+                  Export verified attendees ({presentCount} students) eligible for certificates with timestamped attendance records.
+                </p>
+              </div>
+              <button
+                onClick={() => handleExportParticipantsExcel('present')}
+                className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-md"
+              >
+                <Download className="w-4 h-4" /> Download Present .XLSX ({presentCount})
+              </button>
+            </div>
+
+            {/* 3. Absent Participants Excel */}
+            <div className="glass-iedc p-5 rounded-2xl border border-rose-500/30 bg-rose-500/5 space-y-3 flex flex-col justify-between">
+              <div>
+                <div className="w-10 h-10 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400 mb-3">
+                  <XCircle className="w-5 h-5" />
+                </div>
+                <h4 className="text-sm font-bold text-white">Absent Students (Excel)</h4>
+                <p className="text-xs text-slate-400 mt-1">
+                  Export absent participants ({absentCount} students) who did not attend the program.
+                </p>
+              </div>
+              <button
+                onClick={() => handleExportParticipantsExcel('absent')}
+                className="w-full py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-md"
+              >
+                <Download className="w-4 h-4" /> Download Absent .XLSX ({absentCount})
+              </button>
+            </div>
+
+            {/* 4. Participant List PDF */}
+            <div className="glass-iedc p-5 rounded-2xl border border-purple-500/30 bg-purple-500/5 space-y-3 flex flex-col justify-between">
+              <div>
+                <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 mb-3">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <h4 className="text-sm font-bold text-white">Printable Participant Manifest (PDF)</h4>
+                <p className="text-xs text-slate-400 mt-1">
+                  Formatted landscape A4 PDF document suitable for official college reporting and desk registration verification.
+                </p>
+              </div>
+              <button
+                onClick={handleExportPdf}
+                className="w-full py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-md"
+              >
+                <Download className="w-4 h-4" /> Download Printable PDF
+              </button>
+            </div>
+
+            {/* 5. All Certificates PDF ZIP */}
+            <div className="glass-iedc p-5 rounded-2xl border border-amber-500/30 bg-amber-500/5 space-y-3 flex flex-col justify-between">
+              <div>
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 mb-3">
+                  <Award className="w-5 h-5" />
+                </div>
+                <h4 className="text-sm font-bold text-white">All Certificates Bundle (PDF ZIP)</h4>
+                <p className="text-xs text-slate-400 mt-1">
+                  Archive containing individual high-quality PDF certificates for all {certificates.length} generated recipients.
+                </p>
+              </div>
+              <button
+                onClick={() => handleDownloadCertificatesZip('pdf', false)}
+                disabled={certificates.length === 0 || downloadingZip}
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#F98A5B] to-[#EC3A74] text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md disabled:opacity-50"
+              >
+                <Download className="w-4 h-4" /> Download All PDFs (ZIP)
+              </button>
+            </div>
+
+            {/* 6. All Certificates PNG ZIP */}
+            <div className="glass-iedc p-5 rounded-2xl border border-cyan-500/30 bg-cyan-500/5 space-y-3 flex flex-col justify-between">
+              <div>
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 mb-3">
+                  <Award className="w-5 h-5" />
+                </div>
+                <h4 className="text-sm font-bold text-white">All Certificates Images (PNG ZIP)</h4>
+                <p className="text-xs text-slate-400 mt-1">
+                  Archive containing individual PNG images for social media sharing and digital distribution ({certificates.length} recipients).
+                </p>
+              </div>
+              <button
+                onClick={() => handleDownloadCertificatesZip('png', false)}
+                disabled={certificates.length === 0 || downloadingZip}
+                className="w-full py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md disabled:opacity-50"
+              >
+                <Download className="w-4 h-4" /> Download All PNGs (ZIP)
+              </button>
             </div>
           </div>
         </div>

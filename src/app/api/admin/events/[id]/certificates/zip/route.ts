@@ -9,9 +9,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   const { id } = await params;
+  const format = req.nextUrl.searchParams.get('format') === 'png' ? 'png' : 'pdf';
+  const idsParam = req.nextUrl.searchParams.get('ids');
+  const certificateIds = idsParam ? idsParam.split(',').map((s) => s.trim()).filter(Boolean) : undefined;
 
   try {
-    const { buffer, fileName, count } = await generateProgramCertificatesZip(id);
+    const { buffer, fileName, count } = await generateProgramCertificatesZip(id, format, certificateIds);
 
     return new NextResponse(buffer as any, {
       status: 200,

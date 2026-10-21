@@ -28,6 +28,7 @@ import {
   UserCheck,
   UserCog,
   Settings,
+  QrCode,
   Bell,
   User,
   LogOut,
@@ -91,6 +92,7 @@ export const AdminSidebar: React.FC = () => {
       title: 'PARTICIPATION & CERTIFICATES',
       items: [
         { id: 'registrations', name: '5. Event Registrations', href: '/admin/registrations', icon: Users },
+        { id: 'scanner', name: 'QR Attendance Scanner', href: '/admin/scanner', icon: QrCode },
         { id: 'participants', name: '6. Participants Directory', href: '/admin/participants', icon: Contact },
         { id: 'certificates', name: '7. Certificates', href: '/admin/certificates', icon: Award },
         { id: 'certificate-templates', name: '8. Certificate Templates', href: '/admin/certificate-templates', icon: Stamp }
