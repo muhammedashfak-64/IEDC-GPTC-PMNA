@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ShieldCheck, Mail, Phone, ExternalLink } from 'lucide-react';
 
+import AnimatedProfileCard from '@/components/team/AnimatedProfileCard';
+
 export default function PublicFacultyPage() {
   const [faculty, setFaculty] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,40 +37,18 @@ export default function PublicFacultyPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-        {faculty.map((fac) => (
-          <div key={fac.id} className="p-6 sm:p-8 rounded-3xl bg-[#121216] border border-white/10 space-y-5 flex flex-col justify-between shadow-xl">
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <img
-                  src={fac.photoUrl || '/college-logo.png'}
-                  alt={fac.name}
-                  className="w-20 h-20 rounded-2xl object-cover border-2 border-white/15 shadow"
-                />
-                <div>
-                  <h3 className="font-extrabold text-white text-xl">{fac.name}</h3>
-                  <p className="text-xs text-amber-300 font-bold">{fac.designation}</p>
-                  <span className="text-[11px] text-slate-400 font-mono block mt-0.5">{fac.department}</span>
-                </div>
-              </div>
-
-              <p className="text-xs text-slate-300 leading-relaxed bg-[#18181D] p-4 rounded-2xl border border-white/5">
-                {fac.bio}
-              </p>
-            </div>
-
-            <div className="pt-4 border-t border-white/5 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
-              <div className="flex items-center gap-2">
-                <Mail className="w-3.5 h-3.5 text-slate-400" />
-                <a href={`mailto:${fac.email}`} className="hover:text-white font-mono">{fac.email}</a>
-              </div>
-              {fac.phone && (
-                <div className="flex items-center gap-2 font-mono">
-                  <Phone className="w-3.5 h-3.5 text-slate-400" />
-                  <span>{fac.phone}</span>
-                </div>
-              )}
-            </div>
-          </div>
+        {faculty.map((fac, idx) => (
+          <AnimatedProfileCard
+            key={fac.id}
+            member={{
+              ...fac,
+              role: fac.designation || 'Faculty Coordinator',
+              category: 'Faculty Leadership'
+            }}
+            index={idx}
+            containerHeight="h-80 sm:h-96"
+            layoutVariant="faculty"
+          />
         ))}
       </div>
 

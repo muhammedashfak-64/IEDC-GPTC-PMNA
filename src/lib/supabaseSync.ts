@@ -37,6 +37,9 @@ export async function syncEventToSupabase(event: any, isUpdate = false) {
       brochure_url: event.brochureUrl || '',
       registration_link: event.registrationLink || '',
       status: event.status || 'Published',
+      quota_config: event.quotaConfig || null,
+      registration_start_date: event.registrationStartDate || null,
+      registration_closing_date: event.registrationClosingDate || null,
       updated_at: new Date().toISOString()
     };
 
@@ -58,7 +61,7 @@ export async function deleteEventFromSupabase(id: string) {
 // -------------------------------------------------------------
 export async function syncTeamMemberToSupabase(member: any, isUpdate = false) {
   return safeDbOp('syncTeamMemberToSupabase', async () => {
-    const row = {
+    const baseRow = {
       id: member.id,
       name: member.name,
       role: member.role || member.position || 'Executive Member',
@@ -80,10 +83,38 @@ export async function syncTeamMemberToSupabase(member: any, isUpdate = false) {
       updated_at: new Date().toISOString()
     };
 
-    if (isUpdate) {
-      return supabaseAdmin.from('team_members').upsert(row, { onConflict: 'id' });
+    const extendedRow = {
+      ...baseRow,
+      image_position: member.imagePosition || 'bottom',
+      image_scale: member.imageScale !== undefined ? Number(member.imageScale) : 1.0,
+      animation_enabled: member.animationEnabled !== false,
+      animation_style: member.animationStyle || 'fade-up',
+      animation_delay: member.animationDelay !== undefined ? Number(member.animationDelay) : 0,
+      glow_enabled: member.glowEnabled !== false,
+      glow_intensity: member.glowIntensity || 'subtle',
+      bg_style: member.bgStyle || 'radial-light',
+      is_transparent: member.isTransparent !== false
+    };
+
+    // Try syncing extended row first; if DB columns are not yet migrated, fall back to base row
+    try {
+      const res = isUpdate
+        ? await supabaseAdmin.from('team_members').upsert(extendedRow, { onConflict: 'id' })
+        : await supabaseAdmin.from('team_members').insert(extendedRow);
+      
+      if (!res.error) return res;
+      if (res.error?.code === '42703') {
+        // Fall back to base columns
+        return isUpdate
+          ? await supabaseAdmin.from('team_members').upsert(baseRow, { onConflict: 'id' })
+          : await supabaseAdmin.from('team_members').insert(baseRow);
+      }
+      return res;
+    } catch {
+      return isUpdate
+        ? await supabaseAdmin.from('team_members').upsert(baseRow, { onConflict: 'id' })
+        : await supabaseAdmin.from('team_members').insert(baseRow);
     }
-    return supabaseAdmin.from('team_members').insert(row);
   });
 }
 
@@ -309,6 +340,9 @@ export async function syncSettingsToSupabase(settings: any) {
       college_name: settings.collegeName || 'Government Polytechnic College, Perinthalmanna',
       hero_heading: settings.heroHeading || 'Where Innovation Meets Opportunity',
       campus_photo_url: settings.campusPhotoUrl || '/campus-main.jpeg',
+      iedc_gptc_pmna_logo_url: settings.iedcGptcPmnaLogoUrl || '/iedc-gptc-pmna-logo.png',
+      college_logo_url: settings.collegeLogoUrl || '/college-logo.png',
+      iedc_logo_url: settings.iedcLogoUrl || '/iedc-logo.png',
       contact_email: settings.contact?.email || 'iedc@gptcpmna.edu.in',
       contact_phone: settings.contact?.phone || '+91 4933 227221',
       address: settings.contact?.address || '',
@@ -356,8 +390,12 @@ export async function syncRegistrationToSupabase(reg: any, isUpdate = false) {
       department: reg.department || 'General',
       academic_year: reg.academicYear || reg.academic_year || '2nd Year',
       college_name: reg.collegeName || reg.college_name || 'Govt Polytechnic College Perinthalmanna',
+      participation_category: reg.participationCategory || reg.participation_category || 'Internal',
+      waitlist_position: reg.waitlistPosition ?? reg.waitlist_position ?? null,
+      district: reg.district || null,
+      course: reg.course || null,
       additional_notes: reg.additionalNotes || reg.additional_notes || '',
-      status: ['Confirmed', 'Pending', 'Attended', 'Cancelled'].includes(reg.status) ? reg.status : 'Confirmed',
+      status: ['Confirmed', 'Pending', 'Attended', 'Cancelled', 'Waitlisted', 'Rejected'].includes(reg.status) ? reg.status : 'Confirmed',
       consent: reg.consent !== false,
       created_at: reg.registeredAt || reg.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString()

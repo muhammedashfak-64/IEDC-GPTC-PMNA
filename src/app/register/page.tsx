@@ -22,7 +22,8 @@ import {
   Mail,
   Phone,
   Building,
-  GraduationCap
+  GraduationCap,
+  Lock
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
 
@@ -35,14 +36,20 @@ function RegisterFormContent() {
   const [loadingEvents, setLoadingEvents] = useState(true);
 
   // Form State
+  const [participationCategory, setParticipationCategory] = useState<'Internal' | 'External'>('Internal');
+  const [eventQuota, setEventQuota] = useState<any | null>(null);
+  const [loadingQuota, setLoadingQuota] = useState(false);
+
   const [formData, setFormData] = useState({
     studentName: '',
     registerNumber: '',
-    department: 'Computer Engineering',
-    academicYear: '2nd Year',
+    department: 'Electronics Engineering',
+    academicYear: 'First Year',
     email: '',
     phone: '',
     collegeName: 'Govt Polytechnic College Perinthalmanna',
+    district: 'Malappuram',
+    course: '',
     additionalNotes: '',
     consent: true
   });
@@ -73,6 +80,34 @@ function RegisterFormContent() {
     }
   }, [preselectedEventId]);
 
+  // Fetch Event Quotas when selectedEventId changes
+  useEffect(() => {
+    if (!selectedEventId) {
+      setEventQuota(null);
+      return;
+    }
+    setLoadingQuota(true);
+    fetch(`/api/public/events/${selectedEventId}/quotas`)
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success) {
+          setEventQuota(json);
+          // If Single Class mode, lock department and year
+          if (json.participationType === 'Single Class' && json.singleClass) {
+            setFormData((prev) => ({
+              ...prev,
+              department: json.singleClass.department,
+              academicYear: json.singleClass.academicYear,
+              collegeName: 'Govt Polytechnic College Perinthalmanna'
+            }));
+            setParticipationCategory('Internal');
+          }
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoadingQuota(false));
+  }, [selectedEventId]);
+
   const selectedEvent = events.find((e) => e.id === selectedEventId);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -89,11 +124,6 @@ function RegisterFormContent() {
       return;
     }
 
-    if (!formData.registerNumber.trim()) {
-      setErrorMessage('Please enter your Admission / Register number.');
-      return;
-    }
-
     if (!formData.email.trim() || !formData.email.includes('@')) {
       setErrorMessage('Please enter a valid student email address.');
       return;
@@ -101,6 +131,11 @@ function RegisterFormContent() {
 
     if (!formData.phone.trim() || formData.phone.replace(/\D/g, '').length < 10) {
       setErrorMessage('Please enter a valid 10-digit mobile number.');
+      return;
+    }
+
+    if (participationCategory === 'External' && !formData.collegeName.trim()) {
+      setErrorMessage('Please enter your Institution / College name.');
       return;
     }
 
@@ -117,7 +152,12 @@ function RegisterFormContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           eventId: selectedEventId,
-          ...formData
+          ...formData,
+          participationCategory,
+          collegeName:
+            participationCategory === 'Internal'
+              ? 'Govt Polytechnic College Perinthalmanna'
+              : formData.collegeName
         })
       });
 
@@ -182,9 +222,15 @@ function RegisterFormContent() {
                 {registeredData.eventTitle}
               </h2>
             </div>
-            <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-xs font-bold">
-              CONFIRMED
-            </span>
+            {registeredData.status === 'Waitlisted' ? (
+              <span className="px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-mono text-xs font-bold">
+                WAITLISTED #{registeredData.waitlistPosition || 1}
+              </span>
+            ) : (
+              <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-xs font-bold">
+                CONFIRMED
+              </span>
+            )}
           </div>
 
           {/* Registration Code Display */}
@@ -216,10 +262,12 @@ function RegisterFormContent() {
                 <span className="text-neutral-500 font-medium">Participant:</span>
                 <span className="font-bold text-white">{registeredData.studentName}</span>
               </div>
-              <div className="flex justify-between border-b border-white/5 pb-1.5">
-                <span className="text-neutral-500 font-medium">Register No:</span>
-                <span className="font-mono text-white">{registeredData.registerNumber}</span>
-              </div>
+              {registeredData.registerNumber && registeredData.registerNumber !== 'N/A' && !registeredData.registerNumber.startsWith('REG-') && (
+                <div className="flex justify-between border-b border-white/5 pb-1.5">
+                  <span className="text-neutral-500 font-medium">Register No:</span>
+                  <span className="font-mono text-white">{registeredData.registerNumber}</span>
+                </div>
+              )}
               <div className="flex justify-between border-b border-white/5 pb-1.5">
                 <span className="text-neutral-500 font-medium">Department:</span>
                 <span className="text-white">{registeredData.department}</span>
@@ -277,11 +325,13 @@ function RegisterFormContent() {
               setFormData({
                 studentName: '',
                 registerNumber: '',
-                department: 'Computer Engineering',
-                academicYear: '2nd Year',
+                department: 'Electronics Engineering',
+                academicYear: 'First Year',
                 email: '',
                 phone: '',
                 collegeName: 'Govt Polytechnic College Perinthalmanna',
+                district: 'Malappuram',
+                course: '',
                 additionalNotes: '',
                 consent: true
               });
@@ -368,18 +418,140 @@ function RegisterFormContent() {
           )}
         </div>
 
-        {/* Step 2: Student Details Grid */}
+        {/* Step 2: Participation Category (If Statewide) */}
+        {eventQuota?.isStatewide && (
+          <div className="space-y-2 p-4 rounded-2xl bg-purple-500/10 border border-purple-500/20">
+            <label className="text-xs font-bold text-purple-300 uppercase tracking-wider block">
+              Participation Category <span className="text-red-400">*</span>
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setParticipationCategory('Internal');
+                  setFormData((prev) => ({
+                    ...prev,
+                    collegeName: 'Govt Polytechnic College Perinthalmanna'
+                  }));
+                }}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  participationCategory === 'Internal'
+                    ? 'border-[#F98A5B] bg-[#F98A5B]/15 text-white font-bold'
+                    : 'border-white/10 bg-black/40 text-slate-400 hover:text-white'
+                }`}
+              >
+                <div className="text-xs">Govt Polytechnic College Perinthalmanna</div>
+                <div className="text-[10px] text-slate-400 font-normal">Internal College Quota (12 Classes)</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setParticipationCategory('External');
+                  setFormData((prev) => ({
+                    ...prev,
+                    collegeName: prev.collegeName.includes('Perinthalmanna') ? '' : prev.collegeName
+                  }));
+                }}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  participationCategory === 'External'
+                    ? 'border-purple-400 bg-purple-500/15 text-white font-bold'
+                    : 'border-white/10 bg-black/40 text-slate-400 hover:text-white'
+                }`}
+              >
+                <div className="text-xs">Other Polytechnic / College</div>
+                <div className="text-[10px] text-slate-400 font-normal">Statewide Shared External Quota</div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Student Details Grid */}
         <div className="space-y-4 pt-2">
-          <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider border-b border-white/10 pb-2">
-            Student Information
-          </h3>
+          <div className="flex items-center justify-between border-b border-white/10 pb-2">
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+              {participationCategory === 'Internal' ? 'College Student Information' : 'External Participant Information'}
+            </h3>
+            {/* Live Availability Badge */}
+            {eventQuota && (
+              <div>
+                {participationCategory === 'Internal' ? (
+                  (() => {
+                    const classKey = `${formData.department}__${formData.academicYear}`;
+                    const cls = eventQuota.classes?.[classKey];
+                    if (!cls) return null;
+                    return (
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                          cls.status === 'OPEN'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : cls.status === 'LIMITED'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            : cls.status === 'WAITLIST_AVAILABLE'
+                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                            : cls.status === 'FULL'
+                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                            : 'bg-slate-800 text-slate-400 border border-white/10'
+                        }`}
+                      >
+                        {cls.status === 'OPEN' && `● Open (${cls.remainingSeats} Seats Left)`}
+                        {cls.status === 'LIMITED' && `● Limited (${cls.remainingSeats} Seats Left)`}
+                        {cls.status === 'WAITLIST_AVAILABLE' && '● Class Full — Waitlist Open'}
+                        {cls.status === 'FULL' && '● Class Full'}
+                        {cls.status === 'DISABLED' && '● Class Registration Disabled'}
+                      </span>
+                    );
+                  })()
+                ) : (
+                  (() => {
+                    const ext = eventQuota.externalQuota;
+                    if (!ext) return null;
+                    return (
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                          ext.status === 'OPEN'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : ext.status === 'LIMITED'
+                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                            : ext.status === 'WAITLIST_AVAILABLE'
+                            ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
+                            : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                        }`}
+                      >
+                        {ext.status === 'OPEN' && `● External Open (${ext.remainingSeats} Seats Left)`}
+                        {ext.status === 'LIMITED' && `● Limited (${ext.remainingSeats} Seats Left)`}
+                        {ext.status === 'WAITLIST_AVAILABLE' && '● External Full — Waitlist Open'}
+                        {ext.status === 'FULL' && '● External Quota Full'}
+                      </span>
+                    );
+                  })()
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Single Class Locked Banner */}
+          {participationCategory === 'Internal' &&
+            eventQuota?.participationType === 'Single Class' &&
+            eventQuota.singleClass && (
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2 font-medium">
+                <Lock className="w-4 h-4 shrink-0 text-amber-400" />
+                <span>
+                  Single Class Enrollment: This program is open exclusively to{' '}
+                  <strong className="text-white">
+                    {eventQuota.singleClass.department} ({eventQuota.singleClass.academicYear})
+                  </strong>
+                  . Other classes cannot register.
+                </span>
+              </div>
+            )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* Student Name */}
-            <div className="space-y-1.5">
+            <div className="space-y-1.5 sm:col-span-2">
               <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
                 <User className="w-3.5 h-3.5 text-[#F98A5B]" />
-                Full Name <span className="text-red-400">*</span>
+                Full Legal Name <span className="text-red-400">*</span>
               </label>
               <input
                 type="text"
@@ -391,56 +563,122 @@ function RegisterFormContent() {
               />
             </div>
 
-            {/* Admission / Register Number */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                <GraduationCap className="w-3.5 h-3.5 text-[#F98A5B]" />
-                Admission / Register No <span className="text-red-400">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. 21051234 or ADM9841"
-                value={formData.registerNumber}
-                onChange={(e) => setFormData({ ...formData, registerNumber: e.target.value })}
-                className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none"
-              />
-            </div>
+            {/* If Internal: 4 Departments & 3 Academic Years */}
+            {participationCategory === 'Internal' ? (
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <Building className="w-3.5 h-3.5 text-[#F98A5B]" />
+                    Academic Department <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    disabled={eventQuota?.participationType === 'Single Class'}
+                    value={formData.department}
+                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                    className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none disabled:opacity-60"
+                  >
+                    <option value="Electronics Engineering">Electronics Engineering</option>
+                    <option value="Civil Engineering">Civil Engineering</option>
+                    <option value="Mechanical Engineering">Mechanical Engineering</option>
+                    <option value="Electrical and Electronics Engineering">
+                      Electrical and Electronics Engineering
+                    </option>
+                  </select>
+                </div>
 
-            {/* Department */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                <Building className="w-3.5 h-3.5 text-[#F98A5B]" />
-                Department <span className="text-red-400">*</span>
-              </label>
-              <select
-                value={formData.department}
-                onChange={(e) => setFormData({ ...formData, department: e.target.value })}
-                className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none"
-              >
-                <option value="Computer Engineering">Computer Engineering</option>
-                <option value="Electronics Engineering">Electronics Engineering</option>
-                <option value="Electrical & Electronics Engineering">Electrical &amp; Electronics Engineering</option>
-                <option value="Mechanical Engineering">Mechanical Engineering</option>
-                <option value="Civil Engineering">Civil Engineering</option>
-                <option value="General Engineering">General / Other</option>
-              </select>
-            </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">
+                    Academic Year <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    disabled={eventQuota?.participationType === 'Single Class'}
+                    value={formData.academicYear}
+                    onChange={(e) => setFormData({ ...formData, academicYear: e.target.value })}
+                    className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none disabled:opacity-60"
+                  >
+                    <option value="First Year">First Year (Sem 1 & 2)</option>
+                    <option value="Second Year">Second Year (Sem 3 & 4)</option>
+                    <option value="Third Year">Third Year (Sem 5 & 6)</option>
+                  </select>
+                </div>
+              </>
+            ) : (
+              /* If External: College Name, District, Course, Academic Year */
+              <>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <Building className="w-3.5 h-3.5 text-purple-400" />
+                    Institution / College Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Govt Engineering College Thrissur"
+                    value={formData.collegeName}
+                    onChange={(e) => setFormData({ ...formData, collegeName: e.target.value })}
+                    className="w-full bg-[#18181D] border border-white/10 focus:border-purple-400 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none"
+                  />
+                </div>
 
-            {/* Academic Year */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-300">Academic Year / Semester</label>
-              <select
-                value={formData.academicYear}
-                onChange={(e) => setFormData({ ...formData, academicYear: e.target.value })}
-                className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none"
-              >
-                <option value="1st Year (Sem 1 & 2)">1st Year (Sem 1 &amp; 2)</option>
-                <option value="2nd Year (Sem 3 & 4)">2nd Year (Sem 3 &amp; 4)</option>
-                <option value="3rd Year (Sem 5 & 6)">3rd Year (Sem 5 &amp; 6)</option>
-                <option value="Alumni / External">Alumni / External</option>
-              </select>
-            </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">District <span className="text-red-400">*</span></label>
+                  <select
+                    value={formData.district}
+                    onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+                    className="w-full bg-[#18181D] border border-white/10 focus:border-purple-400 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none"
+                  >
+                    {[
+                      'Malappuram',
+                      'Palakkad',
+                      'Kozhikode',
+                      'Thrissur',
+                      'Ernakulam',
+                      'Wayanad',
+                      'Kannur',
+                      'Kasaragod',
+                      'Kottayam',
+                      'Kollam',
+                      'Thiruvananthapuram',
+                      'Alappuzha',
+                      'Idukki',
+                      'Pathanamthitta',
+                      'Outside Kerala'
+                    ].map((dist) => (
+                      <option key={dist} value={dist}>
+                        {dist}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">Course / Branch</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Diploma in Robotics / B.Tech Computer Science"
+                    value={formData.course}
+                    onChange={(e) =>
+                      setFormData({ ...formData, course: e.target.value, department: e.target.value })
+                    }
+                    className="w-full bg-[#18181D] border border-white/10 focus:border-purple-400 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">Academic Year</label>
+                  <select
+                    value={formData.academicYear}
+                    onChange={(e) => setFormData({ ...formData, academicYear: e.target.value })}
+                    className="w-full bg-[#18181D] border border-white/10 focus:border-purple-400 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none"
+                  >
+                    <option value="First Year">1st Year</option>
+                    <option value="Second Year">2nd Year</option>
+                    <option value="Third Year">3rd Year</option>
+                    <option value="Fourth Year">4th Year</option>
+                  </select>
+                </div>
+              </>
+            )}
 
             {/* Email Address */}
             <div className="space-y-1.5">

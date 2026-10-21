@@ -3,17 +3,25 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 
+export type OperatorRole = 'main_admin' | 'faculty_coordinator' | 'student_operator' | 'student_lead';
+
 export interface AdminUser {
   id: string;
   username: string;
   email: string;
   full_name: string;
-  role: 'faculty_coordinator' | 'student_lead';
+  role: OperatorRole;
   department?: string;
   designation?: string;
   staffId?: string;
   phone?: string;
   avatar?: string;
+  permissions?: string[];
+  linkedProfileId?: string;
+  linkedProfileType?: 'team' | 'faculty';
+  isActive?: boolean;
+  instagramUsername?: string;
+  instagramUrl?: string;
 }
 
 export interface AdminToast {
@@ -27,6 +35,7 @@ interface AdminContextType {
   user: AdminUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isMainAdmin: boolean;
   isFaculty: boolean;
   isStudentLead: boolean;
   login: (identifier: string, pass: string) => Promise<{ success: boolean; error?: string }>;
@@ -53,13 +62,38 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
-  const addToast = useCallback((title: string, message: string, type: AdminToast['type'] = 'info') => {
-    const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { id, title, message, type }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4500);
-  }, []);
+  const addToast = useCallback(
+    (title: string, messageOrType?: string, maybeType?: AdminToast['type']) => {
+      let message = '';
+      let type: AdminToast['type'] = 'info';
+
+      const validTypes: AdminToast['type'][] = ['success', 'error', 'info', 'warning'];
+
+      if (messageOrType && validTypes.includes(messageOrType as any)) {
+        type = messageOrType as AdminToast['type'];
+        message = '';
+      } else {
+        message = messageOrType || '';
+        if (maybeType && validTypes.includes(maybeType)) {
+          type = maybeType;
+        }
+      }
+
+      setToasts((prev) => {
+        // Deduplicate identical active toasts to prevent multi-stacking
+        const isDuplicate = prev.some((t) => t.title === title && t.message === message);
+        if (isDuplicate) return prev;
+
+        const id = Math.random().toString(36).substring(2, 9);
+        setTimeout(() => {
+          setToasts((current) => current.filter((t) => t.id !== id));
+        }, 4500);
+
+        return [...prev, { id, title, message, type }];
+      });
+    },
+    []
+  );
 
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -121,8 +155,9 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     router.push('/admin/login');
   };
 
-  const isFaculty = user?.role === 'faculty_coordinator';
-  const isStudentLead = user?.role === 'student_lead';
+  const isMainAdmin = user?.role === 'main_admin';
+  const isFaculty = user?.role === 'faculty_coordinator' || user?.role === 'main_admin';
+  const isStudentLead = user?.role === 'student_lead' || user?.role === 'student_operator';
 
   return (
     <AdminContext.Provider
@@ -130,6 +165,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         user,
         isAuthenticated,
         isLoading,
+        isMainAdmin,
         isFaculty,
         isStudentLead,
         login,

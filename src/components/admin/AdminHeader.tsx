@@ -174,8 +174,10 @@ export const AdminHeader: React.FC = () => {
               )}
             </div>
             <div className="hidden lg:flex flex-col text-left">
-              <span className="text-xs font-bold text-white leading-none">{user?.full_name?.split(' ')[0]}</span>
-              <span className="text-[9px] font-mono text-slate-400">{isFaculty ? 'Faculty' : 'Student Lead'}</span>
+              <span className="text-xs font-bold text-white leading-none">{user?.full_name?.split(' ')[0] || user?.username}</span>
+              <span className="text-[9px] font-mono text-slate-400">
+                {user?.role === 'main_admin' ? 'Main Admin' : user?.role === 'faculty_coordinator' ? 'Faculty' : 'Student Lead'}
+              </span>
             </div>
           </Link>
           <button

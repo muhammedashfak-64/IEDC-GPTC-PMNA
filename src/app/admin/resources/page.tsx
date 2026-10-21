@@ -52,6 +52,19 @@ export default function ResourcesManagerPage() {
     }
   };
 
+  const handleDelete = async (id: string, title: string) => {
+    if (!confirm(`Are you sure you want to delete "${title}"?`)) return;
+    try {
+      const res = await fetch(`/api/admin/resources?id=${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        addToast('Deleted', `Removed "${title}"`, 'success');
+        loadData();
+      }
+    } catch (err: any) {
+      addToast('Error', err.message, 'error');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
@@ -101,15 +114,25 @@ export default function ResourcesManagerPage() {
 
             <div className="pt-3 border-t border-white/5 flex items-center justify-between">
               <span className="text-[11px] text-slate-400">{res.views || 0} student views</span>
-              <a
-                href={res.fileUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5"
-              >
-                <Download className="w-3.5 h-3.5 text-amber-400" />
-                <span>Download</span>
-              </a>
+              <div className="flex items-center gap-2">
+                <a
+                  href={res.fileUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs flex items-center gap-1.5"
+                >
+                  <Download className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Download</span>
+                </a>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(res.id, res.title)}
+                  className="p-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 transition-colors cursor-pointer"
+                  title="Delete Resource"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           </div>
         ))}

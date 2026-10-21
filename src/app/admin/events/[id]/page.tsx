@@ -28,9 +28,11 @@ import {
   Archive,
   AlertTriangle,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  Layers
 } from 'lucide-react';
 import FileUpload from '@/components/admin/FileUpload';
+import ProgramQuotaManager from '@/components/admin/ProgramQuotaManager';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -40,7 +42,7 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
   const { addToast } = useAdmin();
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'overview' | 'attendance' | 'participants' | 'leaders' | 'template' | 'certificates'>('attendance');
+  const [activeTab, setActiveTab] = useState<'overview' | 'attendance' | 'participants' | 'quotas' | 'leaders' | 'template' | 'certificates'>('attendance');
 
   // Program / Event State
   const [program, setProgram] = useState<any>(null);
@@ -85,6 +87,8 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
   const [generationSummary, setGenerationSummary] = useState<any>(null);
   const [previewCert, setPreviewCert] = useState<any>(null);
   const [downloadingZip, setDownloadingZip] = useState(false);
+  const [liveSamplePdf, setLiveSamplePdf] = useState('/templates/test_generated_certificate.pdf');
+  const [sampleGenerating, setSampleGenerating] = useState(false);
 
   // Template Config State
   const [templateConfig, setTemplateConfig] = useState({
@@ -315,21 +319,74 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
       });
 
       const json = await res.json();
-      if (json.success) {
+      if (res.ok && json.success) {
         setGenerationSummary(json);
         setCertificates(json.certificates || []);
-        addToast(
-          `Successfully generated ${json.generatedCount} certificates (${json.totalEligibleParticipants} participants, ${json.totalEligibleLeaders} leaders)!`,
-          'success'
-        );
+
+        const failed = json.failedCount || json.failed || 0;
+        const succeeded = json.succeeded || json.generatedCount || 0;
+        const requested = json.requested || (json.totalEligibleParticipants + (json.totalEligibleLeaders || 0));
+
+        if (failed > 0 && succeeded > 0) {
+          addToast(
+            'Partial Certificate Generation',
+            `Generated ${succeeded} of ${requested} certificates. ${failed} failed.`,
+            'warning'
+          );
+        } else if (failed > 0 && succeeded === 0) {
+          addToast(
+            'Certificate Generation Failed',
+            `Generation failed: ${json.failures?.[0]?.error || 'Please check template configuration.'}`,
+            'error'
+          );
+        } else {
+          addToast(
+            'Certificates Generated',
+            `Successfully generated all ${succeeded} certificates for eligible attendees.`,
+            'success'
+          );
+        }
         loadProgramData();
       } else {
-        addToast(json.error || 'Generation failed', 'error');
+        const errDetail = json.failures?.[0]?.error || json.error || 'Generation failed';
+        addToast('Certificate Generation Failed', errDetail, 'error');
       }
     } catch (err: any) {
       addToast(err.message, 'error');
     } finally {
       setGenerating(false);
+    }
+  };
+
+  // Generate Sample Preview using a real participant from attendance
+  const handleGenerateSample = async () => {
+    try {
+      setSampleGenerating(true);
+      const sampleParticipant = registrations.find((r) => r.attendance === 'Present')?.studentName || registrations[0]?.studentName || 'MUHAMMED ASHFAK O';
+      const res = await fetch('/api/admin/certificates/sample-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          eventId: id,
+          recipientName: sampleParticipant,
+          programName: program?.title || 'Innovation Workshop',
+          programDate: program?.date || new Date().toISOString().split('T')[0],
+          customParagraph: program?.certificateParagraph || undefined,
+          certificateTemplateUrl: program?.certificateTemplateUrl || undefined,
+          templateConfig
+        })
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setLiveSamplePdf(json.pdfUrl);
+        addToast(`Sample preview generated for ${sampleParticipant}`, 'success');
+      } else {
+        throw new Error(json.error || 'Failed generating sample preview');
+      }
+    } catch (e: any) {
+      addToast(e.message, 'error');
+    } finally {
+      setSampleGenerating(false);
     }
   };
 
@@ -383,31 +440,58 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
     }
   };
 
-  // Export Participants to Excel
+  // Export Participants to Excel (With Department & Waitlist Sheets)
   const handleExportExcel = () => {
-    const rows = registrations.map((r, i) => ({
+    const workbook = XLSX.utils.book_new();
+
+    // Sheet 1: All Participants
+    const allRows = registrations.map((r, i) => ({
       '#': i + 1,
       'Registration ID': r.registrationCode || r.id,
       'Student Name': r.studentName,
       'Admission Number': r.registerNumber,
+      College: r.collegeName || 'Govt Polytechnic College Perinthalmanna',
+      Category: r.participationCategory || (r.collegeName?.includes('Perinthalmanna') ? 'Internal' : 'External'),
       Department: r.department,
       'Academic Year': r.academicYear || '',
       Email: r.email,
       'Mobile Number': r.phone,
+      Status: r.status,
+      'Waitlist Position': r.waitlistPosition ? `#${r.waitlistPosition}` : '-',
       Attendance: r.attendance || (r.status === 'Attended' ? 'Present' : 'Absent'),
       'Attended At': r.attendedAt || '',
       'Certificate ID': r.certificateId || '',
-      Status: r.status
+      'Registered At': r.registeredAt || ''
     }));
+    const wsAll = XLSX.utils.json_to_sheet(allRows);
+    XLSX.utils.book_append_sheet(workbook, wsAll, 'All Registrations');
 
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Participants');
+    // Sheet 2: Confirmed Only
+    const confirmedRows = allRows.filter((r) => r.Status === 'Confirmed' || r.Status === 'Attended');
+    if (confirmedRows.length > 0) {
+      const wsConfirmed = XLSX.utils.json_to_sheet(confirmedRows);
+      XLSX.utils.book_append_sheet(workbook, wsConfirmed, 'Confirmed Attendees');
+    }
+
+    // Sheet 3: Waiting List
+    const waitlistRows = allRows.filter((r) => r.Status === 'Waitlisted');
+    if (waitlistRows.length > 0) {
+      const wsWaitlist = XLSX.utils.json_to_sheet(waitlistRows);
+      XLSX.utils.book_append_sheet(workbook, wsWaitlist, 'Waiting List');
+    }
+
+    // Sheet 4: External Colleges (If Statewide)
+    const externalRows = allRows.filter((r) => r.Category === 'External');
+    if (externalRows.length > 0) {
+      const wsExternal = XLSX.utils.json_to_sheet(externalRows);
+      XLSX.utils.book_append_sheet(workbook, wsExternal, 'External Colleges');
+    }
+
     XLSX.writeFile(
       workbook,
-      `IEDC_${program?.title?.replace(/[^a-zA-Z0-9_-]/g, '_')}_Participants.xlsx`
+      `IEDC_${program?.title?.replace(/[^a-zA-Z0-9_-]/g, '_')}_Master_Report.xlsx`
     );
-    addToast('Excel export downloaded', 'success');
+    addToast('Excel export downloaded', 'Includes confirmed, waitlist, and department breakdowns', 'success');
   };
 
   // Export Participants to PDF
@@ -423,15 +507,16 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
     );
 
     const headers = [
-      ['#', 'Reg ID', 'Student Name', 'Admission No', 'Department', 'Phone', 'Attendance', 'Cert ID']
+      ['#', 'Reg ID', 'Student Name', 'College', 'Department', 'Phone', 'Status', 'Attendance', 'Cert ID']
     ];
     const data = registrations.map((r, i) => [
       i + 1,
       r.registrationCode || r.id,
       r.studentName,
-      r.registerNumber,
+      (r.collegeName || 'GPTC PMNA').slice(0, 20),
       r.department,
       r.phone,
+      r.status === 'Waitlisted' ? `Waitlist #${r.waitlistPosition || 1}` : r.status,
       r.attendance || (r.status === 'Attended' ? 'Present' : 'Absent'),
       r.certificateId || '-'
     ]);
@@ -567,6 +652,7 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
         {[
           { id: 'attendance', label: `Attendance Marking (${presentCount}/${registrations.length})`, icon: CheckCircle2 },
           { id: 'participants', label: `Participants (${registrations.length})`, icon: Users },
+          { id: 'quotas', label: 'Quotas & Seat Allocation', icon: Layers },
           { id: 'leaders', label: `Leaders & Organizers (${leaders.length})`, icon: Award },
           { id: 'template', label: 'Certificate Template', icon: Stamp },
           { id: 'certificates', label: `Certificates (${certificates.length})`, icon: Award },
@@ -877,6 +963,19 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
       )}
 
       {/* ======================================================== */}
+      {/* TAB: REGISTRATION QUOTAS & SEAT ALLOCATION               */}
+      {/* ======================================================== */}
+      {activeTab === 'quotas' && (
+        <ProgramQuotaManager
+          eventId={id}
+          eventTitle={program?.title || 'Campus Program'}
+          eventLevel={program?.level || 'College'}
+          addToast={addToast}
+          onRefreshAll={loadProgramData}
+        />
+      )}
+
+      {/* ======================================================== */}
       {/* TAB 3: LEADERS & ORGANIZERS                              */}
       {/* ======================================================== */}
       {activeTab === 'leaders' && (
@@ -1012,29 +1111,41 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                 </div>
               </div>
 
-              <button
-                onClick={async () => {
-                  try {
-                    const res = await fetch('/api/admin/events', {
-                      method: 'PUT',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        id,
-                        templateConfig,
-                        certificateParagraph: program.certificateParagraph,
-                        certificateTemplateUrl: program.certificateTemplateUrl
-                      })
-                    });
-                    const json = await res.json();
-                    if (json.success) addToast('Template settings saved successfully', 'success');
-                  } catch (e: any) {
-                    addToast(e.message, 'error');
-                  }
-                }}
-                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#F98A5B] to-[#EC3A74] text-white font-bold text-xs shadow-md shadow-[#F98A5B]/20"
-              >
-                Save Template Configuration
-              </button>
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  disabled={sampleGenerating}
+                  onClick={handleGenerateSample}
+                  className="flex-1 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${sampleGenerating ? 'animate-spin' : ''}`} />
+                  <span>{sampleGenerating ? 'Generating Sample...' : 'Generate Sample Preview'}</span>
+                </button>
+
+                <button
+                  onClick={async () => {
+                    try {
+                      const res = await fetch('/api/admin/events', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          id,
+                          templateConfig,
+                          certificateParagraph: program.certificateParagraph,
+                          certificateTemplateUrl: program.certificateTemplateUrl
+                        })
+                      });
+                      const json = await res.json();
+                      if (json.success) addToast('Template settings saved successfully', 'success');
+                    } catch (e: any) {
+                      addToast(e.message, 'error');
+                    }
+                  }}
+                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#F98A5B] to-[#EC3A74] text-white font-bold text-xs shadow-md shadow-[#F98A5B]/20 cursor-pointer"
+                >
+                  Save Configuration
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1042,18 +1153,27 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
           <div className="lg:col-span-7 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-300">Live Certificate Render Preview</span>
-              <a
-                href="/templates/test_generated_certificate.pdf"
-                target="_blank"
-                className="text-xs font-bold text-[#F98A5B] hover:underline flex items-center gap-1"
-              >
-                Open Fullscreen PDF <ExternalLink className="w-3 h-3" />
-              </a>
+              <div className="flex items-center gap-3">
+                <a
+                  href={liveSamplePdf}
+                  download={`IEDC_Sample_Certificate_${id}.pdf`}
+                  className="text-xs font-bold text-emerald-400 hover:underline flex items-center gap-1"
+                >
+                  <Download className="w-3.5 h-3.5" /> Download Sample PDF
+                </a>
+                <a
+                  href={liveSamplePdf}
+                  target="_blank"
+                  className="text-xs font-bold text-[#F98A5B] hover:underline flex items-center gap-1"
+                >
+                  Fullscreen <ExternalLink className="w-3 h-3" />
+                </a>
+              </div>
             </div>
 
-            <div className="aspect-[1.414/1] w-full rounded-2xl border border-white/15 bg-white/5 overflow-hidden shadow-2xl relative flex items-center justify-center">
+            <div className="aspect-[1.414/1] w-full min-h-[400px] rounded-2xl border border-white/15 bg-neutral-900/60 overflow-hidden shadow-2xl relative flex items-center justify-center">
               <iframe
-                src="/templates/test_generated_certificate.pdf#toolbar=0&navpanes=0&scrollbar=0"
+                src={`${liveSamplePdf}#toolbar=0&navpanes=0&scrollbar=0`}
                 className="w-full h-full border-0 pointer-events-auto"
                 title="Certificate Preview"
               />

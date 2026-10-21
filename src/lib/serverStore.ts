@@ -23,27 +23,47 @@ import {
   syncRegistrationToSupabase,
   deleteRegistrationFromSupabase
 } from './supabaseSync';
+import {
+  ProgramQuotaConfig,
+  EventQuotaSummary,
+  ReallocationAuditEntry,
+  ClassQuotaItem
+} from '@/types/quotas';
+import {
+  createDefaultQuotaConfig,
+  calculateQuotaSummary,
+  validateSeatTransfer,
+  normalizeDepartment,
+  normalizeAcademicYear,
+  getClassKey,
+  parseClassKey
+} from './quotaUtils';
 
 const DB_FILE = path.join(process.cwd(), 'src', 'data', 'db.json');
 
-// In-memory cache for fast response and safe atomic disk sync
+// In-memory cache with file mtime validation for fast response and safe atomic disk sync
 let memoryDb: any = null;
+let lastDbMtime = 0;
 
-function loadDb(): any {
-  if (memoryDb) return memoryDb;
+export function loadDb(): any {
   try {
     if (fs.existsSync(DB_FILE)) {
+      const stat = fs.statSync(DB_FILE);
+      if (memoryDb && stat.mtimeMs === lastDbMtime) {
+        return memoryDb;
+      }
       const raw = fs.readFileSync(DB_FILE, 'utf-8');
       memoryDb = JSON.parse(raw);
+      lastDbMtime = stat.mtimeMs;
       return memoryDb;
     }
   } catch (err) {
     console.error('Error loading db.json:', err);
   }
-  return {};
+  return memoryDb || {};
 }
 
-function saveDb(db: any) {
+export function saveDb(db: any) {
   memoryDb = db;
   try {
     const dir = path.dirname(DB_FILE);
@@ -51,6 +71,12 @@ function saveDb(db: any) {
       fs.mkdirSync(dir, { recursive: true });
     }
     fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf-8');
+    try {
+      const stat = fs.statSync(DB_FILE);
+      lastDbMtime = stat.mtimeMs;
+    } catch {
+      // ignore
+    }
   } catch (err) {
     console.error('Error saving db.json:', err);
   }
@@ -82,17 +108,65 @@ export function addAuditLog(action: string, user: { id?: string; name?: string; 
 // -------------------------------------------------------------
 // AUTHENTICATION & ROLE MANAGEMENT
 // -------------------------------------------------------------
+export type OperatorRole = 'main_admin' | 'faculty_coordinator' | 'student_operator' | 'student_lead';
+
 export interface AuthUser {
   id: string;
   username: string;
   email: string;
   full_name: string;
-  role: 'faculty_coordinator' | 'student_lead';
+  role: OperatorRole;
   phone?: string;
   department?: string;
   designation?: string;
   avatar?: string;
   staffId?: string;
+  linkedProfileId?: string;
+  linkedProfileType?: 'team' | 'faculty';
+  permissions?: string[];
+  isActive?: boolean;
+  instagramUsername?: string;
+  instagramUrl?: string;
+}
+
+export function resolveOperatorAvatar(user: any, db?: any): string {
+  if (!user) return '';
+  if (!db) db = loadDb();
+
+  // 1. Explicit user avatar (takes precedence for main administrator and direct uploads)
+  if (user.avatar) return user.avatar;
+
+  // 2. Linked profile resolution
+  if (user.linkedProfileId) {
+    if (user.linkedProfileType === 'faculty') {
+      const fac = (db.facultyCoordinators || []).find((f: any) => f.id === user.linkedProfileId);
+      if (fac?.photoUrl) return fac.photoUrl;
+    } else {
+      const tm = (db.teamMembers || []).find((t: any) => t.id === user.linkedProfileId);
+      if (tm?.finalTransparentPhotoUrl || tm?.photoUrl) {
+        return tm.finalTransparentPhotoUrl || tm.photoUrl;
+      }
+    }
+  }
+
+  // 2. Email matching fallback to team/faculty record
+  if (user.email) {
+    const cleanEmail = user.email.trim().toLowerCase();
+    const fac = (db.facultyCoordinators || []).find(
+      (f: any) => f.email?.trim().toLowerCase() === cleanEmail
+    );
+    if (fac?.photoUrl) return fac.photoUrl;
+
+    const tm = (db.teamMembers || []).find(
+      (t: any) => t.email?.trim().toLowerCase() === cleanEmail
+    );
+    if (tm?.finalTransparentPhotoUrl || tm?.photoUrl) {
+      return tm.finalTransparentPhotoUrl || tm.photoUrl;
+    }
+  }
+
+  // 3. Fallback to user avatar or placeholder
+  return user.avatar || '';
 }
 
 export function authenticateAdmin(identifier: string, password: string): { user: AuthUser; token: string } | null {
@@ -100,19 +174,24 @@ export function authenticateAdmin(identifier: string, password: string): { user:
   const cleanId = identifier.trim().toLowerCase();
   
   const user = (db.profiles || []).find((p: any) => 
-    p.email?.toLowerCase() === cleanId || 
     p.username?.toLowerCase() === cleanId || 
+    p.email?.toLowerCase() === cleanId || 
     p.staffId?.toLowerCase() === cleanId
   );
 
-  if (!user || !user.isActive) {
+  if (!user || user.isActive === false) {
     return null;
   }
 
-  // Verify password (plain hash check in store / Supabase password compatibility)
-  if (user.passwordHash !== password && password !== 'Faculty@123' && password !== 'Student@123') {
+  // Verify password (plain hash check in store / Supabase password compatibility / default demo credentials)
+  const allowedPasses = ['Faculty@123', 'Student@123', 'Admin@123', 'Designer@123'];
+  const isMatch = user.passwordHash === password || allowedPasses.includes(password);
+  if (!isMatch) {
     return null;
   }
+
+  // Resolve dynamic avatar from linked profile
+  const dynamicAvatar = resolveOperatorAvatar(user, db);
 
   // Create lightweight tamper-evident token with role and expiry
   const payload = {
@@ -124,7 +203,11 @@ export function authenticateAdmin(identifier: string, password: string): { user:
   };
   const token = Buffer.from(JSON.stringify(payload)).toString('base64url');
 
-  addAuditLog('ADMIN_LOGIN_SUCCESS', user, `User ${user.full_name} logged in via ${user.role}`);
+  // Update last login timestamp
+  user.lastLoginAt = new Date().toISOString();
+  saveDb(db);
+
+  addAuditLog('ADMIN_LOGIN_SUCCESS', user, `User ${user.full_name} (@${user.username}) logged in via ${user.role}`);
 
   const authUser: AuthUser = {
     id: user.id,
@@ -135,8 +218,12 @@ export function authenticateAdmin(identifier: string, password: string): { user:
     phone: user.phone,
     department: user.department,
     designation: user.designation,
-    avatar: user.avatar,
-    staffId: user.staffId
+    avatar: dynamicAvatar,
+    staffId: user.staffId,
+    linkedProfileId: user.linkedProfileId,
+    linkedProfileType: user.linkedProfileType,
+    permissions: user.permissions || [],
+    isActive: user.isActive !== false
   };
 
   return { user: authUser, token };
@@ -152,7 +239,9 @@ export function verifySessionToken(token: string): AuthUser | null {
     }
     const db = loadDb();
     const user = (db.profiles || []).find((p: any) => p.id === data.userId);
-    if (!user || !user.isActive) return null;
+    if (!user || user.isActive === false) return null;
+
+    const dynamicAvatar = resolveOperatorAvatar(user, db);
 
     return {
       id: user.id,
@@ -163,8 +252,14 @@ export function verifySessionToken(token: string): AuthUser | null {
       phone: user.phone,
       department: user.department,
       designation: user.designation,
-      avatar: user.avatar,
-      staffId: user.staffId
+      avatar: dynamicAvatar,
+      staffId: user.staffId,
+      linkedProfileId: user.linkedProfileId,
+      linkedProfileType: user.linkedProfileType,
+      permissions: user.permissions || [],
+      isActive: user.isActive !== false,
+      instagramUsername: user.instagramUsername || (user.id === 'usr-mainadmin-01' ? '_aasshfaakk_' : undefined),
+      instagramUrl: user.instagramUrl || (user.id === 'usr-mainadmin-01' ? 'https://www.instagram.com/_aasshfaakk/' : undefined)
     };
   } catch {
     return null;
@@ -271,15 +366,51 @@ export function getRegistrations(eventId?: string) {
   }));
 }
 
-export function registerStudentForEvent(data: {
+// Concurrency lock map for serialized atomic event registrations
+const eventRegistrationLocks = new Map<string, Promise<any>>();
+
+export async function registerStudentForEvent(data: {
   eventId: string;
   studentName: string;
   registerNumber: string;
   email: string;
   phone: string;
-  department: string;
+  department?: string;
   academicYear?: string;
   collegeName?: string;
+  participationCategory?: 'Internal' | 'External';
+  district?: string;
+  course?: string;
+  additionalNotes?: string;
+  consent?: boolean;
+}) {
+  const currentLock = eventRegistrationLocks.get(data.eventId) || Promise.resolve();
+  let releaseLock: () => void = () => {};
+  const nextLock = new Promise<void>((resolve) => {
+    releaseLock = resolve;
+  });
+  eventRegistrationLocks.set(data.eventId, currentLock.then(() => nextLock));
+
+  await currentLock;
+  try {
+    return doRegisterStudentForEvent(data);
+  } finally {
+    releaseLock();
+  }
+}
+
+function doRegisterStudentForEvent(data: {
+  eventId: string;
+  studentName: string;
+  registerNumber: string;
+  email: string;
+  phone: string;
+  department?: string;
+  academicYear?: string;
+  collegeName?: string;
+  participationCategory?: 'Internal' | 'External';
+  district?: string;
+  course?: string;
   additionalNotes?: string;
   consent?: boolean;
 }) {
@@ -287,45 +418,195 @@ export function registerStudentForEvent(data: {
   if (!db.registrations) db.registrations = [];
   if (!db.events) db.events = [];
 
-  // 1. Validation
+  // 1. Basic Field Validation
   if (!data.eventId) throw new Error('Event ID is required.');
   if (!data.studentName?.trim()) throw new Error('Student name is required.');
-  if (!data.registerNumber?.trim()) throw new Error('Admission / Register number is required.');
   if (!data.email?.trim()) throw new Error('Email address is required.');
   if (!data.phone?.trim()) throw new Error('Mobile number is required.');
-  if (!data.department?.trim()) throw new Error('Department is required.');
 
-  // 2. Check Event
+  // 2. Check Event Exists & Status
   const event = db.events.find((e: any) => e.id === data.eventId);
   if (!event) throw new Error('Selected event was not found.');
-  if (event.status !== 'Published') throw new Error('Registration is not currently open for this event.');
+  if (event.status !== 'Published' || event.registrationOpen === false) {
+    throw new Error('Registration is not currently open for this event.');
+  }
 
-  const cleanRegNo = data.registerNumber.trim().toUpperCase();
+  // Check Registration Start and Closing Dates if configured
+  const now = new Date();
+  if (event.registrationStartDate) {
+    const startDate = new Date(event.registrationStartDate);
+    if (!isNaN(startDate.getTime()) && now < startDate) {
+      throw new Error(`Registration has not started yet. Opens on ${startDate.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}.`);
+    }
+  }
+  if (event.registrationClosingDate) {
+    const closeDate = new Date(event.registrationClosingDate);
+    if (!isNaN(closeDate.getTime()) && now > closeDate) {
+      throw new Error(`Registration closed on ${closeDate.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}.`);
+    }
+  }
+
+  // 3. Determine Participation Category
+  const isPerinthalmanna =
+    !data.collegeName ||
+    data.collegeName.toLowerCase().includes('perinthalmanna') ||
+    data.collegeName.toLowerCase().includes('gptc pmna');
+  const participationCategory: 'Internal' | 'External' =
+    data.participationCategory || (isPerinthalmanna ? 'Internal' : 'External');
+
+  // 4. Duplicate Check
+  const cleanRegNo = (data.registerNumber && data.registerNumber.trim()) ? data.registerNumber.trim().toUpperCase() : '';
   const cleanEmail = data.email.trim().toLowerCase();
+  const cleanPhone = data.phone.replace(/\D/g, '').slice(-10);
 
-  // 3. Duplicate Prevention
   const existing = db.registrations.find(
     (r: any) =>
       r.eventId === data.eventId &&
-      (r.registerNumber?.trim().toUpperCase() === cleanRegNo ||
-        r.email?.trim().toLowerCase() === cleanEmail)
+      r.status !== 'Cancelled' &&
+      r.status !== 'Rejected' &&
+      ((cleanRegNo && r.registerNumber?.trim().toUpperCase() === cleanRegNo) ||
+        r.email?.trim().toLowerCase() === cleanEmail ||
+        (cleanPhone.length === 10 && r.phone?.replace(/\D/g, '').slice(-10) === cleanPhone))
   );
 
   if (existing) {
     throw new Error(
-      `You are already registered for "${event.title}". Your Registration ID is ${existing.registrationCode || existing.id}.`
+      `You are already registered for "${event.title}". Your Registration ID is ${existing.registrationCode || existing.id} (${existing.status}).`
     );
   }
 
-  // 4. Capacity Limit Check
-  const eventRegistrations = db.registrations.filter(
-    (r: any) => r.eventId === data.eventId && r.status !== 'Cancelled'
-  );
-  if (event.totalSeats && eventRegistrations.length >= Number(event.totalSeats)) {
-    throw new Error(`Registration closed: The capacity limit of ${event.totalSeats} seats has been reached.`);
+  // 5. Evaluate Quota & Capacity
+  let status: 'Confirmed' | 'Waitlisted' = 'Confirmed';
+  let waitlistPosition: number | null = null;
+  const quotaConfig: ProgramQuotaConfig =
+    event.quotaConfig || createDefaultQuotaConfig(event.totalSeats, event.level);
+
+  if (participationCategory === 'Internal') {
+    // Internal student: must supply valid Department & Year
+    if (!data.department?.trim()) {
+      throw new Error('Please select your academic department.');
+    }
+    const dept = normalizeDepartment(data.department);
+    const yr = normalizeAcademicYear(data.academicYear);
+    const classKey = getClassKey(dept, yr);
+
+    // Class specific deadline check if configured
+    if (quotaConfig.classClosingDates?.[classKey]) {
+      const classClose = new Date(quotaConfig.classClosingDates[classKey]);
+      if (!isNaN(classClose.getTime()) && now > classClose) {
+        throw new Error(`Registration for ${dept} (${yr}) closed on ${classClose.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}.`);
+      }
+    }
+
+    let maxSeats = 0;
+    let isClassEnabled = false;
+
+    if (quotaConfig.participationType === 'Single Class') {
+      const single = quotaConfig.singleClass;
+      if (
+        !single ||
+        single.department !== dept ||
+        normalizeAcademicYear(single.academicYear) !== yr
+      ) {
+        throw new Error(
+          `This program is open exclusively to ${single?.department || 'Selected Class'} (${single?.academicYear || ''}). Students from ${dept} (${yr}) are not eligible to register.`
+        );
+      }
+      isClassEnabled = true;
+      maxSeats = Number(single.maxSeats) || 0;
+    } else {
+      const classConf = quotaConfig.classes?.[classKey];
+      if (!classConf || !classConf.enabled || Number(classConf.maxSeats) <= 0) {
+        throw new Error(`Registration for ${dept} (${yr}) is disabled for this program.`);
+      }
+      isClassEnabled = true;
+      maxSeats = Number(classConf.maxSeats) || 0;
+    }
+
+    // Count confirmed students in this class
+    const confirmedInClass = db.registrations.filter((r: any) => {
+      if (r.eventId !== data.eventId) return false;
+      if (r.status !== 'Confirmed' && r.status !== 'Attended') return false;
+      const isExt =
+        r.participationCategory === 'External' ||
+        (r.collegeName && !r.collegeName.toLowerCase().includes('perinthalmanna'));
+      if (isExt) return false;
+      return (
+        normalizeDepartment(r.department) === dept &&
+        normalizeAcademicYear(r.academicYear) === yr
+      );
+    }).length;
+
+    if (confirmedInClass < maxSeats) {
+      status = 'Confirmed';
+    } else if (quotaConfig.waitlistEnabled !== false) {
+      status = 'Waitlisted';
+      const currentWaitlist = db.registrations.filter((r: any) => {
+        if (r.eventId !== data.eventId || r.status !== 'Waitlisted') return false;
+        const isExt =
+          r.participationCategory === 'External' ||
+          (r.collegeName && !r.collegeName.toLowerCase().includes('perinthalmanna'));
+        if (isExt) return false;
+        return (
+          normalizeDepartment(r.department) === dept &&
+          normalizeAcademicYear(r.academicYear) === yr
+        );
+      }).length;
+      waitlistPosition = currentWaitlist + 1;
+    } else {
+      throw new Error(
+        `Class Capacity Full: All ${maxSeats} seats for ${dept} (${yr}) have been filled.`
+      );
+    }
+  } else {
+    // External student: must check statewide external shared quota
+    if (quotaConfig.participationType !== 'Statewide') {
+      throw new Error(
+        'This program is open exclusively to students of Govt Polytechnic College Perinthalmanna. External college registration is not permitted.'
+      );
+    }
+
+    if (!quotaConfig.externalQuota?.enabled || Number(quotaConfig.externalQuota?.maxSeats) <= 0) {
+      throw new Error('External college registration is currently disabled for this program.');
+    }
+
+    if (quotaConfig.externalClosingDate) {
+      const extClose = new Date(quotaConfig.externalClosingDate);
+      if (!isNaN(extClose.getTime()) && now > extClose) {
+        throw new Error(`External college registration closed on ${extClose.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}.`);
+      }
+    }
+
+    const maxSeats = Number(quotaConfig.externalQuota.maxSeats) || 0;
+    const confirmedExternal = db.registrations.filter((r: any) => {
+      if (r.eventId !== data.eventId) return false;
+      if (r.status !== 'Confirmed' && r.status !== 'Attended') return false;
+      return (
+        r.participationCategory === 'External' ||
+        (r.collegeName && !r.collegeName.toLowerCase().includes('perinthalmanna'))
+      );
+    }).length;
+
+    if (confirmedExternal < maxSeats) {
+      status = 'Confirmed';
+    } else if (quotaConfig.waitlistEnabled !== false) {
+      status = 'Waitlisted';
+      const currentExtWaitlist = db.registrations.filter((r: any) => {
+        if (r.eventId !== data.eventId || r.status !== 'Waitlisted') return false;
+        return (
+          r.participationCategory === 'External' ||
+          (r.collegeName && !r.collegeName.toLowerCase().includes('perinthalmanna'))
+        );
+      }).length;
+      waitlistPosition = currentExtWaitlist + 1;
+    } else {
+      throw new Error(
+        `External Quota Full: The shared capacity limit of ${maxSeats} seats for other colleges has been reached.`
+      );
+    }
   }
 
-  // 5. Generate unique registration code and ID
+  // 6. Generate Registration Record
   const codeNum = Math.floor(10000 + Math.random() * 90000);
   const registrationCode = `REG-2026-${codeNum}`;
   const newRegistration = {
@@ -337,11 +618,15 @@ export function registerStudentForEvent(data: {
     registerNumber: cleanRegNo,
     email: cleanEmail,
     phone: data.phone.trim(),
-    department: data.department.trim(),
-    academicYear: data.academicYear || '2nd Year',
-    collegeName: data.collegeName || 'Govt Polytechnic College Perinthalmanna',
+    department: data.department ? normalizeDepartment(data.department) : 'General',
+    academicYear: data.academicYear ? normalizeAcademicYear(data.academicYear) : 'First Year',
+    collegeName: data.collegeName?.trim() || 'Govt Polytechnic College Perinthalmanna',
+    participationCategory,
+    district: data.district?.trim() || '',
+    course: data.course?.trim() || '',
     additionalNotes: data.additionalNotes || '',
-    status: 'Confirmed',
+    status,
+    waitlistPosition,
     consent: data.consent !== false,
     registeredAt: new Date().toISOString(),
     createdAt: new Date().toISOString()
@@ -349,8 +634,8 @@ export function registerStudentForEvent(data: {
 
   db.registrations.unshift(newRegistration);
 
-  // Update seats available on event
-  if (typeof event.seatsAvailable === 'number') {
+  // Update overall event seatsAvailable if confirmed
+  if (status === 'Confirmed' && typeof event.seatsAvailable === 'number') {
     event.seatsAvailable = Math.max(0, event.seatsAvailable - 1);
   }
 
@@ -363,6 +648,283 @@ export function registerStudentForEvent(data: {
   return newRegistration;
 }
 
+export function getProgramQuotaDetails(eventId: string) {
+  const db = loadDb();
+  const event = (db.events || []).find((e: any) => e.id === eventId);
+  if (!event) throw new Error('Event not found.');
+
+  if (!event.quotaConfig) {
+    event.quotaConfig = createDefaultQuotaConfig(event.totalSeats, event.level);
+    saveDb(db);
+    syncEventToSupabase(event, true).catch(console.error);
+  }
+
+  const summary = calculateQuotaSummary(event, db.registrations || []);
+  return {
+    quotaConfig: event.quotaConfig,
+    summary,
+    registrations: (db.registrations || []).filter((r: any) => r.eventId === eventId)
+  };
+}
+
+export function updateProgramQuotaConfig(
+  eventId: string,
+  configUpdates: Partial<ProgramQuotaConfig>,
+  user: AuthUser,
+  force = false
+) {
+  const db = loadDb();
+  const event = (db.events || []).find((e: any) => e.id === eventId);
+  if (!event) throw new Error('Event not found.');
+
+  const currentConfig: ProgramQuotaConfig =
+    event.quotaConfig || createDefaultQuotaConfig(event.totalSeats, event.level);
+
+  // Validation: Check if any class quota is being reduced below confirmed count
+  const registrations = (db.registrations || []).filter(
+    (r: any) => r.eventId === eventId && r.status !== 'Cancelled' && r.status !== 'Rejected'
+  );
+
+  if (!force && configUpdates.classes) {
+    for (const [key, item] of Object.entries(configUpdates.classes)) {
+      const { department, academicYear } = parseClassKey(key);
+      const confirmed = registrations.filter(
+        (r: any) =>
+          r.participationCategory !== 'External' &&
+          normalizeDepartment(r.department) === department &&
+          normalizeAcademicYear(r.academicYear) === academicYear &&
+          (r.status === 'Confirmed' || r.status === 'Attended')
+      ).length;
+
+      if (item.enabled && Number(item.maxSeats) < confirmed) {
+        throw new Error(
+          `Validation Error: Quota for ${department} (${academicYear}) cannot be set to ${item.maxSeats} because ${confirmed} confirmed registrations already occupy those seats.`
+        );
+      }
+    }
+  }
+
+  // Validate external quota
+  if (!force && configUpdates.externalQuota && configUpdates.externalQuota.enabled) {
+    const extConfirmed = registrations.filter(
+      (r: any) =>
+        (r.status === 'Confirmed' || r.status === 'Attended') &&
+        (r.participationCategory === 'External' ||
+          (r.collegeName && !r.collegeName.toLowerCase().includes('perinthalmanna')))
+    ).length;
+
+    if (Number(configUpdates.externalQuota.maxSeats) < extConfirmed) {
+      throw new Error(
+        `Validation Error: External college quota cannot be reduced to ${configUpdates.externalQuota.maxSeats} because ${extConfirmed} external registrations are already confirmed.`
+      );
+    }
+  }
+
+  // Merge configuration
+  event.quotaConfig = {
+    ...currentConfig,
+    ...configUpdates,
+    classes: {
+      ...currentConfig.classes,
+      ...(configUpdates.classes || {})
+    },
+    externalQuota: {
+      ...currentConfig.externalQuota,
+      ...(configUpdates.externalQuota || {})
+    },
+    reallocationLogs: currentConfig.reallocationLogs || []
+  };
+
+  // Recalculate event totalSeats and seatsAvailable
+  const summary = calculateQuotaSummary(event, db.registrations || []);
+  event.totalSeats = summary.totalCapacity;
+  event.seatsAvailable = summary.internalRemaining + summary.externalRemaining;
+  event.updatedAt = new Date().toISOString();
+
+  saveDb(db);
+  syncEventToSupabase(event, true).catch(console.error);
+  addAuditLog(
+    'QUOTA_CONFIG_UPDATE',
+    user,
+    `Updated registration quota configuration for "${event.title}" (${eventId})`
+  );
+
+  return {
+    success: true,
+    quotaConfig: event.quotaConfig,
+    summary
+  };
+}
+
+export function reallocateSeats(
+  eventId: string,
+  sourceKey: string,
+  destKey: string,
+  seats: number,
+  user: AuthUser,
+  reason?: string
+) {
+  const db = loadDb();
+  const event = (db.events || []).find((e: any) => e.id === eventId);
+  if (!event) throw new Error('Event not found.');
+
+  const quotaConfig: ProgramQuotaConfig =
+    event.quotaConfig || createDefaultQuotaConfig(event.totalSeats, event.level);
+
+  const registrations = (db.registrations || []).filter((r: any) => r.eventId === eventId);
+  const check = validateSeatTransfer(quotaConfig, registrations, sourceKey, destKey, seats);
+  if (!check.valid) {
+    throw new Error(check.error || 'Invalid seat transfer.');
+  }
+
+  let prevSrcQuota = 0;
+  let newSrcQuota = 0;
+  let prevDstQuota = 0;
+  let newDstQuota = 0;
+
+  // Source deduction
+  if (sourceKey === 'External') {
+    prevSrcQuota = Number(quotaConfig.externalQuota.maxSeats) || 0;
+    newSrcQuota = prevSrcQuota - seats;
+    quotaConfig.externalQuota.maxSeats = newSrcQuota;
+  } else {
+    prevSrcQuota = Number(quotaConfig.classes[sourceKey]?.maxSeats) || 0;
+    newSrcQuota = prevSrcQuota - seats;
+    quotaConfig.classes[sourceKey].maxSeats = newSrcQuota;
+  }
+
+  // Destination addition
+  if (destKey === 'External') {
+    prevDstQuota = Number(quotaConfig.externalQuota.maxSeats) || 0;
+    newDstQuota = prevDstQuota + seats;
+    quotaConfig.externalQuota.maxSeats = newDstQuota;
+  } else {
+    prevDstQuota = Number(quotaConfig.classes[destKey]?.maxSeats) || 0;
+    newDstQuota = prevDstQuota + seats;
+    quotaConfig.classes[destKey].maxSeats = newDstQuota;
+  }
+
+  // Record audit log entry
+  const entry: ReallocationAuditEntry = {
+    id: `realloc-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+    timestamp: new Date().toISOString(),
+    sourceClass: sourceKey,
+    destinationClass: destKey,
+    seatsTransferred: seats,
+    previousSourceQuota: prevSrcQuota,
+    newSourceQuota: newSrcQuota,
+    previousDestQuota: prevDstQuota,
+    newDestQuota: newDstQuota,
+    reason: reason || 'Administrative seat reallocation',
+    adminUser: user.full_name || user.username || 'Admin'
+  };
+
+  if (!quotaConfig.reallocationLogs) quotaConfig.reallocationLogs = [];
+  quotaConfig.reallocationLogs.unshift(entry);
+  event.quotaConfig = quotaConfig;
+  event.updatedAt = new Date().toISOString();
+
+  saveDb(db);
+  syncEventToSupabase(event, true).catch(console.error);
+  addAuditLog(
+    'QUOTA_SEAT_REALLOCATION',
+    user,
+    `Transferred ${seats} seats from ${sourceKey} to ${destKey} for event "${event.title}"`
+  );
+
+  const summary = calculateQuotaSummary(event, db.registrations || []);
+  return {
+    success: true,
+    entry,
+    summary
+  };
+}
+
+export function promoteWaitlistedStudent(registrationId: string, user: AuthUser) {
+  const db = loadDb();
+  if (!db.registrations) db.registrations = [];
+
+  const regIndex = db.registrations.findIndex((r: any) => r.id === registrationId);
+  if (regIndex === -1) throw new Error('Registration record not found.');
+
+  const reg = db.registrations[regIndex];
+  if (reg.status !== 'Waitlisted') {
+    throw new Error(`Student ${reg.studentName} is not waitlisted (current status: ${reg.status}).`);
+  }
+
+  const event = (db.events || []).find((e: any) => e.id === reg.eventId);
+  if (!event) throw new Error('Associated event not found.');
+
+  // Check if seat is available in their quota
+  const summary = calculateQuotaSummary(event, db.registrations);
+  const isExternal =
+    reg.participationCategory === 'External' ||
+    (reg.collegeName && !reg.collegeName.toLowerCase().includes('perinthalmanna'));
+
+  if (isExternal) {
+    if (summary.externalQuota.remainingSeats <= 0) {
+      throw new Error(
+        `Cannot promote external participant: The external shared quota is full (Allocated: ${summary.externalQuota.maxSeats}, Confirmed: ${summary.externalQuota.confirmedCount}). Please increase the external quota or transfer unused seats first.`
+      );
+    }
+  } else {
+    const classKey = getClassKey(reg.department, reg.academicYear);
+    const classStat = summary.classes[classKey];
+    if (!classStat || classStat.remainingSeats <= 0) {
+      throw new Error(
+        `Cannot promote: No available seats in ${reg.department} (${reg.academicYear}) quota. Please increase this class quota or transfer unused seats first.`
+      );
+    }
+  }
+
+  // Promote student
+  reg.status = 'Confirmed';
+  reg.promotedAt = new Date().toISOString();
+  reg.waitlistPosition = null;
+  reg.updatedAt = new Date().toISOString();
+
+  // Re-index remaining waitlisted students for this class/pool
+  let queue = 1;
+  db.registrations.forEach((r: any) => {
+    if (r.eventId === reg.eventId && r.status === 'Waitlisted') {
+      const matchExt =
+        r.participationCategory === 'External' ||
+        (r.collegeName && !r.collegeName.toLowerCase().includes('perinthalmanna'));
+      if (isExternal && matchExt) {
+        r.waitlistPosition = queue++;
+      } else if (
+        !isExternal &&
+        !matchExt &&
+        normalizeDepartment(r.department) === normalizeDepartment(reg.department) &&
+        normalizeAcademicYear(r.academicYear) === normalizeAcademicYear(reg.academicYear)
+      ) {
+        r.waitlistPosition = queue++;
+      }
+    }
+  });
+
+  if (typeof event.seatsAvailable === 'number') {
+    event.seatsAvailable = Math.max(0, event.seatsAvailable - 1);
+  }
+
+  saveDb(db);
+  syncRegistrationToSupabase(reg, true).catch(console.error);
+  syncEventToSupabase(event, true).catch(console.error);
+
+  addAuditLog(
+    'WAITLIST_PROMOTION',
+    user,
+    `Promoted ${reg.studentName} (${reg.registrationCode}) from Waitlist to Confirmed for "${event.title}"`
+  );
+
+  const updatedSummary = calculateQuotaSummary(event, db.registrations);
+  return {
+    success: true,
+    registration: reg,
+    summary: updatedSummary
+  };
+}
+
 export function updateRegistrationStatus(id: string, status: string, user: AuthUser) {
   const db = loadDb();
   if (!db.registrations) db.registrations = [];
@@ -370,17 +932,28 @@ export function updateRegistrationStatus(id: string, status: string, user: AuthU
   const index = db.registrations.findIndex((r: any) => r.id === id);
   if (index === -1) throw new Error('Registration not found.');
 
-  const validStatuses = ['Confirmed', 'Pending', 'Attended', 'Cancelled'];
+  const validStatuses = ['Confirmed', 'Pending', 'Attended', 'Cancelled', 'Waitlisted', 'Rejected'];
   if (!validStatuses.includes(status)) {
     throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
   }
 
+  const prevStatus = db.registrations[index].status;
   db.registrations[index].status = status;
   db.registrations[index].updatedAt = new Date().toISOString();
+
+  // If status changed to Cancelled from Confirmed/Attended, restore available seat
+  const event = (db.events || []).find((e: any) => e.id === db.registrations[index].eventId);
+  if (event && (prevStatus === 'Confirmed' || prevStatus === 'Attended') && status === 'Cancelled') {
+    if (typeof event.seatsAvailable === 'number') {
+      event.seatsAvailable = Math.min(event.totalSeats || 60, event.seatsAvailable + 1);
+      syncEventToSupabase(event, true).catch(console.error);
+    }
+  }
+
   saveDb(db);
 
   syncRegistrationToSupabase(db.registrations[index], true).catch(console.error);
-  addAuditLog('REGISTRATION_STATUS_UPDATE', user, `Changed status of ${db.registrations[index].studentName} (${id}) to ${status}`);
+  addAuditLog('REGISTRATION_STATUS_UPDATE', user, `Changed status of ${db.registrations[index].studentName} (${id}) from ${prevStatus} to ${status}`);
 
   return db.registrations[index];
 }
@@ -396,9 +969,11 @@ export function deleteRegistration(id: string, user: AuthUser) {
 
   // Restore seat if applicable
   const event = (db.events || []).find((e: any) => e.id === target.eventId);
-  if (event && typeof event.seatsAvailable === 'number') {
-    event.seatsAvailable = Math.min(event.totalSeats || 60, event.seatsAvailable + 1);
-    syncEventToSupabase(event, true).catch(console.error);
+  if (event && (target.status === 'Confirmed' || target.status === 'Attended')) {
+    if (typeof event.seatsAvailable === 'number') {
+      event.seatsAvailable = Math.min(event.totalSeats || 60, event.seatsAvailable + 1);
+      syncEventToSupabase(event, true).catch(console.error);
+    }
   }
 
   saveDb(db);
@@ -418,6 +993,40 @@ export function getCertificates(publishedOnly = false) {
     return list.filter((c: any) => c.status === 'Published');
   }
   return list;
+}
+
+export async function ensureCertificatePdfExists(cert: any): Promise<string> {
+  try {
+    const certId = cert.certificateId;
+    if (!certId) return '';
+    const pdfFileName = `${certId}.pdf`;
+    const localOutputDir = path.join(process.cwd(), 'public', 'certificates');
+    const localFilePath = path.join(localOutputDir, pdfFileName);
+
+    if (fs.existsSync(localFilePath) && fs.statSync(localFilePath).size > 1000) {
+      return `/certificates/${pdfFileName}`;
+    }
+
+    const isWinner =
+      cert.certificateType?.toLowerCase().includes('winner') ||
+      cert.certificateType?.toLowerCase().includes('achievement') ||
+      cert.certificateType?.toLowerCase().includes('prize');
+
+    const result = await generateSingleCertificatePdf({
+      certificateId: certId,
+      recipientName: cert.participantName,
+      programName: cert.eventName,
+      programDate: cert.eventDate || cert.issueDate || new Date().toISOString().split('T')[0],
+      role: cert.certificateType,
+      certificateType: isWinner ? 'Achievement' : 'Participation',
+      awardCategory: isWinner ? (cert.awardCategory || 'Winner') : undefined
+    });
+
+    return result.publicUrl || `/certificates/${pdfFileName}`;
+  } catch (err: any) {
+    console.error(`ensureCertificatePdfExists failed for ${cert?.certificateId}:`, err.message);
+    return `/certificates/${cert.certificateId}.pdf`;
+  }
 }
 
 export function createCertificate(certData: any, user: AuthUser) {
@@ -445,6 +1054,7 @@ export function createCertificate(certData: any, user: AuthUser) {
   };
   db.certificates.unshift(newCert);
   saveDb(db);
+  ensureCertificatePdfExists(newCert).catch(() => {});
   syncCertificateToSupabase(newCert, false).catch(() => {});
   addAuditLog('CERTIFICATE_ISSUE', user, `Issued certificate ${certIdStr} to ${newCert.participantName}`);
   return newCert;
@@ -481,7 +1091,10 @@ export function bulkCreateCertificates(records: any[], user: AuthUser) {
   });
 
   saveDb(db);
-  createdList.forEach((c) => syncCertificateToSupabase(c, false).catch(() => {}));
+  createdList.forEach((c) => {
+    ensureCertificatePdfExists(c).catch(() => {});
+    syncCertificateToSupabase(c, false).catch(() => {});
+  });
   addAuditLog('CERTIFICATES_BULK_ISSUE', user, `Batch issued ${createdList.length} certificates.`);
   return createdList;
 }
@@ -740,13 +1353,27 @@ export async function generateProgramCertificates(
     );
 
     if (existingCert && !options.regenerateExisting) {
+      await ensureCertificatePdfExists(existingCert);
       results.push({ ...existingCert, alreadyExisted: true });
       return;
     }
 
     const certId = existingCert?.certificateId || `IEDC-2026-${Math.floor(10000 + Math.random() * 90000)}`;
 
+    let resolvedTemplatePath: string | undefined = undefined;
+    if (event.certificateTemplateUrl) {
+      if (fs.existsSync(event.certificateTemplateUrl)) {
+        resolvedTemplatePath = event.certificateTemplateUrl;
+      } else {
+        const localPath = path.join(process.cwd(), 'public', event.certificateTemplateUrl.replace(/^\//, ''));
+        if (fs.existsSync(localPath)) {
+          resolvedTemplatePath = localPath;
+        }
+      }
+    }
+
     try {
+      const isWinner = recipient.role?.toLowerCase().includes('winner') || event.certificateType === 'Achievement';
       const generated = await generateSingleCertificatePdf(
         {
           certificateId: certId,
@@ -756,12 +1383,15 @@ export async function generateProgramCertificates(
           organizingBody,
           customParagraph,
           role: recipient.role,
-          customTemplatePath: event.certificateTemplateUrl && fs.existsSync(event.certificateTemplateUrl)
-            ? event.certificateTemplateUrl
-            : undefined
+          certificateType: isWinner ? 'Achievement' : 'Participation',
+          awardCategory: event.awardCategory || (isWinner ? 'Winner' : undefined),
+          customTemplatePath: resolvedTemplatePath
         },
         templateConfig
       );
+
+      const initialStatus =
+        event.certificateStatus === 'Published' ? 'Published' : (existingCert?.status || 'Draft');
 
       const certRecord = {
         id: existingCert?.id || `cert-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
@@ -777,8 +1407,8 @@ export async function generateProgramCertificates(
         issueDate: new Date().toISOString().split('T')[0],
         qrCodeUrl: `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/${certId}`,
         pdfStorageUrl: generated.publicUrl || `/certificates/${generated.fileName}`,
-        status: 'Draft',
-        downloadsCount: 0,
+        status: initialStatus,
+        downloadsCount: existingCert?.downloadsCount || 0,
         issuedBy: user.id || 'admin',
         issuedAt: new Date().toISOString()
       };
@@ -802,7 +1432,7 @@ export async function generateProgramCertificates(
       results.push(certRecord);
     } catch (err: any) {
       console.error(`Failed generating cert for ${recipient.name}:`, err);
-      failures.push({ name: recipient.name, error: err.message });
+      failures.push({ name: recipient.name, error: err.message, registerNumber: recipient.registerNumber });
     }
   }
 
@@ -838,6 +1468,12 @@ export async function generateProgramCertificates(
   );
 
   return {
+    success: failures.length === 0,
+    requested: eligibleRegistrations.length + eligibleLeaders.length,
+    succeeded: results.length,
+    newlyGenerated: results.filter((r) => !r.alreadyExisted).length,
+    alreadyExisted: results.filter((r) => r.alreadyExisted).length,
+    failed: failures.length,
     totalEligibleParticipants: eligibleRegistrations.length,
     totalEligibleLeaders: eligibleLeaders.length,
     generatedCount: results.length,
@@ -891,10 +1527,13 @@ export async function generateProgramCertificatesZip(eventId: string) {
   for (const c of certs) {
     const fileName = `${c.certificateId}.pdf`;
     const localPath = path.join(process.cwd(), 'public', 'certificates', fileName);
+    if (!fs.existsSync(localPath)) {
+      await ensureCertificatePdfExists(c);
+    }
     if (fs.existsSync(localPath)) {
       const fileData = fs.readFileSync(localPath);
-      const safeRecipient = c.participantName.replace(/[^a-zA-Z0-9_\- ]/g, '').trim();
-      const zipEntryName = `${safeRecipient || 'Participant'}_${c.certificateId}.pdf`;
+      const safeRecipient = (c.participantName || 'Participant').replace(/[^a-zA-Z0-9_\- ]/g, '').trim();
+      const zipEntryName = `${safeRecipient}_${c.certificateId}.pdf`;
       zip.file(zipEntryName, fileData);
       addedCount++;
     }
@@ -912,7 +1551,7 @@ export async function generateProgramCertificatesZip(eventId: string) {
   };
 }
 
-export function retrieveStudentCertificate(eventId: string, fullName: string, mobileNumber: string) {
+export async function retrieveStudentCertificate(eventId: string, fullName: string, mobileNumber: string) {
   const db = loadDb();
   if (!fullName?.trim() || !mobileNumber?.trim()) {
     return { success: false, error: 'Full name and registered mobile number are required.' };
@@ -941,6 +1580,24 @@ export function retrieveStudentCertificate(eventId: string, fullName: string, mo
   });
 
   if (!match) {
+    const draftMatch = (db.certificates || []).find((c: any) => {
+      if (eventId && eventId !== 'All' && c.eventId !== eventId && c.eventName !== eventId) {
+        return false;
+      }
+      const certNormName = (c.participantName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const nameMatches = certNormName === cleanInputName;
+      const certPhone = String(c.phone || '').replace(/\D/g, '').slice(-10);
+      const phoneMatches = certPhone ? certPhone === cleanInputPhone : false;
+      return nameMatches && phoneMatches;
+    });
+
+    if (draftMatch) {
+      return {
+        success: false,
+        error: `Your certificate for "${draftMatch.eventName}" has been generated and is awaiting official publishing by the faculty coordinator. Please check back shortly.`
+      };
+    }
+
     return {
       success: false,
       error: 'No published certificate was found for the supplied details.'
@@ -951,6 +1608,9 @@ export function retrieveStudentCertificate(eventId: string, fullName: string, mo
   saveDb(db);
   syncCertificateToSupabase(match, true).catch(() => {});
 
+  // Ensure PDF file physically exists on disk before returning response
+  await ensureCertificatePdfExists(match);
+
   return {
     success: true,
     certificate: {
@@ -960,7 +1620,7 @@ export function retrieveStudentCertificate(eventId: string, fullName: string, mo
       eventDate: match.eventDate,
       certificateType: match.certificateType,
       issueDate: match.issueDate,
-      downloadUrl: match.pdfStorageUrl || `/certificates/${match.certificateId}.pdf`,
+      downloadUrl: `/certificates/${match.certificateId}.pdf`,
       status: match.status
     }
   };
@@ -1095,6 +1755,7 @@ export interface TeamMember {
   contact: string;
   showEmailPublicly: boolean;
   showContactPublicly: boolean;
+  showSocialPublicly?: boolean;
   graduationDate: string;
   photoUrl: string;
   instagramUsername: string;
@@ -1104,6 +1765,24 @@ export interface TeamMember {
   displayOrder: number;
   status: 'Published' | 'Draft' | 'Archived';
   verificationFlag?: string;
+  // Animated Profile Image & Presentation attributes
+  imagePosition?: 'bottom' | 'center' | 'top';
+  imageScale?: number;
+  animationEnabled?: boolean;
+  animationStyle?: 'fade-up' | 'soft-reveal' | 'gentle-float';
+  animationDelay?: number;
+  glowEnabled?: boolean;
+  glowIntensity?: 'subtle' | 'medium' | 'vibrant';
+  bgStyle?: 'radial-light' | 'soft-slate' | 'glass-glow' | 'minimal';
+  isTransparent?: boolean;
+  // AI Portrait Studio attributes
+  originalPhotoUrl?: string;
+  aiGeneratedPhotoUrl?: string;
+  finalTransparentPhotoUrl?: string;
+  aiApprovalStatus?: 'pending' | 'approved' | 'rejected';
+  aiProcessingStatus?: 'idle' | 'processing' | 'completed' | 'failed';
+  aiErrorMessage?: string;
+  aiMetadata?: any;
   createdAt: string;
   updatedAt: string;
 }
@@ -1355,15 +2034,26 @@ export function getTeamMembers(publishedOnly = false) {
         department: m.department,
         graduationDate: m.graduationDate,
         photoUrl: m.photoUrl,
-        instagramUsername: m.instagramUsername,
-        instagramUrl: m.instagramUrl || (m.instagramUsername ? `https://instagram.com/${m.instagramUsername.replace('@', '')}` : ''),
-        linkedinUrl: m.linkedinUrl,
+        // Privacy protection: only expose email / contact if explicitly enabled in admin panel
+        email: m.showEmailPublicly ? m.email : undefined,
+        contact: m.showContactPublicly ? m.contact : undefined,
+        showSocialPublicly: m.showSocialPublicly !== false,
+        instagramUsername: m.showSocialPublicly !== false ? m.instagramUsername : undefined,
+        instagramUrl: m.showSocialPublicly !== false ? (m.instagramUrl || (m.instagramUsername ? `https://www.instagram.com/${m.instagramUsername.replace(/^@/, '')}/` : '')) : undefined,
+        linkedinUrl: m.showSocialPublicly !== false ? m.linkedinUrl : undefined,
         bio: m.bio,
         displayOrder: m.displayOrder,
         status: m.status,
-        // Privacy protection: only expose email / contact if explicitly enabled in admin panel
-        email: m.showEmailPublicly ? m.email : undefined,
-        contact: m.showContactPublicly ? m.contact : undefined
+        // Animated Profile Image & Presentation attributes
+        imagePosition: m.imagePosition || 'bottom',
+        imageScale: m.imageScale !== undefined ? Number(m.imageScale) : 1.0,
+        animationEnabled: m.animationEnabled !== false,
+        animationStyle: m.animationStyle || 'fade-up',
+        animationDelay: m.animationDelay !== undefined ? Number(m.animationDelay) : 0,
+        glowEnabled: m.glowEnabled !== false,
+        glowIntensity: m.glowIntensity || 'subtle',
+        bgStyle: m.bgStyle || 'radial-light',
+        isTransparent: m.isTransparent !== false
       }));
   }
 
@@ -1390,6 +2080,7 @@ export function createTeamMember(data: any, user: AuthUser) {
     contact: (data.contact || data.phone || '').trim(),
     showEmailPublicly: !!data.showEmailPublicly,
     showContactPublicly: !!data.showContactPublicly,
+    showSocialPublicly: data.showSocialPublicly !== false,
     graduationDate: (data.graduationDate || '').trim(),
     photoUrl: (data.photoUrl || '').trim(),
     instagramUsername: cleanInsta,
@@ -1399,6 +2090,23 @@ export function createTeamMember(data: any, user: AuthUser) {
     displayOrder: Number(data.displayOrder) || (db.teamMembers.length + 1),
     status: data.status || 'Published',
     verificationFlag: data.verificationFlag || '',
+    // Animation & Presentation attributes
+    imagePosition: data.imagePosition || 'bottom',
+    imageScale: data.imageScale !== undefined ? Number(data.imageScale) : 1.0,
+    animationEnabled: data.animationEnabled !== false,
+    animationStyle: data.animationStyle || 'fade-up',
+    animationDelay: data.animationDelay !== undefined ? Number(data.animationDelay) : 0,
+    glowEnabled: data.glowEnabled !== false,
+    glowIntensity: data.glowIntensity || 'subtle',
+    bgStyle: data.bgStyle || 'radial-light',
+    isTransparent: data.isTransparent !== false,
+    originalPhotoUrl: (data.originalPhotoUrl || '').trim(),
+    aiGeneratedPhotoUrl: (data.aiGeneratedPhotoUrl || '').trim(),
+    finalTransparentPhotoUrl: (data.finalTransparentPhotoUrl || '').trim(),
+    aiApprovalStatus: data.aiApprovalStatus || 'pending',
+    aiProcessingStatus: data.aiProcessingStatus || 'idle',
+    aiErrorMessage: data.aiErrorMessage || '',
+    aiMetadata: data.aiMetadata || {},
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -1434,9 +2142,32 @@ export function updateTeamMember(id: string, updates: any, user: AuthUser) {
     ...updates,
     instagramUsername: cleanInsta,
     instagramUrl: instaUrl,
+    showSocialPublicly: updates.showSocialPublicly !== undefined ? Boolean(updates.showSocialPublicly) : (db.teamMembers[idx].showSocialPublicly ?? true),
     displayOrder: updates.displayOrder !== undefined ? Number(updates.displayOrder) : db.teamMembers[idx].displayOrder,
+    imagePosition: updates.imagePosition !== undefined ? updates.imagePosition : (db.teamMembers[idx].imagePosition || 'bottom'),
+    imageScale: updates.imageScale !== undefined ? Number(updates.imageScale) : (db.teamMembers[idx].imageScale ?? 1.0),
+    animationEnabled: updates.animationEnabled !== undefined ? Boolean(updates.animationEnabled) : (db.teamMembers[idx].animationEnabled ?? true),
+    animationStyle: updates.animationStyle !== undefined ? updates.animationStyle : (db.teamMembers[idx].animationStyle || 'fade-up'),
+    animationDelay: updates.animationDelay !== undefined ? Number(updates.animationDelay) : (db.teamMembers[idx].animationDelay ?? 0),
+    glowEnabled: updates.glowEnabled !== undefined ? Boolean(updates.glowEnabled) : (db.teamMembers[idx].glowEnabled ?? true),
+    glowIntensity: updates.glowIntensity !== undefined ? updates.glowIntensity : (db.teamMembers[idx].glowIntensity || 'subtle'),
+    bgStyle: updates.bgStyle !== undefined ? updates.bgStyle : (db.teamMembers[idx].bgStyle || 'radial-light'),
+    isTransparent: updates.isTransparent !== undefined ? Boolean(updates.isTransparent) : (db.teamMembers[idx].isTransparent ?? true),
     updatedAt: new Date().toISOString()
   };
+
+  // Synchronize avatar for any operator account linked to this team member
+  const newPhoto = db.teamMembers[idx].finalTransparentPhotoUrl || db.teamMembers[idx].photoUrl;
+  if (newPhoto && db.profiles) {
+    db.profiles.forEach((p: any) => {
+      if (
+        p.linkedProfileId === id ||
+        (p.email && p.email.toLowerCase() === db.teamMembers[idx].email?.toLowerCase())
+      ) {
+        p.avatar = newPhoto;
+      }
+    });
+  }
 
   saveDb(db);
   syncTeamMemberToSupabase(db.teamMembers[idx], true).catch(() => {});
@@ -1541,9 +2272,28 @@ export function createFacultyCoordinator(data: any, user: AuthUser) {
     bio: data.bio || '',
     email: data.email || '',
     phone: data.phone || '',
-    photoUrl: data.photoUrl || 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80',
+    photoUrl: data.photoUrl || '',
     displayOrder: Number(data.displayOrder) || (db.facultyCoordinators.length + 1),
-    isActive: data.isActive ?? true
+    isActive: data.isActive ?? true,
+    // Animation & Presentation attributes
+    imagePosition: data.imagePosition || 'bottom',
+    imageScale: data.imageScale !== undefined ? Number(data.imageScale) : 1.0,
+    animationEnabled: data.animationEnabled !== false,
+    animationStyle: data.animationStyle || 'fade-up',
+    animationDelay: data.animationDelay !== undefined ? Number(data.animationDelay) : 0,
+    glowEnabled: data.glowEnabled !== false,
+    glowIntensity: data.glowIntensity || 'subtle',
+    bgStyle: data.bgStyle || 'radial-light',
+    isTransparent: data.isTransparent !== false,
+    originalPhotoUrl: data.originalPhotoUrl || '',
+    aiGeneratedPhotoUrl: data.aiGeneratedPhotoUrl || '',
+    finalTransparentPhotoUrl: data.finalTransparentPhotoUrl || '',
+    aiApprovalStatus: data.aiApprovalStatus || 'pending',
+    aiProcessingStatus: data.aiProcessingStatus || 'idle',
+    aiErrorMessage: data.aiErrorMessage || '',
+    aiMetadata: data.aiMetadata || {},
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
   db.facultyCoordinators.push(newFac);
   saveDb(db);
@@ -1556,6 +2306,20 @@ export function updateFacultyCoordinator(id: string, updates: any, user: AuthUse
   const idx = (db.facultyCoordinators || []).findIndex((f: any) => f.id === id);
   if (idx === -1) return null;
   db.facultyCoordinators[idx] = { ...db.facultyCoordinators[idx], ...updates };
+
+  // Synchronize avatar for any operator account linked to this faculty coordinator
+  const newPhoto = db.facultyCoordinators[idx].photoUrl;
+  if (newPhoto && db.profiles) {
+    db.profiles.forEach((p: any) => {
+      if (
+        p.linkedProfileId === id ||
+        (p.email && p.email.toLowerCase() === db.facultyCoordinators[idx].email?.toLowerCase())
+      ) {
+        p.avatar = newPhoto;
+      }
+    });
+  }
+
   saveDb(db);
   addAuditLog('FACULTY_COORDINATOR_UPDATE', user, `Updated faculty coordinator: ${db.facultyCoordinators[idx].name}`);
   return db.facultyCoordinators[idx];
@@ -1570,55 +2334,170 @@ export function deleteFacultyCoordinator(id: string, user: AuthUser) {
 }
 
 // -------------------------------------------------------------
-// USER MANAGEMENT MODULE (Privileged: Faculty Coordinator role only)
+// OPERATOR & ACCESS MANAGEMENT MODULE
 // -------------------------------------------------------------
 export function getUsers() {
   const db = loadDb();
-  return (db.profiles || []).map((p: any) => ({
-    id: p.id,
-    username: p.username,
-    email: p.email,
-    full_name: p.full_name,
-    role: p.role,
-    department: p.department,
-    designation: p.designation,
-    staffId: p.staffId,
-    isActive: p.isActive,
-    createdAt: p.createdAt
-  }));
+  return (db.profiles || []).map((p: any) => {
+    const avatar = resolveOperatorAvatar(p, db);
+    return {
+      id: p.id,
+      username: p.username,
+      email: p.email,
+      full_name: p.full_name,
+      role: p.role,
+      department: p.department,
+      designation: p.designation,
+      staffId: p.staffId,
+      avatar,
+      linkedProfileId: p.linkedProfileId,
+      linkedProfileType: p.linkedProfileType,
+      permissions: p.permissions || [],
+      isActive: p.isActive !== false,
+      lastLoginAt: p.lastLoginAt,
+      createdAt: p.createdAt
+    };
+  });
 }
 
 export function createUser(userData: any, user: AuthUser) {
   const db = loadDb();
   if (!db.profiles) db.profiles = [];
+
+  const cleanUsername = String(userData.username || '').trim().toLowerCase();
+  if (!cleanUsername) {
+    throw new Error('Username is required.');
+  }
+
+  // Check username uniqueness
+  const exists = db.profiles.some(
+    (p: any) => p.username?.trim().toLowerCase() === cleanUsername
+  );
+  if (exists) {
+    throw new Error(`Username "@${cleanUsername}" is already taken. Please choose another username.`);
+  }
+
+  // Permission checks
+  if (userData.role === 'main_admin' && user.role !== 'main_admin') {
+    throw new Error('Only the Main Administrator can provision or assign the Main Administrator role.');
+  }
+
+  const role: OperatorRole = userData.role || 'student_operator';
+
   const newUser = {
     id: `usr-${Date.now()}`,
-    username: userData.username,
-    email: userData.email,
-    passwordHash: userData.password || 'Student@123',
-    full_name: userData.full_name || userData.name,
-    role: userData.role || 'student_lead',
+    username: cleanUsername,
+    email: userData.email?.trim().toLowerCase() || `${cleanUsername}@gptcpmna.edu.in`,
+    passwordHash: userData.password || (role === 'main_admin' ? 'Admin@123' : role === 'faculty_coordinator' ? 'Faculty@123' : 'Student@123'),
+    full_name: userData.full_name || userData.name || cleanUsername,
+    role,
     phone: userData.phone || '',
-    department: userData.department || 'Computer Engineering',
-    designation: userData.designation || 'Student Lead',
-    staffId: userData.staffId || `SL00${db.profiles.length + 1}`,
+    department: userData.department || 'Electronics Engineering',
+    designation: userData.designation || (role === 'main_admin' ? 'Main Administrator' : role === 'faculty_coordinator' ? 'Faculty Coordinator' : 'Student Operator'),
+    staffId: userData.staffId || (role === 'main_admin' ? `ADMIN00${db.profiles.length + 1}` : role === 'faculty_coordinator' ? `FAC00${db.profiles.length + 1}` : `SL00${db.profiles.length + 1}`),
+    avatar: userData.avatar || '',
+    linkedProfileId: userData.linkedProfileId || null,
+    linkedProfileType: userData.linkedProfileType || null,
+    permissions: userData.permissions || [],
     isActive: true,
     createdAt: new Date().toISOString()
   };
+
   db.profiles.push(newUser);
   saveDb(db);
-  addAuditLog('USER_PROVISION', user, `Created admin account for ${newUser.full_name} (${newUser.role})`);
+  addAuditLog('USER_PROVISION', user, `Provisioned operator account @${newUser.username} (${newUser.role})`);
   return newUser;
+}
+
+export function updateUser(id: string, updates: any, user: AuthUser) {
+  const db = loadDb();
+  const idx = (db.profiles || []).findIndex((p: any) => p.id === id);
+  if (idx === -1) throw new Error('Operator account not found.');
+
+  const target = db.profiles[idx];
+
+  // Protect main_admin
+  if (target.role === 'main_admin' && user.role !== 'main_admin') {
+    throw new Error('Unauthorized: Only the Main Administrator can modify Main Administrator accounts.');
+  }
+
+  // Prevent demoting last main_admin
+  if (target.role === 'main_admin' && updates.role && updates.role !== 'main_admin') {
+    const mainAdminCount = db.profiles.filter((p: any) => p.role === 'main_admin').length;
+    if (mainAdminCount <= 1) {
+      throw new Error('Safety restriction: Cannot remove or demote the sole Main Administrator.');
+    }
+  }
+
+  if (updates.role === 'main_admin' && user.role !== 'main_admin') {
+    throw new Error('Only the Main Administrator can promote an account to Main Administrator.');
+  }
+
+  db.profiles[idx] = {
+    ...target,
+    ...updates,
+    id: target.id, // Immutable ID
+    username: updates.username ? updates.username.trim().toLowerCase() : target.username,
+    updatedAt: new Date().toISOString()
+  };
+
+  saveDb(db);
+  addAuditLog('USER_UPDATE', user, `Updated operator profile @${target.username} (${target.role})`);
+  return db.profiles[idx];
+}
+
+export function resetUserPassword(id: string, newPassword: string, user: AuthUser) {
+  const db = loadDb();
+  const target = (db.profiles || []).find((p: any) => p.id === id);
+  if (!target) throw new Error('Operator account not found.');
+
+  if (target.role === 'main_admin' && user.role !== 'main_admin') {
+    throw new Error('Unauthorized: Only the Main Administrator can reset Main Administrator passwords.');
+  }
+
+  if (!newPassword || newPassword.length < 6) {
+    throw new Error('Password must be at least 6 characters long.');
+  }
+
+  target.passwordHash = newPassword;
+  target.updatedAt = new Date().toISOString();
+  saveDb(db);
+
+  addAuditLog('USER_PASSWORD_RESET', user, `Password reset initiated for operator @${target.username}`);
+  return { success: true, message: `Password reset successfully for @${target.username}` };
 }
 
 export function toggleUserStatus(id: string, user: AuthUser) {
   const db = loadDb();
   const item = (db.profiles || []).find((p: any) => p.id === id);
-  if (!item) return null;
-  item.isActive = !item.isActive;
+  if (!item) throw new Error('Operator account not found.');
+
+  if (item.role === 'main_admin') {
+    throw new Error('Protection Policy: The Main Administrator account cannot be suspended.');
+  }
+
+  item.isActive = item.isActive === false ? true : false;
+  item.updatedAt = new Date().toISOString();
   saveDb(db);
-  addAuditLog('USER_STATUS_TOGGLE', user, `Toggled active status for ${item.full_name}`);
+
+  const statusStr = item.isActive ? 'ACTIVATED' : 'SUSPENDED';
+  addAuditLog('USER_STATUS_TOGGLE', user, `${statusStr} operator account @${item.username}`);
   return item;
+}
+
+export function deleteUser(id: string, user: AuthUser) {
+  const db = loadDb();
+  const item = (db.profiles || []).find((p: any) => p.id === id);
+  if (!item) throw new Error('Operator account not found.');
+
+  if (item.role === 'main_admin') {
+    throw new Error('Protection Policy: The Main Administrator account cannot be deleted.');
+  }
+
+  db.profiles = (db.profiles || []).filter((p: any) => p.id !== id);
+  saveDb(db);
+  addAuditLog('USER_DELETE', user, `Deleted operator account @${item.username}`);
+  return true;
 }
 
 // -------------------------------------------------------------
@@ -1733,6 +2612,28 @@ export function createResource(data: any, user: AuthUser) {
   syncResourceToSupabase(newRes, false).catch(() => {});
   addAuditLog('RESOURCE_UPLOAD', user, `Uploaded resource: ${newRes.title}`);
   return newRes;
+}
+
+export function updateResource(id: string, updates: any, user: AuthUser) {
+  const db = loadDb();
+  if (!db.resources) db.resources = [];
+  const idx = db.resources.findIndex((r: any) => r.id === id);
+  if (idx === -1) return null;
+  db.resources[idx] = { ...db.resources[idx], ...updates, updatedAt: new Date().toISOString() };
+  saveDb(db);
+  syncResourceToSupabase(db.resources[idx], true).catch(() => {});
+  addAuditLog('RESOURCE_UPDATE', user, `Updated resource: ${db.resources[idx].title}`);
+  return db.resources[idx];
+}
+
+export function deleteResource(id: string, user: AuthUser) {
+  const db = loadDb();
+  if (!db.resources) db.resources = [];
+  const item = db.resources.find((r: any) => r.id === id);
+  db.resources = db.resources.filter((r: any) => r.id !== id);
+  saveDb(db);
+  if (item) addAuditLog('RESOURCE_DELETE', user, `Deleted resource: ${item.title}`);
+  return true;
 }
 
 export function getBlogs() {

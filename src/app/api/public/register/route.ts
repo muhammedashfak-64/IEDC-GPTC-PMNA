@@ -20,10 +20,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Please enter your full legal student name.' }, { status: 400 });
     }
 
-    if (!registerNumber || registerNumber.length < 4) {
-      return NextResponse.json({ success: false, error: 'Please enter a valid Admission / Register number.' }, { status: 400 });
-    }
-
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!email || !emailRegex.test(email)) {
       return NextResponse.json({ success: false, error: 'Please enter a valid email address.' }, { status: 400 });
@@ -34,31 +30,54 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Please enter a valid 10-digit mobile number.' }, { status: 400 });
     }
 
-    if (!department) {
+    const collegeName = String(body.collegeName || '').trim();
+    const isExternal =
+      body.participationCategory === 'External' ||
+      (collegeName &&
+        !collegeName.toLowerCase().includes('perinthalmanna') &&
+        !collegeName.toLowerCase().includes('gptc pmna'));
+
+    const participationCategory: 'Internal' | 'External' = isExternal ? 'External' : 'Internal';
+
+    if (participationCategory === 'Internal' && !department) {
       return NextResponse.json({ success: false, error: 'Please select your academic department.' }, { status: 400 });
+    }
+
+    if (participationCategory === 'External' && !collegeName) {
+      return NextResponse.json({ success: false, error: 'Please enter your institution / college name.' }, { status: 400 });
     }
 
     if (body.consent === false) {
       return NextResponse.json({ success: false, error: 'Consent to attend and adhere to event guidelines is required.' }, { status: 400 });
     }
 
-    const registration = registerStudentForEvent({
+    const registration = await registerStudentForEvent({
       eventId,
       studentName,
       registerNumber,
       email,
       phone,
-      department,
-      academicYear: body.academicYear || '2nd Year',
-      collegeName: body.collegeName || 'Govt Polytechnic College Perinthalmanna',
+      department: department || body.course || 'External',
+      academicYear: body.academicYear || 'First Year',
+      collegeName: collegeName || 'Govt Polytechnic College Perinthalmanna',
+      participationCategory,
+      district: body.district ? String(body.district).trim() : '',
+      course: body.course ? String(body.course).trim() : '',
       additionalNotes: body.additionalNotes || '',
       consent: true
     });
 
+    const isWaitlisted = registration.status === 'Waitlisted';
+    const message = isWaitlisted
+      ? `Seats full! You have joined the official Waiting List at position #${registration.waitlistPosition}. We will notify you if a seat opens up.`
+      : 'Your registration has been confirmed successfully!';
+
     return NextResponse.json(
       {
         success: true,
-        message: 'Your registration has been confirmed successfully!',
+        message,
+        status: registration.status,
+        waitlistPosition: registration.waitlistPosition,
         data: registration
       },
       { status: 201 }

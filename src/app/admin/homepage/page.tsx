@@ -13,7 +13,9 @@ import {
   Layers,
   BarChart2,
   Globe,
-  Settings
+  Settings,
+  Sliders,
+  RotateCcw
 } from 'lucide-react';
 import FileUpload from '@/components/admin/FileUpload';
 
@@ -30,6 +32,11 @@ export default function HomepageManagementPage() {
     heroSub: 'Innovation and Entrepreneurship Development Centre (IEDC) is the official innovation hub of Government Polytechnic College, Perinthalmanna, empowering students to innovate, build startups, develop technical skills, and transform ideas into impactful solutions.',
     tickerAnnouncement: 'Hackathon 2026 Registrations are now LIVE! Certificate portal is open for recent workshops.',
     campusPhotoUrl: '/campus-main.jpeg',
+    bgOpacity: 28,
+    bgBlur: 12,
+    darkOverlayOpacity: 85,
+    imagePosition: 'center',
+    bgScale: 104,
     statMembers: '650+',
     statProjects: '120+',
     statEvents: '35+',
@@ -38,7 +45,10 @@ export default function HomepageManagementPage() {
     contactEmail: 'iedc@gptcpmna.edu.in',
     contactPhone: '+91 4933 227221',
     address: 'Govt Polytechnic College, Angadippuram PO, Perinthalmanna, Malappuram, Kerala 679321',
-    footerCopyright: '© 2026 IEDC Government Polytechnic College Perinthalmanna. All Rights Reserved.'
+    footerCopyright: '© 2026 IEDC Government Polytechnic College Perinthalmanna. All Rights Reserved.',
+    iedcGptcPmnaLogoUrl: '/iedc-gptc-pmna-logo.png',
+    collegeLogoUrl: '/college-logo.png',
+    iedcLogoUrl: '/iedc-logo.png'
   });
 
   useEffect(() => {
@@ -53,7 +63,12 @@ export default function HomepageManagementPage() {
             heroHeading: d.heroHeading || 'Where Innovation Meets Opportunity',
             heroSub: d.heroSub || '',
             tickerAnnouncement: d.tickerAnnouncement || '',
-            campusPhotoUrl: d.campusPhotoUrl || '/campus-main.jpeg',
+            campusPhotoUrl: d.heroVisual?.campusPhotoUrl || d.campusPhotoUrl || '/campus-main.jpeg',
+            bgOpacity: d.heroVisual?.bgOpacity ?? 28,
+            bgBlur: d.heroVisual?.bgBlur ?? 12,
+            darkOverlayOpacity: d.heroVisual?.darkOverlayOpacity ?? 85,
+            imagePosition: d.heroVisual?.imagePosition || 'center',
+            bgScale: d.heroVisual?.bgScale ?? 104,
             statMembers: d.stats?.[0]?.value || '650+',
             statProjects: d.stats?.[1]?.value || '120+',
             statEvents: d.stats?.[2]?.value || '35+',
@@ -62,13 +77,29 @@ export default function HomepageManagementPage() {
             contactEmail: d.contact?.email || 'iedc@gptcpmna.edu.in',
             contactPhone: d.contact?.phone || '+91 4933 227221',
             address: d.contact?.address || '',
-            footerCopyright: '© 2026 IEDC Government Polytechnic College Perinthalmanna. All Rights Reserved.'
+            footerCopyright: '© 2026 IEDC Government Polytechnic College Perinthalmanna. All Rights Reserved.',
+            iedcGptcPmnaLogoUrl: d.iedcGptcPmnaLogoUrl || '/iedc-gptc-pmna-logo.png',
+            collegeLogoUrl: d.collegeLogoUrl || '/college-logo.png',
+            iedcLogoUrl: d.iedcLogoUrl || '/iedc-logo.png'
           });
         }
       })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  const restoreDefaultHeroVisual = () => {
+    setFormData((prev) => ({
+      ...prev,
+      campusPhotoUrl: '/campus-main.jpeg',
+      bgOpacity: 28,
+      bgBlur: 12,
+      darkOverlayOpacity: 85,
+      imagePosition: 'center',
+      bgScale: 104
+    }));
+    addToast('Visual Settings Reset', 'Hero background settings restored to defaults.', 'info');
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -81,6 +112,18 @@ export default function HomepageManagementPage() {
       heroSub: formData.heroSub,
       tickerAnnouncement: formData.tickerAnnouncement,
       campusPhotoUrl: formData.campusPhotoUrl,
+      iedcGptcPmnaLogoUrl: formData.iedcGptcPmnaLogoUrl,
+      collegeLogoUrl: formData.collegeLogoUrl,
+      iedcLogoUrl: formData.iedcLogoUrl,
+      logoUrl: formData.collegeLogoUrl,
+      heroVisual: {
+        campusPhotoUrl: formData.campusPhotoUrl,
+        bgOpacity: Number(formData.bgOpacity),
+        bgBlur: Number(formData.bgBlur),
+        darkOverlayOpacity: Number(formData.darkOverlayOpacity),
+        imagePosition: formData.imagePosition,
+        bgScale: Number(formData.bgScale)
+      },
       stats: [
         { label: 'Active Members', value: formData.statMembers },
         { label: 'Student Projects', value: formData.statProjects },
@@ -162,21 +205,45 @@ export default function HomepageManagementPage() {
       {previewMode && (
         <div className="p-6 rounded-3xl bg-[#141418] border border-white/20 space-y-4 shadow-2xl">
           <div className="flex items-center justify-between border-b border-white/10 pb-3">
-            <span className="text-xs font-mono font-bold text-amber-300">● LIVE HERO PREVIEW CANVAS</span>
-            <span className="text-[11px] text-slate-400">Shows how changes will render on the public site</span>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-xs font-mono font-bold text-white uppercase tracking-wider">LIVE HERO PREVIEW CANVAS</span>
+            </div>
+            <span className="text-[11px] text-slate-400 font-mono">
+              Blur: {formData.bgBlur}px | Opacity: {formData.bgOpacity}% | Overlay: {formData.darkOverlayOpacity}%
+            </span>
           </div>
 
-          <div className="relative rounded-2xl overflow-hidden p-8 bg-[#0F0F10] border border-white/10 text-center space-y-4">
+          <div className="relative rounded-2xl overflow-hidden p-8 bg-[#0F0F10] border border-white/10 text-center min-h-[260px] flex items-center justify-center">
+            {/* Background layer with isolated blur & opacity */}
             <div
-              className="absolute inset-0 bg-cover bg-center filter blur-lg opacity-25"
-              style={{ backgroundImage: `url(${formData.campusPhotoUrl})` }}
+              className="absolute inset-0 bg-cover pointer-events-none"
+              style={{
+                backgroundImage: `url(${formData.campusPhotoUrl || '/campus-main.jpeg'})`,
+                backgroundPosition: formData.imagePosition || 'center',
+                filter: `blur(${formData.bgBlur}px) brightness(0.30) contrast(1.0)`,
+                transform: `scale(${(formData.bgScale || 104) / 100})`,
+                opacity: (formData.bgOpacity ?? 28) / 100,
+                transition: 'all 0.2s ease',
+              }}
             />
+            {/* Configurable dark overlay */}
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                background: `linear-gradient(to bottom, rgba(15, 15, 16, ${(formData.darkOverlayOpacity ?? 85) / 100}) 0%, rgba(15, 15, 16, ${Math.min(1, ((formData.darkOverlayOpacity ?? 85) / 100) * 0.92)}) 50%, rgba(15, 15, 16, ${Math.min(1, ((formData.darkOverlayOpacity ?? 85) / 100) * 1.05)}) 100%)`,
+                transition: 'background 0.2s ease',
+              }}
+            />
+            {/* Foreground content: 100% crisp, never transparent or blurred */}
             <div className="relative z-10 max-w-2xl mx-auto space-y-3">
-              <span className="px-3 py-1 rounded-full bg-white/10 text-[10px] font-mono text-slate-300 border border-white/15 inline-block">
-                {formData.tickerAnnouncement}
-              </span>
-              <h2 className="text-3xl font-black text-white">{formData.heroHeading}</h2>
-              <p className="text-xs text-slate-300 leading-relaxed">{formData.heroSub}</p>
+              {formData.tickerAnnouncement && (
+                <span className="px-3 py-1 rounded-full bg-white/10 text-[10px] font-mono text-slate-200 border border-white/15 inline-block shadow-sm">
+                  {formData.tickerAnnouncement}
+                </span>
+              )}
+              <h2 className="text-3xl font-black text-white drop-shadow-md">{formData.heroHeading}</h2>
+              <p className="text-xs text-slate-300 leading-relaxed line-clamp-3">{formData.heroSub}</p>
             </div>
           </div>
         </div>
@@ -189,7 +256,7 @@ export default function HomepageManagementPage() {
         <div className="lg:col-span-7 space-y-6">
           <div className="p-6 rounded-3xl bg-[#121216] border border-white/10 space-y-4">
             <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Layers className="w-4 h-4 text-slate-300" /> Hero Section Content
+              <Layers className="w-4 h-4 text-[#F98A5B]" /> Hero Section Content
             </h3>
 
             <div>
@@ -231,20 +298,168 @@ export default function HomepageManagementPage() {
             </div>
           </div>
 
-          {/* Campus Background Image Upload / Path */}
-          <div className="p-6 rounded-3xl bg-[#121216] border border-white/10 space-y-4">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-slate-300" /> Campus Background Image
-            </h3>
+          {/* ═══════════════════════════════════════════════════════
+              SECTION: HERO BACKGROUND & VISUAL SETTINGS
+          ═══════════════════════════════════════════════════════ */}
+          <div className="p-6 rounded-3xl bg-[#121216] border border-white/10 space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+              <div>
+                <span className="text-[9px] font-mono font-bold text-[#F98A5B] uppercase tracking-wider block">
+                  VISUAL CONTROLS
+                </span>
+                <h3 className="text-sm font-black text-white flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-[#F98A5B]" /> HERO BACKGROUND &amp; VISUAL SETTINGS
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={restoreDefaultHeroVisual}
+                className="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-[11px] font-bold flex items-center gap-1.5 transition-colors self-start sm:self-auto cursor-pointer"
+              >
+                <RotateCcw className="w-3 h-3 text-amber-400" />
+                <span>Restore Defaults</span>
+              </button>
+            </div>
 
-            <FileUpload
-              label="Campus Background / Hero Backdrop Image"
-              value={formData.campusPhotoUrl}
-              onChange={(url) => setFormData({ ...formData, campusPhotoUrl: url })}
-              folder="homepage"
-              accept="image/jpeg,image/png,image/webp"
-              helperText="Upload official campus drone shot or high-resolution backdrop from your PC"
-            />
+            {/* A. College background image upload and preview */}
+            <div className="space-y-3">
+              <FileUpload
+                label="College Background Photograph"
+                value={formData.campusPhotoUrl}
+                onChange={(url) => setFormData({ ...formData, campusPhotoUrl: url || '/campus-main.jpeg' })}
+                folder="homepage"
+                accept="image/jpeg,image/png,image/webp"
+                helperText="Upload official college campus photograph from your computer. Stored securely in Supabase."
+              />
+              {formData.campusPhotoUrl && (
+                <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
+                  <span>Current Source: <code className="text-white bg-white/5 px-2 py-0.5 rounded">{formData.campusPhotoUrl}</code></span>
+                  {formData.campusPhotoUrl !== '/campus-main.jpeg' && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, campusPhotoUrl: '/campus-main.jpeg' })}
+                      className="text-[#F98A5B] hover:underline cursor-pointer"
+                    >
+                      Revert to Default Campus Image
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* B & C. Sliders: Opacity, Blur, Overlay, Zoom */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+              {/* Opacity Slider */}
+              <div className="p-4 rounded-2xl bg-[#18181D] border border-white/10 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-white">Background Opacity</label>
+                  <span className="px-2 py-0.5 rounded-md bg-[#F98A5B]/20 border border-[#F98A5B]/40 text-[#F98A5B] text-xs font-mono font-bold">
+                    {formData.bgOpacity}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={formData.bgOpacity}
+                  onChange={(e) => setFormData({ ...formData, bgOpacity: Number(e.target.value) })}
+                  className="w-full accent-[#F98A5B] cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-slate-400">
+                  <span>0% (Transparent)</span>
+                  <span>100% (Solid)</span>
+                </div>
+              </div>
+
+              {/* Blur Slider */}
+              <div className="p-4 rounded-2xl bg-[#18181D] border border-white/10 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-white">Background Blur</label>
+                  <span className="px-2 py-0.5 rounded-md bg-purple-500/20 border border-purple-500/40 text-purple-300 text-xs font-mono font-bold">
+                    {formData.bgBlur}px
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="20"
+                  step="1"
+                  value={formData.bgBlur}
+                  onChange={(e) => setFormData({ ...formData, bgBlur: Number(e.target.value) })}
+                  className="w-full accent-purple-500 cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-slate-400">
+                  <span>0px (Crisp)</span>
+                  <span>20px (Maximum Softness)</span>
+                </div>
+              </div>
+
+              {/* Dark Overlay Opacity Slider */}
+              <div className="p-4 rounded-2xl bg-[#18181D] border border-white/10 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-white">Dark Shade Overlay</label>
+                  <span className="px-2 py-0.5 rounded-md bg-slate-700/50 border border-white/20 text-slate-200 text-xs font-mono font-bold">
+                    {formData.darkOverlayOpacity}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="1"
+                  value={formData.darkOverlayOpacity}
+                  onChange={(e) => setFormData({ ...formData, darkOverlayOpacity: Number(e.target.value) })}
+                  className="w-full accent-slate-400 cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-slate-400">
+                  <span>0% (No Shade)</span>
+                  <span>100% (Deep Black)</span>
+                </div>
+              </div>
+
+              {/* Background Zoom / Scale Slider */}
+              <div className="p-4 rounded-2xl bg-[#18181D] border border-white/10 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-white">Backdrop Zoom (Scale)</label>
+                  <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-mono font-bold">
+                    {formData.bgScale}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="100"
+                  max="130"
+                  step="1"
+                  value={formData.bgScale}
+                  onChange={(e) => setFormData({ ...formData, bgScale: Number(e.target.value) })}
+                  className="w-full accent-emerald-500 cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-slate-400">
+                  <span>100% (Original)</span>
+                  <span>130% (Zoomed)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* D. Image Positioning */}
+            <div className="p-4 rounded-2xl bg-[#18181D] border border-white/10 space-y-2">
+              <label className="text-xs font-bold text-white block">Image Alignment Position</label>
+              <select
+                value={formData.imagePosition}
+                onChange={(e) => setFormData({ ...formData, imagePosition: e.target.value })}
+                className="w-full bg-[#121216] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+              >
+                <option value="center">Center (Balanced Campus View)</option>
+                <option value="top">Top (Show Upper Campus &amp; Architecture)</option>
+                <option value="bottom">Bottom (Show Ground Level)</option>
+                <option value="left">Left Aligned</option>
+                <option value="right">Right Aligned</option>
+              </select>
+              <p className="text-[10px] text-slate-400">
+                Positions the focal point of the college photo behind the hero text and cards.
+              </p>
+            </div>
           </div>
         </div>
 
@@ -342,6 +557,60 @@ export default function HomepageManagementPage() {
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   className="w-full bg-[#18181D] border border-white/10 rounded-xl p-2.5 text-xs text-white"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Institutional Logos & Header Branding (Order: 1, 2, 3) */}
+          <div className="p-6 rounded-3xl bg-[#121216] border border-white/10 space-y-4">
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <ImageIcon className="w-4 h-4 text-amber-400" /> Header Branding Logos
+            </h3>
+            <p className="text-[11px] text-slate-400">
+              Configure the 3 official logos displayed across the public header in left-to-right order.
+            </p>
+
+            <div className="space-y-4 pt-1">
+              <div className="bg-[#16161D] p-3 rounded-2xl border border-white/10">
+                <span className="text-[10px] font-mono font-bold text-amber-400 uppercase tracking-widest block mb-2">
+                  1. IEDC GPTC PMNA LOGO (LEFTMOST)
+                </span>
+                <FileUpload
+                  label="IEDC GPTC PMNA LOGO"
+                  value={formData.iedcGptcPmnaLogoUrl}
+                  onChange={(url) => setFormData({ ...formData, iedcGptcPmnaLogoUrl: url })}
+                  folder="branding"
+                  accept="image/png,image/svg+xml,image/jpeg,image/webp"
+                  helperText="Upload official college unit logo from PC. Appears 1st on the left."
+                />
+              </div>
+
+              <div className="bg-[#16161D] p-3 rounded-2xl border border-white/10">
+                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block mb-2">
+                  2. COLLEGE CREST / LOGO (CENTER)
+                </span>
+                <FileUpload
+                  label="COLLEGE CREST / LOGO"
+                  value={formData.collegeLogoUrl}
+                  onChange={(url) => setFormData({ ...formData, collegeLogoUrl: url })}
+                  folder="branding"
+                  accept="image/png,image/svg+xml,image/jpeg,image/webp"
+                  helperText="Government Polytechnic College Perinthalmanna crest. Appears 2nd."
+                />
+              </div>
+
+              <div className="bg-[#16161D] p-3 rounded-2xl border border-white/10">
+                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block mb-2">
+                  3. OFFICIAL IEDC LOGO (RIGHT)
+                </span>
+                <FileUpload
+                  label="OFFICIAL IEDC LOGO"
+                  value={formData.iedcLogoUrl}
+                  onChange={(url) => setFormData({ ...formData, iedcLogoUrl: url })}
+                  folder="branding"
+                  accept="image/png,image/svg+xml,image/jpeg,image/webp"
+                  helperText="Official Kerala IEDC state emblem. Appears 3rd."
                 />
               </div>
             </div>

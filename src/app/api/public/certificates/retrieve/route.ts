@@ -28,7 +28,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { event_id, full_name, mobile_number } = await req.json();
+    const body = await req.json();
+    const event_id = body.event_id || body.eventId;
+    const full_name = body.full_name || body.fullName || body.name;
+    const mobile_number = body.mobile_number || body.mobileNumber || body.phone;
 
     if (!full_name || !mobile_number) {
       return NextResponse.json(
@@ -37,7 +40,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = retrieveStudentCertificate(event_id, full_name, mobile_number);
+    const result = await retrieveStudentCertificate(event_id, full_name, mobile_number);
 
     if (!result.success) {
       return NextResponse.json(

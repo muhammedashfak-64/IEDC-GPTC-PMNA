@@ -50,11 +50,37 @@ export function requireAdminAuth(
     };
   }
 
-  if (requireFacultyRole && user.role !== 'faculty_coordinator') {
+  if (requireFacultyRole && user.role !== 'faculty_coordinator' && user.role !== 'main_admin') {
     return {
       user: null,
       errorResponse: NextResponse.json(
-        { success: false, error: 'Forbidden. This action requires Faculty Coordinator privileges.' },
+        { success: false, error: 'Forbidden. This action requires Faculty Coordinator or Main Administrator privileges.' },
+        { status: 403 }
+      )
+    };
+  }
+
+  return { user, errorResponse: null };
+}
+
+export function requireMainAdminAuth(req: NextRequest | Request): AdminAuthResult {
+  const user = getAdminUserFromRequest(req);
+
+  if (!user) {
+    return {
+      user: null,
+      errorResponse: NextResponse.json(
+        { success: false, error: 'Unauthorized. An active administrative session is required.' },
+        { status: 401 }
+      )
+    };
+  }
+
+  if (user.role !== 'main_admin') {
+    return {
+      user: null,
+      errorResponse: NextResponse.json(
+        { success: false, error: 'Forbidden. This action requires Main Administrator (Website Owner) privileges.' },
         { status: 403 }
       )
     };

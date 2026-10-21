@@ -9,38 +9,131 @@ export interface CertificateGenerateParams {
   programName: string;
   programDate: string;
   organizingBody?: string;
-  certificateHeading?: string;
+  certificateHeading?: string; // 'CERTIFICATE'
+  certificateSubtitle?: string; // e.g. '— OF PARTICIPATION —' or '— OF ACHIEVEMENT —'
+  recipientIntro?: string; // 'THIS CERTIFICATE IS PRESENTED TO' or 'THIS CERTIFICATE IS AWARDED TO'
   customParagraph?: string;
-  role?: string; // 'Participant' | 'Student Lead' | 'Program Coordinator' | 'Volunteer' | 'Organizer' | 'Speaker' | 'Faculty Coordinator'
+  role?: string; // 'Participant' | 'Winner' | 'First Prize' | 'Runner-up' | 'Student Lead' | 'Coordinator'
+  certificateType?: 'Participation' | 'Achievement' | 'Winner' | string;
+  awardCategory?: string; // 'Winner' | 'First Prize' | 'Second Prize' | 'Third Prize' | 'Special Award' | 'Custom Achievement'
+  achievementDescription?: string;
+  recipientPhotoUrl?: string; // optional recipient photo path or URL
   customTemplatePath?: string;
 }
 
 export interface CertificateConfig {
   nameX?: number; // if undefined, centered
   nameY: number; // default 305
-  nameFontSize: number; // default 34
-  nameColor: [number, number, number]; // RGB 0-1, default [139/255, 0, 0]
+  nameFontSize: number; // default 32
+  nameColor: string | [number, number, number]; // Hex string or RGB 0-1
   paraY: number; // default 252
-  paraFontSize: number; // default 12.5
-  paraLineSpacing: number; // default 18
+  paraFontSize: number; // default 12
+  paraLineSpacing: number; // default 17
   paraMaxWidth: number; // default 580
-  paraColor: [number, number, number]; // default [31/255, 41/255, 55/255]
+  paraColor: string | [number, number, number]; // Hex string or RGB 0-1
   showCertId: boolean; // default true
   certIdY: number; // default 45
+  // Type B Header Positions
+  subtitleY?: number; // default 398
+  introY?: number; // default 363
+  // Optional Recipient Photo
+  showPhoto?: boolean; // default false
+  photoX?: number; // default 670
+  photoY?: number; // default 240
+  photoWidth?: number; // default 75
+  photoHeight?: number; // default 95
 }
 
 export const DEFAULT_CERT_CONFIG: CertificateConfig = {
   nameY: 305,
-  nameFontSize: 34,
+  nameFontSize: 32,
   nameColor: [139 / 255, 0, 0],
   paraY: 252,
-  paraFontSize: 12.5,
-  paraLineSpacing: 18,
+  paraFontSize: 12,
+  paraLineSpacing: 17,
   paraMaxWidth: 580,
   paraColor: [31 / 255, 41 / 255, 55 / 255],
   showCertId: true,
-  certIdY: 45
+  certIdY: 45,
+  subtitleY: 398,
+  introY: 363,
+  showPhoto: false,
+  photoX: 670,
+  photoY: 240,
+  photoWidth: 75,
+  photoHeight: 95
 };
+
+/**
+ * Safely parse any color representation (hex string #RRGGBB, #RGB, rgb(...) string, or array of numbers)
+ * into a valid pdf-lib RGB tuple: [r, g, b] where each channel is a float between 0.0 and 1.0.
+ */
+export function normalizeColorToRgb(
+  color: any,
+  fallback: [number, number, number] = [139 / 255, 0, 0]
+): [number, number, number] {
+  if (!color) return fallback;
+
+  // Case 1: Array of numbers
+  if (Array.isArray(color) && color.length >= 3) {
+    const isAlready01 = color.slice(0, 3).every(
+      (c) => typeof c === 'number' && !isNaN(c) && c >= 0 && c <= 1.0
+    );
+    if (isAlready01) {
+      return [Number(color[0]), Number(color[1]), Number(color[2])];
+    }
+    const r = Math.min(1, Math.max(0, Number(color[0]) / 255));
+    const g = Math.min(1, Math.max(0, Number(color[1]) / 255));
+    const b = Math.min(1, Math.max(0, Number(color[2]) / 255));
+    if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
+      return [r, g, b];
+    }
+  }
+
+  // Case 2: String
+  if (typeof color === 'string') {
+    const str = color.trim();
+    // Hex string
+    const hex = str.replace(/^#/, '');
+    if (hex.length === 6) {
+      const r = parseInt(hex.slice(0, 2), 16) / 255;
+      const g = parseInt(hex.slice(2, 4), 16) / 255;
+      const b = parseInt(hex.slice(4, 6), 16) / 255;
+      if (!isNaN(r) && !isNaN(g) && !isNaN(b)) return [r, g, b];
+    } else if (hex.length === 3) {
+      const r = parseInt(hex[0] + hex[0], 16) / 255;
+      const g = parseInt(hex[1] + hex[1], 16) / 255;
+      const b = parseInt(hex[2] + hex[2], 16) / 255;
+      if (!isNaN(r) && !isNaN(g) && !isNaN(b)) return [r, g, b];
+    }
+
+    // rgb(r, g, b) string
+    const rgbMatch = str.match(/rgb\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)/i);
+    if (rgbMatch) {
+      const r = Math.min(1, Math.max(0, parseInt(rgbMatch[1], 10) / 255));
+      const g = Math.min(1, Math.max(0, parseInt(rgbMatch[2], 10) / 255));
+      const b = Math.min(1, Math.max(0, parseInt(rgbMatch[3], 10) / 255));
+      if (!isNaN(r) && !isNaN(g) && !isNaN(b)) return [r, g, b];
+    }
+  }
+
+  return fallback;
+}
+
+/**
+ * Safely parse numbers from inputs or JSON, rejecting NaN and keeping within boundaries.
+ */
+export function normalizeNumber(
+  val: any,
+  fallback: number,
+  min: number = -Infinity,
+  max: number = Infinity
+): number {
+  if (val === undefined || val === null || val === '') return fallback;
+  const num = typeof val === 'number' ? val : parseFloat(String(val));
+  if (isNaN(num) || !isFinite(num)) return fallback;
+  return Math.min(max, Math.max(min, num));
+}
 
 /**
  * Word wrap helper for PDF canvas text
@@ -65,48 +158,165 @@ function wrapText(text: string, maxWidth: number, font: any, fontSize: number): 
 }
 
 /**
- * Generate a high-resolution PDF certificate preserving the official ADARSH P master design
+ * Generate a high-resolution PDF certificate preserving the official master design
  */
 export async function generateSingleCertificatePdf(
   params: CertificateGenerateParams,
   config: Partial<CertificateConfig> = {}
 ): Promise<{ pdfBytes: Uint8Array; fileName: string; storagePath: string; publicUrl?: string }> {
-  const cfg: CertificateConfig = { ...DEFAULT_CERT_CONFIG, ...config };
+  // Normalize all configuration values safely
+  const defaultNameColor = Array.isArray(DEFAULT_CERT_CONFIG.nameColor)
+    ? DEFAULT_CERT_CONFIG.nameColor
+    : [139 / 255, 0, 0];
+  const defaultParaColor = Array.isArray(DEFAULT_CERT_CONFIG.paraColor)
+    ? DEFAULT_CERT_CONFIG.paraColor
+    : [31 / 255, 41 / 255, 55 / 255];
+
+  const cfg = {
+    nameX: config.nameX !== undefined && config.nameX !== null ? normalizeNumber(config.nameX, 0) : undefined,
+    nameY: normalizeNumber(config.nameY, DEFAULT_CERT_CONFIG.nameY),
+    nameFontSize: normalizeNumber(config.nameFontSize, DEFAULT_CERT_CONFIG.nameFontSize, 10, 60),
+    nameColor: normalizeColorToRgb(config.nameColor, defaultNameColor as [number, number, number]),
+    paraY: normalizeNumber(config.paraY, DEFAULT_CERT_CONFIG.paraY),
+    paraFontSize: normalizeNumber(config.paraFontSize, DEFAULT_CERT_CONFIG.paraFontSize, 8, 30),
+    paraLineSpacing: normalizeNumber(config.paraLineSpacing, DEFAULT_CERT_CONFIG.paraLineSpacing, 10, 40),
+    paraMaxWidth: normalizeNumber(config.paraMaxWidth, DEFAULT_CERT_CONFIG.paraMaxWidth, 200, 800),
+    paraColor: normalizeColorToRgb(config.paraColor, defaultParaColor as [number, number, number]),
+    showCertId: config.showCertId !== undefined ? Boolean(config.showCertId) : DEFAULT_CERT_CONFIG.showCertId,
+    certIdY: normalizeNumber(config.certIdY, DEFAULT_CERT_CONFIG.certIdY),
+    subtitleY: normalizeNumber(config.subtitleY, DEFAULT_CERT_CONFIG.subtitleY || 398),
+    introY: normalizeNumber(config.introY, DEFAULT_CERT_CONFIG.introY || 363),
+    showPhoto: Boolean(config.showPhoto),
+    photoX: normalizeNumber(config.photoX, DEFAULT_CERT_CONFIG.photoX || 670),
+    photoY: normalizeNumber(config.photoY, DEFAULT_CERT_CONFIG.photoY || 240),
+    photoWidth: normalizeNumber(config.photoWidth, DEFAULT_CERT_CONFIG.photoWidth || 75),
+    photoHeight: normalizeNumber(config.photoHeight, DEFAULT_CERT_CONFIG.photoHeight || 95)
+  };
+
+  // Determine Certificate Type: Type A (Participation) vs Type B (Achievement/Winner)
+  const isTypeB =
+    params.certificateType?.toLowerCase().includes('achievement') ||
+    params.certificateType?.toLowerCase().includes('winner') ||
+    params.certificateType?.toLowerCase().includes('prize') ||
+    (params.role && params.role.toLowerCase().includes('winner'));
 
   // 1. Locate the master template
-  let templateBytes: Buffer;
   const masterCleanPath = path.join(process.cwd(), 'public', 'templates', 'clean_master_template.pdf');
   const referencePath = path.join(process.cwd(), 'public', 'templates', 'reference_certificate.pdf');
+  const masterPngPath = path.join(
+    process.cwd(),
+    'public',
+    'uploads',
+    'certificate-templates',
+    'IEDC_PARTICIPATE_CERTICICATE_1792467393382.png'
+  );
 
-  if (params.customTemplatePath && fs.existsSync(params.customTemplatePath)) {
-    templateBytes = fs.readFileSync(params.customTemplatePath);
-  } else if (fs.existsSync(masterCleanPath)) {
-    templateBytes = fs.readFileSync(masterCleanPath);
-  } else if (fs.existsSync(referencePath)) {
-    templateBytes = fs.readFileSync(referencePath);
-  } else {
-    throw new Error('Official Certificate Master Template not found on server.');
+  let pdfDoc: PDFDocument;
+  let page: any;
+  let width: number;
+  let height: number;
+
+  let resolvedCustomPath = params.customTemplatePath;
+  if (resolvedCustomPath && !fs.existsSync(/*turbopackIgnore: true*/ resolvedCustomPath)) {
+    const candidateInPublic = path.join(process.cwd(), 'public', resolvedCustomPath.replace(/^\//, ''));
+    if (fs.existsSync(candidateInPublic)) {
+      resolvedCustomPath = candidateInPublic;
+    }
   }
 
-  // 2. Load PDF into pdf-lib
-  const pdfDoc = await PDFDocument.load(templateBytes);
-  const pages = pdfDoc.getPages();
-  const page = pages[0];
-  const { width } = page.getSize();
+  const isCustomImage =
+    resolvedCustomPath &&
+    fs.existsSync(/*turbopackIgnore: true*/ resolvedCustomPath) &&
+    (resolvedCustomPath.endsWith('.png') || resolvedCustomPath.endsWith('.jpg') || resolvedCustomPath.endsWith('.jpeg'));
 
-  // 3. Embed standard fonts
+  if (isCustomImage && resolvedCustomPath) {
+    // Image-based template: Create new landscape PDF (A4 842.25 x 595.5 pt) and embed template image
+    pdfDoc = await PDFDocument.create();
+    width = 842.25;
+    height = 595.5;
+    page = pdfDoc.addPage([width, height]);
+
+    const imgBytes = fs.readFileSync(/*turbopackIgnore: true*/ resolvedCustomPath);
+    const bgImage = resolvedCustomPath.endsWith('.png')
+      ? await pdfDoc.embedPng(imgBytes)
+      : await pdfDoc.embedJpg(imgBytes);
+
+    page.drawImage(bgImage, { x: 0, y: 0, width, height });
+
+    // Clean whiteout over recipient name & paragraph if an existing populated template was uploaded
+    page.drawRectangle({
+      x: 110,
+      y: 190,
+      width: width - 220,
+      height: 155,
+      color: rgb(1, 1, 1)
+    });
+  } else {
+    // Vector PDF Master: clean_master_template.pdf or reference_certificate.pdf
+    let templateBytes: Buffer;
+    if (resolvedCustomPath && fs.existsSync(/*turbopackIgnore: true*/ resolvedCustomPath) && resolvedCustomPath.endsWith('.pdf')) {
+      templateBytes = fs.readFileSync(/*turbopackIgnore: true*/ resolvedCustomPath);
+    } else if (fs.existsSync(masterCleanPath)) {
+      templateBytes = fs.readFileSync(masterCleanPath);
+    } else if (fs.existsSync(referencePath)) {
+      templateBytes = fs.readFileSync(referencePath);
+    } else {
+      throw new Error('Official Certificate Master Template not found on server.');
+    }
+
+    pdfDoc = await PDFDocument.load(templateBytes);
+    const pages = pdfDoc.getPages();
+    page = pages[0];
+    const size = page.getSize();
+    width = size.width;
+    height = size.height;
+  }
+
+  // Embed standard Helvetica fonts
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-  // 4. Clean & format Recipient Name
+  // 2. Type B Header Replacement (if Certificate of Achievement / Winner)
+  if (isTypeB) {
+    // Cleanly cover the original "— OF PARTICIPATION —" and "THIS CERTIFICATE IS PRESENTED TO" lines
+    page.drawRectangle({
+      x: 180,
+      y: 350,
+      width: width - 360,
+      height: 75,
+      color: rgb(1, 1, 1)
+    });
+
+    const subTitle = params.certificateSubtitle || '— OF ACHIEVEMENT —';
+    const subWidth = fontBold.widthOfTextAtSize(subTitle, 13);
+    page.drawText(subTitle, {
+      x: (width - subWidth) / 2,
+      y: cfg.subtitleY || 398,
+      size: 13,
+      font: fontBold,
+      color: rgb(26 / 255, 36 / 255, 86 / 255) // Official IEDC Navy Blue
+    });
+
+    const intro = params.recipientIntro || 'THIS CERTIFICATE IS AWARDED TO';
+    const introWidth = fontRegular.widthOfTextAtSize(intro, 11);
+    page.drawText(intro, {
+      x: (width - introWidth) / 2,
+      y: cfg.introY || 363,
+      size: 11,
+      font: fontRegular,
+      color: rgb(31 / 255, 41 / 255, 55 / 255)
+    });
+  }
+
+  // 3. Recipient Name
   const cleanName = params.recipientName.trim().toUpperCase();
   let nameSize = cfg.nameFontSize;
   let nameWidth = fontBold.widthOfTextAtSize(cleanName, nameSize);
 
   // Dynamically shrink font size if name is particularly long
-  const maxNameWidth = width - 200;
+  const maxNameWidth = width - 240;
   if (nameWidth > maxNameWidth) {
-    nameSize = Math.max(22, (maxNameWidth / nameWidth) * nameSize);
+    nameSize = Math.max(20, (maxNameWidth / nameWidth) * nameSize);
     nameWidth = fontBold.widthOfTextAtSize(cleanName, nameSize);
   }
 
@@ -119,16 +329,21 @@ export async function generateSingleCertificatePdf(
     color: rgb(cfg.nameColor[0], cfg.nameColor[1], cfg.nameColor[2])
   });
 
-  // 5. Construct Paragraph Text
+  // 4. Construct Dynamic Paragraph Text
   let paraText = params.customParagraph;
   const orgBody = params.organizingBody || 'the IEDC Cell, Government Polytechnic College Perinthalmanna';
-  const roleText = params.role && params.role !== 'Participant' ? ` as ${params.role}` : '';
 
   if (!paraText) {
-    paraText = `In recognition of your outstanding participation and dedication${roleText} in the ${params.programName}, organized by ${orgBody}, held on ${params.programDate}.`;
+    if (isTypeB) {
+      const category = params.awardCategory || params.role || 'WINNER';
+      paraText = `IN RECOGNITION OF YOUR OUTSTANDING ACHIEVEMENT AS ${category.toUpperCase()} in the ${params.programName}, organized by ${orgBody}, held on ${params.programDate}.`;
+    } else {
+      const roleText = params.role && params.role !== 'Participant' ? ` as ${params.role}` : '';
+      paraText = `In recognition of your outstanding participation and dedication${roleText} in the ${params.programName}, organized by ${orgBody}, held on ${params.programDate}.`;
+    }
   }
 
-  // 6. Word-wrap and draw paragraph lines centered
+  // 5. Word-wrap and draw paragraph lines centered
   const paraLines = wrapText(paraText, cfg.paraMaxWidth, fontRegular, cfg.paraFontSize);
   let currentY = cfg.paraY;
   for (const line of paraLines) {
@@ -144,7 +359,59 @@ export async function generateSingleCertificatePdf(
     currentY -= cfg.paraLineSpacing;
   }
 
-  // 7. Draw Certificate ID
+  // 6. Optional Recipient Photograph (Only if explicitly enabled)
+  if (cfg.showPhoto && params.recipientPhotoUrl) {
+    try {
+      let photoBytes: Buffer | null = null;
+      if (params.recipientPhotoUrl.startsWith('http')) {
+        const photoRes = await fetch(params.recipientPhotoUrl);
+        if (photoRes.ok) {
+          photoBytes = Buffer.from(await photoRes.arrayBuffer());
+        }
+      } else {
+        const localPath = path.join(process.cwd(), 'public', params.recipientPhotoUrl.replace(/^\//, ''));
+        if (fs.existsSync(localPath)) {
+          photoBytes = fs.readFileSync(localPath);
+        }
+      }
+
+      if (photoBytes) {
+        let photoImg: any = null;
+        try {
+          photoImg = await pdfDoc.embedPng(photoBytes);
+        } catch {
+          photoImg = await pdfDoc.embedJpg(photoBytes);
+        }
+
+        if (photoImg) {
+          const pWidth = cfg.photoWidth || 75;
+          const pHeight = cfg.photoHeight || 95;
+          const px = cfg.photoX || 670;
+          const py = cfg.photoY || 240;
+
+          // Subtle photo border
+          page.drawRectangle({
+            x: px - 2,
+            y: py - 2,
+            width: pWidth + 4,
+            height: pHeight + 4,
+            color: rgb(0.9, 0.9, 0.9)
+          });
+
+          page.drawImage(photoImg, {
+            x: px,
+            y: py,
+            width: pWidth,
+            height: pHeight
+          });
+        }
+      }
+    } catch (e: any) {
+      console.warn('Optional recipient photo could not be embedded:', e.message);
+    }
+  }
+
+  // 7. Draw Official Certificate ID
   if (cfg.showCertId && params.certificateId) {
     const certIdText = `CERTIFICATE ID: ${params.certificateId}`;
     const idWidth = fontRegular.widthOfTextAtSize(certIdText, 8.5);
@@ -174,12 +441,16 @@ export async function generateSingleCertificatePdf(
   let publicUrl = `/certificates/${fileName}`;
   if (isSupabaseAdminConfigured()) {
     try {
-      const { error: uploadErr } = await supabaseAdmin.storage
+      const uploadPromise = supabaseAdmin.storage
         .from('certificates')
         .upload(fileName, pdfBytes, {
           contentType: 'application/pdf',
           upsert: true
         });
+      const timeoutPromise = new Promise<{ error: any }>((resolve) =>
+        setTimeout(() => resolve({ error: new Error('Upload timed out after 5s') }), 5000)
+      );
+      const { error: uploadErr } = await Promise.race([uploadPromise, timeoutPromise]);
 
       if (!uploadErr) {
         const { data: urlData } = supabaseAdmin.storage

@@ -14,8 +14,12 @@ import {
   AlertCircle,
   RefreshCw,
   Key,
-  ExternalLink
+  ExternalLink,
+  Film,
+  Sparkles,
+  Share2
 } from 'lucide-react';
+import { InstagramIcon as Instagram } from '@/components/SocialIcons';
 import FileUpload from '@/components/admin/FileUpload';
 
 export default function WebsiteSettingsPage() {
@@ -28,9 +32,26 @@ export default function WebsiteSettingsPage() {
     contactPhone: '+91 4933 227221',
     address: 'Govt Polytechnic College, Angadippuram PO, Perinthalmanna, Malappuram, Kerala 679321',
     logoUrl: '/college-logo.png',
+    iedcGptcPmnaLogoUrl: '/iedc-gptc-pmna-logo.png',
+    collegeLogoUrl: '/college-logo.png',
+    iedcLogoUrl: '/iedc-logo.png',
     github: 'https://github.com/iedc-gptc-pmna',
     linkedin: 'https://linkedin.com/company/iedc-gptc-pmna',
-    instagram: 'https://instagram.com/iedc_gptcpmna'
+    instagram: 'https://www.instagram.com/iedc_gpc_pmna/',
+    // Footer & Social Media Settings
+    officialInstagramUsername: '@iedc_gpc_pmna',
+    officialInstagramUrl: 'https://www.instagram.com/iedc_gpc_pmna/',
+    creatorName: 'Muhammed Ashfak O',
+    creatorInstagramUsername: '@_aasshfaakk_',
+    creatorInstagramUrl: 'https://www.instagram.com/_aasshfaakk/',
+    showOfficialInstagram: true,
+    showCreatorAttribution: true,
+    showFooterSocialSection: true,
+    // Featured Reel
+    featuredReelEnabled: false,
+    featuredReelUrl: '',
+    featuredReelCaption: '',
+    featuredReelThumbnail: ''
   });
 
   const [supabaseInfo, setSupabaseInfo] = useState<any>(null);
@@ -45,16 +66,32 @@ export default function WebsiteSettingsPage() {
       .then((json) => {
         if (json.success && json.data) {
           const d = json.data;
+          const fs = d.footerSocial || {};
           setFormData({
             siteTitle: d.siteTitle || 'IEDC GPTC PMNA',
             collegeName: d.collegeName || 'Government Polytechnic College, Perinthalmanna',
             contactEmail: d.contact?.email || 'iedc@gptcpmna.edu.in',
             contactPhone: d.contact?.phone || '+91 4933 227221',
             address: d.contact?.address || '',
-            logoUrl: d.logoUrl || '/college-logo.png',
+            logoUrl: d.collegeLogoUrl || d.logoUrl || '/college-logo.png',
+            iedcGptcPmnaLogoUrl: d.iedcGptcPmnaLogoUrl || '/iedc-gptc-pmna-logo.png',
+            collegeLogoUrl: d.collegeLogoUrl || d.logoUrl || '/college-logo.png',
+            iedcLogoUrl: d.iedcLogoUrl || '/iedc-logo.png',
             github: d.social?.github || '',
             linkedin: d.social?.linkedin || '',
-            instagram: d.social?.instagram || ''
+            instagram: fs.officialInstagramUrl || d.social?.instagram || 'https://www.instagram.com/iedc_gpc_pmna/',
+            officialInstagramUsername: fs.officialInstagramUsername || '@iedc_gpc_pmna',
+            officialInstagramUrl: fs.officialInstagramUrl || 'https://www.instagram.com/iedc_gpc_pmna/',
+            creatorName: fs.creatorName || 'Muhammed Ashfak O',
+            creatorInstagramUsername: fs.creatorInstagramUsername || '@_aasshfaakk_',
+            creatorInstagramUrl: fs.creatorInstagramUrl || 'https://www.instagram.com/_aasshfaakk/',
+            showOfficialInstagram: fs.showOfficialInstagram ?? true,
+            showCreatorAttribution: fs.showCreatorAttribution ?? true,
+            showFooterSocialSection: fs.showFooterSocialSection ?? true,
+            featuredReelEnabled: fs.featuredReel?.enabled ?? false,
+            featuredReelUrl: fs.featuredReel?.reelUrl || '',
+            featuredReelCaption: fs.featuredReel?.caption || '',
+            featuredReelThumbnail: fs.featuredReel?.thumbnailUrl || ''
           });
         }
         if (json.supabase) {
@@ -98,6 +135,10 @@ export default function WebsiteSettingsPage() {
       const payload: any = {
         siteTitle: formData.siteTitle,
         collegeName: formData.collegeName,
+        iedcGptcPmnaLogoUrl: formData.iedcGptcPmnaLogoUrl,
+        collegeLogoUrl: formData.collegeLogoUrl,
+        iedcLogoUrl: formData.iedcLogoUrl,
+        logoUrl: formData.collegeLogoUrl,
         contact: {
           email: formData.contactEmail,
           phone: formData.contactPhone,
@@ -106,7 +147,23 @@ export default function WebsiteSettingsPage() {
         social: {
           github: formData.github,
           linkedin: formData.linkedin,
-          instagram: formData.instagram
+          instagram: formData.officialInstagramUrl
+        },
+        footerSocial: {
+          officialInstagramUsername: formData.officialInstagramUsername,
+          officialInstagramUrl: formData.officialInstagramUrl,
+          creatorName: formData.creatorName,
+          creatorInstagramUsername: formData.creatorInstagramUsername,
+          creatorInstagramUrl: formData.creatorInstagramUrl,
+          showOfficialInstagram: formData.showOfficialInstagram,
+          showCreatorAttribution: formData.showCreatorAttribution,
+          showFooterSocialSection: formData.showFooterSocialSection,
+          featuredReel: {
+            enabled: formData.featuredReelEnabled,
+            reelUrl: formData.featuredReelUrl,
+            caption: formData.featuredReelCaption,
+            thumbnailUrl: formData.featuredReelThumbnail
+          }
         }
       };
 
@@ -208,15 +265,48 @@ export default function WebsiteSettingsPage() {
               />
             </div>
 
-            <div className="pt-2 border-t border-white/10">
-              <FileUpload
-                label="Official Website & College Logo"
-                value={formData.logoUrl}
-                onChange={(url) => setFormData({ ...formData, logoUrl: url })}
-                folder="website"
-                accept="image/png,image/svg+xml,image/jpeg,image/webp"
-                helperText="Upload official college or IEDC logo (PNG, SVG, WebP) from your PC"
-              />
+            <div className="pt-4 border-t border-white/10 space-y-4">
+              <div className="bg-[#16161D] p-3.5 rounded-2xl border border-white/10">
+                <span className="text-[10px] font-mono font-bold text-amber-400 uppercase tracking-widest block mb-2">
+                  1. PRIMARY BRAND LOGO (LEFTMOST IN HEADER)
+                </span>
+                <FileUpload
+                  label="IEDC GPTC PMNA LOGO"
+                  value={formData.iedcGptcPmnaLogoUrl}
+                  onChange={(url) => setFormData({ ...formData, iedcGptcPmnaLogoUrl: url })}
+                  folder="branding"
+                  accept="image/png,image/svg+xml,image/jpeg,image/webp"
+                  helperText="Official IEDC unit logo for Government Polytechnic College, Perinthalmanna. Appears first in the website header."
+                />
+              </div>
+
+              <div className="bg-[#16161D] p-3.5 rounded-2xl border border-white/10">
+                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block mb-2">
+                  2. COLLEGE CREST (CENTER IN HEADER)
+                </span>
+                <FileUpload
+                  label="COLLEGE CREST / LOGO"
+                  value={formData.collegeLogoUrl}
+                  onChange={(url) => setFormData({ ...formData, collegeLogoUrl: url, logoUrl: url })}
+                  folder="branding"
+                  accept="image/png,image/svg+xml,image/jpeg,image/webp"
+                  helperText="Official Government Polytechnic College Perinthalmanna institutional seal. Appears second in the header."
+                />
+              </div>
+
+              <div className="bg-[#16161D] p-3.5 rounded-2xl border border-white/10">
+                <span className="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-widest block mb-2">
+                  3. KERALA IEDC LOGO (RIGHT IN HEADER)
+                </span>
+                <FileUpload
+                  label="OFFICIAL IEDC LOGO"
+                  value={formData.iedcLogoUrl}
+                  onChange={(url) => setFormData({ ...formData, iedcLogoUrl: url })}
+                  folder="branding"
+                  accept="image/png,image/svg+xml,image/jpeg,image/webp"
+                  helperText="Official Kerala Startup Mission / IEDC Kerala state emblem. Appears third in the header."
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -302,6 +392,194 @@ export default function WebsiteSettingsPage() {
                 className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
               />
             </div>
+          </div>
+        </div>
+
+        {/* ═══════════════════════════════════════════════════════
+            FOOTER & SOCIAL MEDIA SETTINGS (MD:COL-SPAN-2)
+        ═══════════════════════════════════════════════════════ */}
+        <div className="md:col-span-2 p-6 rounded-3xl bg-[#121216] border border-white/10 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-4">
+            <div>
+              <span className="text-[10px] font-mono font-bold text-[#F98A5B] uppercase tracking-wider block mb-1">
+                PUBLIC FOOTER &amp; COMMUNITY INTEGRATION
+              </span>
+              <h3 className="font-extrabold text-white text-base flex items-center gap-2">
+                <Share2 className="w-4 h-4 text-[#E1306C]" /> FOOTER &amp; SOCIAL MEDIA SETTINGS
+              </h3>
+              <p className="text-slate-400 text-xs mt-0.5">
+                Manage the official IEDC Instagram account, subtle website creator attribution, footer visibility, and optional featured Reels.
+              </p>
+            </div>
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-300 cursor-pointer self-start sm:self-auto bg-white/5 px-3 py-1.5 rounded-xl border border-white/10">
+              <input
+                type="checkbox"
+                checked={formData.showFooterSocialSection}
+                onChange={(e) => setFormData({ ...formData, showFooterSocialSection: e.target.checked })}
+                className="accent-[#F98A5B]"
+              />
+              <span>Footer Social Section Visible</span>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Left: Official IEDC Instagram Profile */}
+            <div className="p-4 rounded-2xl bg-[#18181D] border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold text-white">
+                  <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-[#833AB4] via-[#FD1D1D] to-[#FCB045] flex items-center justify-center text-white shrink-0 shadow-sm">
+                    <Instagram className="w-3.5 h-3.5" />
+                  </div>
+                  <span>Official IEDC Instagram</span>
+                </div>
+                <label className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.showOfficialInstagram}
+                    onChange={(e) => setFormData({ ...formData, showOfficialInstagram: e.target.checked })}
+                    className="accent-[#F98A5B]"
+                  />
+                  <span>Display in Footer</span>
+                </label>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Official Instagram ID</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.officialInstagramUsername}
+                    onChange={(e) => setFormData({ ...formData, officialInstagramUsername: e.target.value })}
+                    className="w-full bg-[#121216] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                    placeholder="@iedc_gpc_pmna"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Official Profile URL</label>
+                  <input
+                    type="url"
+                    required
+                    value={formData.officialInstagramUrl}
+                    onChange={(e) => setFormData({ ...formData, officialInstagramUrl: e.target.value })}
+                    className="w-full bg-[#121216] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                    placeholder="https://www.instagram.com/iedc_gpc_pmna/"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Website Creator & Designer Attribution */}
+            <div className="p-4 rounded-2xl bg-[#18181D] border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-bold text-white">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span>Website Creator Attribution</span>
+                </div>
+                <label className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.showCreatorAttribution}
+                    onChange={(e) => setFormData({ ...formData, showCreatorAttribution: e.target.checked })}
+                    className="accent-[#F98A5B]"
+                  />
+                  <span>Show Attribution</span>
+                </label>
+              </div>
+
+              <div className="space-y-2 text-xs">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Creator Name</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.creatorName}
+                    onChange={(e) => setFormData({ ...formData, creatorName: e.target.value })}
+                    className="w-full bg-[#121216] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                    placeholder="Muhammed Ashfak O"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Personal Instagram ID</label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.creatorInstagramUsername}
+                      onChange={(e) => setFormData({ ...formData, creatorInstagramUsername: e.target.value })}
+                      className="w-full bg-[#121216] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                      placeholder="@_aasshfaakk_"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Personal Profile URL</label>
+                    <input
+                      type="url"
+                      required
+                      value={formData.creatorInstagramUrl}
+                      onChange={(e) => setFormData({ ...formData, creatorInstagramUrl: e.target.value })}
+                      className="w-full bg-[#121216] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                      placeholder="https://www.instagram.com/_aasshfaakk/"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Optional Featured Instagram Reel */}
+          <div className="p-4 rounded-2xl bg-[#18181D] border border-white/10 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-bold text-white">
+                <Film className="w-4 h-4 text-purple-400" />
+                <span>Featured Instagram Reel (Optional Homepage Spotlight)</span>
+              </div>
+              <label className="flex items-center gap-1.5 text-[11px] text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.featuredReelEnabled}
+                  onChange={(e) => setFormData({ ...formData, featuredReelEnabled: e.target.checked })}
+                  className="accent-purple-400"
+                />
+                <span>Enable Reel Spotlight</span>
+              </label>
+            </div>
+
+            {formData.featuredReelEnabled && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs pt-1">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Featured Reel URL</label>
+                  <input
+                    type="url"
+                    value={formData.featuredReelUrl}
+                    onChange={(e) => setFormData({ ...formData, featuredReelUrl: e.target.value })}
+                    className="w-full bg-[#121216] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                    placeholder="https://www.instagram.com/reel/C3abcXYZ/"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase block mb-1">Short Caption / Highlight</label>
+                  <input
+                    type="text"
+                    value={formData.featuredReelCaption}
+                    onChange={(e) => setFormData({ ...formData, featuredReelCaption: e.target.value })}
+                    className="w-full bg-[#121216] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                    placeholder="e.g. Highlights from Drone Technology Bootcamp 2026"
+                  />
+                </div>
+                <div className="sm:col-span-2 pt-2 border-t border-white/5">
+                  <FileUpload
+                    label="Optional Reel Thumbnail / Poster Image"
+                    value={formData.featuredReelThumbnail}
+                    onChange={(url) => setFormData({ ...formData, featuredReelThumbnail: url })}
+                    folder="reels"
+                    accept="image/*"
+                    helperText="Upload an optional custom cover photo or poster frame for this featured Reel"
+                  />
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </form>

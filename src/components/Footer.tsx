@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Rocket,
@@ -15,10 +15,35 @@ import {
   Code,
   FileCheck
 } from 'lucide-react';
+import { InstagramIcon as Instagram } from '@/components/SocialIcons';
 
 export const Footer: React.FC = () => {
   const [emailInput, setEmailInput] = useState('');
   const [subscribed, setSubscribed] = useState(false);
+  const [footerSettings, setFooterSettings] = useState({
+    officialInstagramUsername: '@iedc_gpc_pmna',
+    officialInstagramUrl: 'https://www.instagram.com/iedc_gpc_pmna/',
+    creatorName: 'Muhammed Ashfak O',
+    creatorInstagramUsername: '@_aasshfaakk_',
+    creatorInstagramUrl: 'https://www.instagram.com/_aasshfaakk/',
+    showOfficialInstagram: true,
+    showCreatorAttribution: true,
+    showFooterSocialSection: true
+  });
+
+  useEffect(() => {
+    fetch('/api/public/settings')
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && json.data?.footerSocial) {
+          setFooterSettings((prev) => ({
+            ...prev,
+            ...json.data.footerSocial
+          }));
+        }
+      })
+      .catch((err) => console.error('Failed to load footer settings:', err));
+  }, []);
 
   const handleSubscribe = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,8 +69,9 @@ export const Footer: React.FC = () => {
           {/* Brand Column */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex items-center gap-3">
-              <img src="/iedc-logo.png" alt="IEDC" className="w-9 h-9 object-contain drop-shadow" />
+              <img src="/iedc-gptc-pmna-logo.png" alt="IEDC GPTC PMNA" className="h-9 w-auto max-w-[130px] object-contain drop-shadow" />
               <img src="/college-logo.png" alt="GPTC" className="w-8 h-8 object-contain drop-shadow" />
+              <img src="/iedc-logo.png" alt="IEDC" className="w-8 h-8 object-contain drop-shadow" />
               <div className="flex flex-col">
                 <span className="font-black text-lg text-white tracking-wide">
                   IEDC GPTC PMNA
@@ -143,15 +169,71 @@ export const Footer: React.FC = () => {
               </div>
             </div>
 
-            {/* Social Icons */}
+            {/* CONNECT WITH US — Official IEDC Instagram */}
+            {footerSettings.showFooterSocialSection && footerSettings.showOfficialInstagram && (
+              <div className="pt-3 border-t border-white/10 space-y-2">
+                <div className="text-[10px] font-mono font-bold text-slate-300 uppercase tracking-wider">
+                  CONNECT WITH US
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Follow IEDC GPTC PMNA on Instagram
+                </div>
+                <a
+                  href={footerSettings.officialInstagramUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Follow IEDC GPTC PMNA on Instagram (@iedc_gpc_pmna)"
+                  className="inline-flex items-center gap-2.5 px-3 py-2 rounded-xl bg-gradient-to-r from-[#833AB4]/10 via-[#FD1D1D]/10 to-[#FCB045]/10 hover:from-[#833AB4]/20 hover:via-[#FD1D1D]/20 hover:to-[#FCB045]/20 border border-white/10 hover:border-[#E1306C]/40 text-slate-200 hover:text-white transition-all group"
+                >
+                  <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-[#833AB4] via-[#FD1D1D] to-[#FCB045] flex items-center justify-center text-white shrink-0 shadow-sm group-hover:scale-105 transition-transform">
+                    <Instagram className="w-3.5 h-3.5" />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-[9px] text-slate-400 font-mono leading-none">Official Instagram</div>
+                    <span className="text-xs font-bold text-white group-hover:text-[#F98A5B] transition-colors font-mono">
+                      {footerSettings.officialInstagramUsername}
+                    </span>
+                  </div>
+                </a>
+              </div>
+            )}
+
+            {/* General Social Icons */}
             <div className="flex items-center gap-2 pt-2">
-              <a href="#" className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 transition-all">
-                <Code className="w-3.5 h-3.5" />
+              <a
+                href={footerSettings.officialInstagramUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="IEDC Instagram"
+                className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:text-[#E1306C] hover:bg-white/10 transition-all"
+              >
+                <Instagram className="w-3.5 h-3.5" />
               </a>
-              <a href="#" className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 transition-all">
+              <a
+                href="https://linkedin.com/company/iedc-gptc-pmna"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="IEDC LinkedIn"
+                className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:text-[#0077b5] hover:bg-white/10 transition-all"
+              >
                 <Globe className="w-3.5 h-3.5" />
               </a>
-              <a href="#" className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 transition-all">
+              <a
+                href="https://github.com/iedc-gptc-pmna"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="IEDC GitHub"
+                className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 transition-all"
+              >
+                <Code className="w-3.5 h-3.5" />
+              </a>
+              <a
+                href="https://iedckerala.in"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="IEDC Kerala Portal"
+                className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:text-[#F98A5B] hover:bg-white/10 transition-all"
+              >
                 <Share2 className="w-3.5 h-3.5" />
               </a>
             </div>
@@ -159,11 +241,30 @@ export const Footer: React.FC = () => {
 
         </div>
 
-        {/* Bottom Copyright Bar - ZERO Admin links */}
-        <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs">
-          <div className="text-slate-400 font-medium">
+        {/* Bottom Copyright & Creator Attribution Bar */}
+        <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs">
+          <div className="text-slate-400 font-medium text-center md:text-left">
             © 2026 IEDC Government Polytechnic College Perinthalmanna. All Rights Reserved.
           </div>
+
+          {/* Website Creator Attribution - Subtle, Professional & Unobtrusive */}
+          {footerSettings.showCreatorAttribution && (
+            <div className="flex flex-wrap items-center justify-center gap-2 text-slate-400 text-[11px]">
+              <span>Website Designed &amp; Developed by <strong className="text-slate-200 font-semibold">{footerSettings.creatorName}</strong></span>
+              {footerSettings.creatorInstagramUrl && (
+                <a
+                  href={footerSettings.creatorInstagramUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`${footerSettings.creatorName}'s Instagram Profile (${footerSettings.creatorInstagramUsername})`}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 hover:border-[#E1306C]/30 text-slate-300 hover:text-white transition-all group font-mono text-[11px]"
+                >
+                  <Instagram className="w-3 h-3 text-[#E1306C] group-hover:scale-110 transition-transform" />
+                  <span>{footerSettings.creatorInstagramUsername}</span>
+                </a>
+              )}
+            </div>
+          )}
 
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-slate-300 font-mono text-[11px]">
             <Eye className="w-3.5 h-3.5 text-white" />

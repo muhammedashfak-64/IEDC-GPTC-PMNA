@@ -10,14 +10,16 @@ export default function AdminLoginPage() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading } = useAdmin();
 
-  const [identifier, setIdentifier] = useState('faculty@iedcgptcpmna.in');
+  const [identifier, setIdentifier] = useState('iedc.faculty');
   const [password, setPassword] = useState('Faculty@123');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
-  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotMessage, setForgotMessage] = useState('');
+  const [forgotError, setForgotError] = useState('');
 
   // If already authenticated, redirect to dashboard
   useEffect(() => {
@@ -37,31 +39,58 @@ export default function AdminLoginPage() {
     if (res.success) {
       router.push('/admin/dashboard');
     } else {
-      setErrorMessage(res.error || 'Authentication failed. Please verify your credentials.');
+      setErrorMessage(res.error || 'Authentication failed. Please verify your username and password.');
     }
   };
 
+  const autofillMainAdmin = () => {
+    setIdentifier('iedc.admin');
+    setPassword('Admin@123');
+    setErrorMessage('');
+  };
+
   const autofillFaculty = () => {
-    setIdentifier('faculty@iedcgptcpmna.in');
+    setIdentifier('iedc.faculty');
     setPassword('Faculty@123');
     setErrorMessage('');
   };
 
   const autofillStudentLead = () => {
-    setIdentifier('studentlead@iedcgptcpmna.in');
+    setIdentifier('iedc.studentlead');
     setPassword('Student@123');
     setErrorMessage('');
   };
 
-  const handleForgotSubmit = (e: React.FormEvent) => {
+  const autofillDesigner = () => {
+    setIdentifier('iedc.designer');
+    setPassword('Designer@123');
+    setErrorMessage('');
+  };
+
+  const handleForgotSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!forgotEmail) return;
-    setForgotSent(true);
-    setTimeout(() => {
-      setShowForgotModal(false);
-      setForgotSent(false);
-      setForgotEmail('');
-    }, 2500);
+    setForgotLoading(true);
+    setForgotMessage('');
+    setForgotError('');
+
+    try {
+      const res = await fetch('/api/admin/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotEmail })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setForgotMessage(data.message || 'Recovery email dispatched via Supabase Auth.');
+      } else {
+        setForgotError(data.error || 'Failed to initiate password recovery.');
+      }
+    } catch (err: any) {
+      setForgotError(err.message || 'Network error while contacting recovery service.');
+    } finally {
+      setForgotLoading(false);
+    }
   };
 
   return (
@@ -103,10 +132,24 @@ export default function AdminLoginPage() {
           {/* Quick Credential Test Switcher Chips */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-              <span>DEMO CREDENTIALS:</span>
+              <span>OPERATOR ROLES:</span>
               <span className="text-[10px] text-slate-400">1-Click Autofill</span>
             </div>
             <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={autofillMainAdmin}
+                className="p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-left transition-all cursor-pointer group"
+              >
+                <div className="flex items-center gap-1.5 text-xs font-bold text-rose-300">
+                  <Shield className="w-3.5 h-3.5" />
+                  <span>Main Admin</span>
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
+                  @iedc.admin
+                </div>
+              </button>
+
               <button
                 type="button"
                 onClick={autofillFaculty}
@@ -117,7 +160,7 @@ export default function AdminLoginPage() {
                   <span>Faculty Nodal</span>
                 </div>
                 <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
-                  Full Admin Rights
+                  @iedc.faculty
                 </div>
               </button>
 
@@ -131,7 +174,21 @@ export default function AdminLoginPage() {
                   <span>Student Lead</span>
                 </div>
                 <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
-                  CMS Operations
+                  @iedc.studentlead
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={autofillDesigner}
+                className="p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-left transition-all cursor-pointer group"
+              >
+                <div className="flex items-center gap-1.5 text-xs font-bold text-purple-300">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Media Designer</span>
+                </div>
+                <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
+                  @iedc.designer
                 </div>
               </button>
             </div>
@@ -149,17 +206,17 @@ export default function AdminLoginPage() {
           <form onSubmit={handleLoginSubmit} className="space-y-4">
             <div>
               <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
-                Staff ID, Username or Email
+                Username or Staff ID
               </label>
               <div className="relative">
-                <Mail className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-500" />
+                <User className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-500" />
                 <input
                   type="text"
                   required
-                  placeholder="faculty@iedcgptcpmna.in or iedc.faculty"
+                  placeholder="e.g. iedc.faculty or iedc.designer"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  className="w-full bg-[#16161B] border border-white/10 focus:border-white/30 rounded-xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none transition-all"
+                  className="w-full bg-[#16161B] border border-white/10 focus:border-white/30 rounded-xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none transition-all font-mono"
                 />
               </div>
             </div>
@@ -245,16 +302,37 @@ export default function AdminLoginPage() {
               </p>
             </div>
 
-            {forgotSent ? (
-              <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
-                ✓ Password reset recovery link dispatched to {forgotEmail}.
+            {forgotMessage ? (
+              <div className="space-y-4">
+                <div className="p-3.5 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold leading-relaxed">
+                  ✓ {forgotMessage}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotModal(false);
+                    setForgotMessage('');
+                    setForgotError('');
+                    setForgotEmail('');
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-white text-black font-extrabold text-xs hover:bg-slate-200 transition-colors"
+                >
+                  Close Window
+                </button>
               </div>
             ) : (
-              <form onSubmit={handleForgotSubmit} className="space-y-3">
+              <form onSubmit={handleForgotSubmit} className="space-y-3.5">
+                {forgotError && (
+                  <div className="p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs leading-relaxed text-left">
+                    <span className="font-bold block mb-0.5">Recovery Notice:</span>
+                    {forgotError}
+                  </div>
+                )}
+
                 <input
-                  type="email"
+                  type="text"
                   required
-                  placeholder="faculty@iedcgptcpmna.in"
+                  placeholder="Enter username or official email address"
                   value={forgotEmail}
                   onChange={(e) => setForgotEmail(e.target.value)}
                   className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none"
@@ -263,16 +341,21 @@ export default function AdminLoginPage() {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setShowForgotModal(false)}
+                    onClick={() => {
+                      setShowForgotModal(false);
+                      setForgotError('');
+                      setForgotMessage('');
+                    }}
                     className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold text-xs transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 py-2.5 rounded-xl bg-white text-black hover:bg-slate-200 font-extrabold text-xs transition-colors"
+                    disabled={forgotLoading}
+                    className="flex-1 py-2.5 rounded-xl bg-white text-black hover:bg-slate-200 font-extrabold text-xs transition-colors disabled:opacity-50"
                   >
-                    Send Link
+                    {forgotLoading ? 'Verifying...' : 'Initiate Recovery'}
                   </button>
                 </div>
               </form>

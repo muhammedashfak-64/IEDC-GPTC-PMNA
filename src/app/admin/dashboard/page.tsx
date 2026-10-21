@@ -8,18 +8,17 @@ import {
   Award,
   Cpu,
   Users,
-  TrendingUp,
   ArrowRight,
-  ShieldCheck,
   Plus,
   Home,
   Image as ImageIcon,
   BookOpen,
   UserCheck,
-  Activity,
   CheckCircle2,
   Clock,
-  Sparkles
+  Sparkles,
+  BarChart2,
+  PieChart as PieIcon
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -50,66 +49,84 @@ ChartJS.register(
 export default function AdminDashboardPage() {
   const { user, isFaculty } = useAdmin();
   const [stats, setStats] = useState<any>({
-    totalEvents: 3,
-    publishedEvents: 3,
-    totalCertificates: 3,
-    publishedCertificates: 3,
-    totalRegistrations: 3,
-    totalProjects: 2,
-    totalIdeas: 2
+    totalEvents: 0,
+    publishedEvents: 0,
+    totalCertificates: 0,
+    publishedCertificates: 0,
+    totalRegistrations: 0,
+    totalProjects: 0,
+    totalIdeas: 0
+  });
+  const [analyticsPayload, setAnalyticsPayload] = useState<any>({
+    timeline: [],
+    departmentBreakdown: []
   });
   const [recentLogs, setRecentLogs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Fetch live dashboard analytics
+    // Fetch live dashboard analytics from real database
     fetch('/api/admin/analytics')
       .then((res) => res.json())
       .then((data) => {
-        if (data.success && data.data?.stats) {
-          setStats(data.data.stats);
+        if (data.success && data.data) {
+          if (data.data.stats) setStats(data.data.stats);
+          setAnalyticsPayload({
+            timeline: data.data.timeline || [],
+            departmentBreakdown: data.data.departmentBreakdown || []
+          });
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+
+    // Fetch live audit logs
+    fetch('/api/admin/audit-logs')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data) {
+          setRecentLogs(data.data.slice(0, 5));
         }
       })
       .catch(console.error);
+  }, []);
 
-    // Fetch audit logs if permitted
-    if (isFaculty) {
-      fetch('/api/admin/audit-logs')
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.success && data.data) {
-            setRecentLogs(data.data.slice(0, 5));
-          }
-        })
-        .catch(console.error);
-    }
-  }, [isFaculty]);
+  // Real Timeline Chart Data
+  const timeline = analyticsPayload.timeline || [];
+  const lineLabels = timeline.length > 0 ? timeline.map((t: any) => t.period) : ['Start'];
+  const lineValues = timeline.length > 0 ? timeline.map((t: any) => t.cumulative) : [0];
 
-  // Chart 1: Member Growth
   const lineChartData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug'],
+    labels: lineLabels,
     datasets: [
       {
-        label: 'Active IEDC Registrations',
-        data: [120, 180, 240, 310, 380, 450, 540, 650],
-        borderColor: '#E5E5EA',
-        backgroundColor: 'rgba(229, 229, 234, 0.1)',
-        tension: 0.4,
+        label: 'Cumulative Registrations',
+        data: lineValues,
+        borderColor: '#F98A5B',
+        backgroundColor: 'rgba(249, 138, 91, 0.12)',
+        tension: 0.35,
         fill: true,
-        pointBackgroundColor: '#FFFFFF',
+        pointBackgroundColor: '#F98A5B',
         pointBorderColor: '#000000',
         pointRadius: 4
       }
     ]
   };
 
-  // Chart 2: Department Share
+  // Real Department Doughnut Chart Data
+  const deptBreakdown = analyticsPayload.departmentBreakdown || [];
+  const deptLabels = deptBreakdown.length > 0 ? deptBreakdown.map((d: any) => d.department) : ['No Data'];
+  const deptValues = deptBreakdown.length > 0 ? deptBreakdown.map((d: any) => d.count) : [0];
+  const deptColors = ['#F98A5B', '#38BDF8', '#A855F7', '#10B981', '#F59E0B', '#EC4899'];
+
   const doughnutChartData = {
-    labels: ['Computer', 'Electronics', 'Electrical', 'Mechanical', 'Civil'],
+    labels: deptLabels,
     datasets: [
       {
-        data: [38, 30, 18, 10, 4],
-        backgroundColor: ['#FFFFFF', '#D1D1D6', '#8E8E93', '#48484A', '#2C2C2E'],
-        borderWidth: 0
+        data: deptValues,
+        backgroundColor: deptColors.slice(0, Math.max(1, deptLabels.length)),
+        borderColor: '#121216',
+        borderWidth: 2
       }
     ]
   };
@@ -121,7 +138,7 @@ export default function AdminDashboardPage() {
       legend: {
         labels: {
           color: '#A1A1AA',
-          font: { family: 'monospace', size: 11 }
+          font: { family: 'ui-sans-serif, system-ui, sans-serif', size: 11 }
         }
       }
     },
@@ -132,7 +149,7 @@ export default function AdminDashboardPage() {
       },
       y: {
         grid: { color: 'rgba(255, 255, 255, 0.05)' },
-        ticks: { color: '#71717A', font: { size: 10 } }
+        ticks: { color: '#71717A', font: { size: 10 }, precision: 0 }
       }
     }
   };
@@ -147,19 +164,19 @@ export default function AdminDashboardPage() {
               className={`px-3 py-1 rounded-full text-[10px] font-mono font-extrabold uppercase tracking-wider ${
                 isFaculty
                   ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
-                  : 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+                  : 'bg-[#F98A5B]/15 text-[#F98A5B] border border-[#F98A5B]/30'
               }`}
             >
-              {isFaculty ? 'Faculty Coordinator (Full Access)' : 'Student Lead (Restricted Access)'}
+              {isFaculty ? 'Faculty Coordinator (Full Access)' : 'Main Administrator (Full CMS Control)'}
             </span>
-            <span className="text-xs text-slate-400 font-mono">Staff ID: {user?.staffId || 'ID-001'}</span>
+            <span className="text-xs text-slate-400 font-mono">Operator ID: {user?.staffId || user?.username || 'ADMIN-01'}</span>
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            Welcome back, {user?.full_name}
+            Welcome back, {user?.full_name || 'Administrator'}
           </h1>
           <p className="text-slate-400 text-xs sm:text-sm leading-relaxed">
-            Manage public website content, publish state hackathons, verify participant certificates, and oversee campus innovation initiatives.
+            Manage public website content, publish campus workshops, verify participant certificates, and oversee IEDC operations.
           </p>
         </div>
 
@@ -167,7 +184,7 @@ export default function AdminDashboardPage() {
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
           <Link
             href="/admin/events"
-            className="px-4 py-2.5 rounded-xl bg-white text-black font-extrabold text-xs flex items-center gap-2 hover:bg-slate-200 transition-colors shadow-sm"
+            className="px-4 py-2.5 rounded-xl bg-[#F98A5B] text-black font-extrabold text-xs flex items-center gap-2 hover:bg-[#F98A5B]/90 transition-colors shadow-sm"
           >
             <Plus className="w-4 h-4" />
             <span>Create Event</span>
@@ -187,32 +204,32 @@ export default function AdminDashboardPage() {
         {[
           {
             title: 'Events & Workshops',
-            count: stats.totalEvents,
-            sub: `${stats.publishedEvents} published live`,
+            count: stats.totalEvents ?? 0,
+            sub: `${stats.publishedEvents ?? 0} published live`,
             icon: Calendar,
             href: '/admin/events',
             color: 'text-amber-400'
           },
           {
             title: 'Issued Certificates',
-            count: stats.totalCertificates,
-            sub: `${stats.publishedCertificates} downloadable`,
+            count: stats.publishedCertificates ?? 0,
+            sub: `${stats.totalCertificates ?? 0} total generated`,
             icon: Award,
             href: '/admin/certificates',
             color: 'text-emerald-400'
           },
           {
             title: 'Student Projects',
-            count: stats.totalProjects,
-            sub: 'Prototypes & Rovers',
+            count: stats.totalProjects ?? 0,
+            sub: 'Prototypes & Innovations',
             icon: Cpu,
             href: '/admin/projects',
             color: 'text-purple-400'
           },
           {
-            title: 'Registered Participants',
-            count: stats.totalRegistrations,
-            sub: 'Across 3 workshops',
+            title: 'Registered Students',
+            count: stats.totalRegistrations ?? 0,
+            sub: `${stats.confirmedRegistrations ?? stats.totalRegistrations ?? 0} confirmed`,
             icon: Users,
             href: '/admin/registrations',
             color: 'text-sky-400'
@@ -253,15 +270,25 @@ export default function AdminDashboardPage() {
           <div className="flex items-center justify-between border-b border-white/10 pb-3">
             <div>
               <h3 className="text-sm font-extrabold text-white">Innovation Community Growth</h3>
-              <p className="text-[11px] text-slate-400">Total active registered student members in 2026</p>
+              <p className="text-[11px] text-slate-400">Total active registered student participants in database</p>
             </div>
-            <span className="text-xs font-mono font-bold text-white bg-white/5 px-3 py-1 rounded-full border border-white/10">
-              +440% YTD
-            </span>
+            <Link
+              href="/admin/analytics"
+              className="text-xs font-mono font-bold text-[#F98A5B] hover:underline bg-[#F98A5B]/10 px-3 py-1 rounded-full border border-[#F98A5B]/20"
+            >
+              Detailed Analytics →
+            </Link>
           </div>
 
           <div className="h-64 pt-2">
-            <Line data={lineChartData} options={chartOptions} />
+            {timeline.length > 0 ? (
+              <Line data={lineChartData} options={chartOptions} />
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-slate-500 text-xs">
+                <BarChart2 className="w-8 h-8 mb-2 opacity-40" />
+                <span>Loading live registration data...</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -273,19 +300,26 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="h-52 flex items-center justify-center">
-            <Doughnut
-              data={doughnutChartData}
-              options={{
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                  legend: {
-                    position: 'bottom',
-                    labels: { color: '#A1A1AA', font: { size: 10 } }
+            {deptBreakdown.length > 0 ? (
+              <Doughnut
+                data={doughnutChartData}
+                options={{
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                    legend: {
+                      position: 'bottom',
+                      labels: { color: '#A1A1AA', font: { size: 10 } }
+                    }
                   }
-                }
-              }}
-            />
+                }}
+              />
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-slate-500 text-xs">
+                <PieIcon className="w-8 h-8 mb-2 opacity-40" />
+                <span>No department data logged</span>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -304,9 +338,11 @@ export default function AdminDashboardPage() {
               { label: 'Homepage CMS', href: '/admin/homepage', icon: Home },
               { label: 'Events & Posters', href: '/admin/events', icon: Calendar },
               { label: 'Certificates Desk', href: '/admin/certificates', icon: Award },
+              { label: 'Learning Resources', href: '/admin/resources', icon: BookOpen },
               { label: 'Gallery Manager', href: '/admin/gallery', icon: ImageIcon },
               { label: 'Student Projects', href: '/admin/projects', icon: Cpu },
-              { label: 'Executive Team', href: '/admin/committee', icon: UserCheck }
+              { label: 'Student Leads', href: '/admin/team', icon: Users },
+              { label: 'Faculty Coordinators', href: '/admin/faculty-coordinators', icon: UserCheck }
             ].map((hub) => {
               const Icon = hub.icon;
               return (
@@ -332,11 +368,9 @@ export default function AdminDashboardPage() {
               <h3 className="text-sm font-extrabold text-white">Recent Admin Activity</h3>
               <p className="text-[11px] text-slate-400">Live system audit trail</p>
             </div>
-            {isFaculty && (
-              <Link href="/admin/audit-logs" className="text-[11px] text-slate-400 hover:text-white font-bold">
-                View All →
-              </Link>
-            )}
+            <Link href="/admin/audit-logs" className="text-[11px] text-[#F98A5B] hover:underline font-bold">
+              View All →
+            </Link>
           </div>
 
           <div className="space-y-3">
@@ -355,7 +389,7 @@ export default function AdminDashboardPage() {
               ))
             ) : (
               <div className="p-4 rounded-xl bg-white/[0.02] text-center text-xs text-slate-400">
-                System separated into Frontend &amp; Backend. All activity logged securely.
+                All administrator actions and content changes are recorded in the system audit logs.
               </div>
             )}
           </div>

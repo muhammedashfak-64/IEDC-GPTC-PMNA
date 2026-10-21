@@ -27,7 +27,11 @@ import {
   Star,
   ChevronRight,
   ExternalLink,
+  Film,
+  Sparkles,
 } from 'lucide-react';
+import { InstagramIcon as Instagram } from '@/components/SocialIcons';
+import AnimatedProfileCard, { ProfileCardData } from '@/components/team/AnimatedProfileCard';
 
 /* ─── PARTNER ORGANIZATIONS ──────────────────────────── */
 const PARTNERS = [
@@ -78,6 +82,73 @@ const EXPLORE_CARDS = [
 
 export default function HomePage() {
   const { registerForEvent, addToast } = useApp();
+  const [teamMembers, setTeamMembers] = useState<ProfileCardData[]>([]);
+  const [teamLoading, setTeamLoading] = useState(true);
+  const [homepageData, setHomepageData] = useState<{
+    settings?: any;
+    heroVisual?: {
+      campusPhotoUrl: string;
+      bgOpacity: number;
+      bgBlur: number;
+      darkOverlayOpacity: number;
+      imagePosition: string;
+      bgScale: number;
+    };
+    upcomingEvents?: any[];
+    ongoingEvents?: any[];
+    announcements?: any[];
+  }>({});
+  const [hpLoading, setHpLoading] = useState(true);
+
+  useEffect(() => {
+    // Real-time CMS homepage data: events, announcements, hero visuals
+    fetch('/api/public/homepage')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data) {
+          setHomepageData(data.data);
+        }
+      })
+      .catch((err) => console.error('Failed to load homepage CMS data:', err))
+      .finally(() => setHpLoading(false));
+
+    // Dynamic Student Leads
+    fetch('/api/public/team')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.data)) {
+          setTeamMembers(data.data);
+        }
+      })
+      .catch((err) => console.error('Failed to load team leads on homepage:', err))
+      .finally(() => setTeamLoading(false));
+  }, []);
+
+  const heroVisual = homepageData.heroVisual || {
+    campusPhotoUrl: '/campus-main.jpeg',
+    bgOpacity: 28,
+    bgBlur: 12,
+    darkOverlayOpacity: 85,
+    imagePosition: 'center',
+    bgScale: 104
+  };
+
+  const bgOpacityFloat = (heroVisual.bgOpacity ?? 28) / 100;
+  const bgBlurPx = heroVisual.bgBlur ?? 12;
+  const darkOverlayFloat = (heroVisual.darkOverlayOpacity ?? 85) / 100;
+  const bgScaleFloat = (heroVisual.bgScale ?? 104) / 100;
+  const objectPos = heroVisual.imagePosition || 'center';
+
+  const upcomingEvent = homepageData.upcomingEvents && homepageData.upcomingEvents.length > 0
+    ? homepageData.upcomingEvents[0]
+    : null;
+
+  // Format date for upcoming event
+  const eventDateObj = upcomingEvent?.date ? new Date(upcomingEvent.date) : null;
+  const eventDay = eventDateObj && !isNaN(eventDateObj.getDate()) ? String(eventDateObj.getDate()).padStart(2, '0') : '--';
+  const eventMonth = eventDateObj && !isNaN(eventDateObj.getMonth())
+    ? eventDateObj.toLocaleString('en-US', { month: 'short' }).toUpperCase()
+    : '---';
 
   return (
     <div className="relative overflow-hidden min-h-screen bg-[#0F0F10]">
@@ -85,28 +156,33 @@ export default function HomePage() {
 
       {/* ═══════════════════════════════════════════════════════
           HOMEPAGE CAMPUS BACKGROUND PHOTO & DARK SHADE
+          Strictly isolated to background layer: blur & opacity
+          never affect text, buttons, or cards!
       ═══════════════════════════════════════════════════════ */}
-      <div className="fixed inset-0 z-0 pointer-events-none" aria-hidden="true">
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden" aria-hidden="true">
         {/* Subtle Campus Photo */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/campus-main.jpeg"
+          src={heroVisual.campusPhotoUrl || '/campus-main.jpeg'}
           alt="GPTC Perinthalmanna Campus"
           style={{
             width: '100%',
             height: '100%',
             objectFit: 'cover',
-            filter: 'blur(12px) brightness(0.30) contrast(1.0)',
-            transform: 'scale(1.04)',
-            opacity: 0.28,
+            objectPosition: objectPos,
+            filter: `blur(${bgBlurPx}px) brightness(0.30) contrast(1.0)`,
+            transform: `scale(${bgScaleFloat})`,
+            opacity: bgOpacityFloat,
+            transition: 'filter 0.3s ease, opacity 0.3s ease, transform 0.3s ease',
           }}
         />
-        {/* Deep Black Shade Overlay */}
+        {/* Deep Black Shade Overlay with configurable opacity */}
         <div
           style={{
             position: 'absolute',
             inset: 0,
-            background: 'linear-gradient(to bottom, rgba(15, 15, 16, 0.88) 0%, rgba(15, 15, 16, 0.80) 50%, rgba(15, 15, 16, 0.94) 100%)',
+            background: `linear-gradient(to bottom, rgba(15, 15, 16, ${darkOverlayFloat}) 0%, rgba(15, 15, 16, ${Math.min(1, darkOverlayFloat * 0.92)}) 50%, rgba(15, 15, 16, ${Math.min(1, darkOverlayFloat * 1.05)}) 100%)`,
+            transition: 'background 0.3s ease',
           }}
         />
       </div>
@@ -131,21 +207,28 @@ export default function HomePage() {
               IEDC — Innovation &amp; Entrepreneurship Development Centre
             </div>
 
-            {/* College name + IEDC logos side-by-side */}
-            <div className="flex items-center gap-4">
+            {/* Institutional Crests - 1. IEDC GPTC PMNA, 2. College Crest, 3. Official IEDC */}
+            <div className="flex items-center gap-4 flex-wrap">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/iedc-gptc-pmna-logo.png"
+                alt="IEDC GPTC PMNA Logo"
+                style={{ height: '48px', width: 'auto', maxWidth: '170px' }}
+                className="drop-shadow-xl object-contain"
+              />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/college-logo.png"
                 alt="GPTC Perinthalmanna Crest"
-                style={{ width: '60px', height: 'auto' }}
-                className="drop-shadow-xl"
+                style={{ width: '48px', height: 'auto' }}
+                className="drop-shadow-xl object-contain"
               />
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/iedc-logo.png"
                 alt="IEDC Logo"
-                style={{ width: '56px', height: 'auto' }}
-                className="drop-shadow-xl"
+                style={{ width: '48px', height: 'auto' }}
+                className="drop-shadow-xl object-contain"
               />
               <div className="text-xs text-slate-400 leading-snug">
                 <div className="font-bold text-white">Govt. Polytechnic College</div>
@@ -235,64 +318,128 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Upcoming event + announcement side by side */}
+            {/* Upcoming event + announcement side by side (Real-Time CMS-Driven) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Upcoming Event */}
-              <div className="glass-iedc p-5 rounded-3xl border border-white/10 shadow-xl space-y-3">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider border-b border-white/10 pb-2">
-                  <Calendar className="w-4 h-4 text-[#F98A5B]" />
-                  Upcoming Event
-                </div>
-                <div className="flex items-start gap-3">
-                  <div className="w-12 h-14 rounded-xl bg-[#1B1B1D] border border-white/10 flex flex-col items-center justify-center shrink-0">
-                    <span className="text-lg font-black text-white leading-none">23</span>
-                    <span className="text-[10px] font-bold text-[#F98A5B] font-mono uppercase">AUG</span>
+              {upcomingEvent ? (
+                <div className="glass-iedc p-5 rounded-3xl border border-white/10 shadow-xl space-y-3 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
+                        <Calendar className="w-4 h-4 text-[#F98A5B]" />
+                        {upcomingEvent.isToday ? 'Ongoing Event' : 'Upcoming Event'}
+                      </div>
+                      <span className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-bold border ${
+                        upcomingEvent.registrationStatus === 'Ongoing'
+                          ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                          : upcomingEvent.registrationStatus === 'Registration Closing Soon'
+                          ? 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                          : upcomingEvent.registrationStatus === 'Registration Closed'
+                          ? 'bg-rose-500/20 text-rose-300 border-rose-500/30'
+                          : 'bg-[#F98A5B]/20 text-[#F98A5B] border-[#F98A5B]/30'
+                      }`}>
+                        {upcomingEvent.registrationStatus}
+                      </span>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <div className="w-12 h-14 rounded-xl bg-[#1B1B1D] border border-white/10 flex flex-col items-center justify-center shrink-0">
+                        <span className="text-lg font-black text-white leading-none">{eventDay}</span>
+                        <span className="text-[10px] font-bold text-[#F98A5B] font-mono uppercase">{eventMonth}</span>
+                      </div>
+                      <div className="space-y-1 min-w-0">
+                        <h3 className="text-sm font-extrabold text-white leading-snug line-clamp-1">{upcomingEvent.title}</h3>
+                        <p className="flex items-center gap-1 text-[10px] text-slate-400 line-clamp-1">
+                          <MapPin className="w-3 h-3 text-[#F98A5B] shrink-0" /> {upcomingEvent.venue || 'GPTC Perinthalmanna'}
+                        </p>
+                        <p className="flex items-center gap-1 text-[10px] text-slate-400">
+                          <Clock className="w-3 h-3 text-[#EC3A74] shrink-0" /> {upcomingEvent.time || '10:00 AM – 04:00 PM'}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-1">
-                    <h3 className="text-sm font-extrabold text-white leading-snug">Vibe Coding Session</h3>
-                    <p className="flex items-center gap-1 text-[10px] text-slate-400">
-                      <MapPin className="w-3 h-3 text-[#F98A5B]" /> ICFC Lab, GPTC PMNA
-                    </p>
-                    <p className="flex items-center gap-1 text-[10px] text-slate-400">
-                      <Clock className="w-3 h-3 text-[#EC3A74]" /> 01:00 PM – 04:00 PM
-                    </p>
-                  </div>
+
+                  {upcomingEvent.registrationStatus === 'Registration Closed' ? (
+                    <div className="w-full py-2.5 rounded-xl bg-white/5 border border-white/10 text-slate-400 font-extrabold text-xs text-center">
+                      Registration Closed
+                    </div>
+                  ) : (
+                    <Link
+                      href={`/register?event=${upcomingEvent.id}`}
+                      className="w-full py-2.5 rounded-xl btn-primary-iedc text-white font-extrabold text-xs shadow-lg text-center block hover:scale-[1.02] transition-transform"
+                    >
+                      Register Now
+                    </Link>
+                  )}
                 </div>
-                <button
-                  onClick={() => registerForEvent('event-1')}
-                  className="w-full py-2.5 rounded-xl btn-primary-iedc text-white font-extrabold text-xs shadow-lg"
-                >
-                  Register Now
-                </button>
-              </div>
+              ) : (
+                <div className="glass-iedc p-5 rounded-3xl border border-white/10 shadow-xl space-y-3 flex flex-col justify-between">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider border-b border-white/10 pb-2">
+                    <Calendar className="w-4 h-4 text-[#F98A5B]" />
+                    Upcoming Event
+                  </div>
+                  <div className="py-3 text-center space-y-1.5">
+                    <Calendar className="w-7 h-7 text-slate-500 mx-auto" />
+                    <p className="text-xs font-bold text-white">No upcoming events at the moment.</p>
+                    <p className="text-[10px] text-slate-400">Stay tuned for new workshops &amp; bootcamps.</p>
+                  </div>
+                  <Link
+                    href="/events"
+                    className="inline-flex items-center justify-center gap-1 text-xs font-bold text-[#F98A5B] hover:text-white transition-colors"
+                  >
+                    View All Programs <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              )}
 
               {/* Announcement */}
-              <div className="glass-iedc p-5 rounded-3xl border border-white/10 shadow-xl space-y-3">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider border-b border-white/10 pb-2">
-                  <Megaphone className="w-4 h-4 text-[#EC3A74]" />
-                  Announcement
+              {homepageData.announcements && homepageData.announcements.length > 0 ? (
+                <div className="glass-iedc p-5 rounded-3xl border border-white/10 shadow-xl space-y-3 flex flex-col justify-between">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                      <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider">
+                        <Megaphone className="w-4 h-4 text-[#EC3A74]" />
+                        Announcements
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-[#EC3A74]/15 text-[#EC3A74] border border-[#EC3A74]/30">
+                        LIVE
+                      </span>
+                    </div>
+                    <div className="space-y-2">
+                      {homepageData.announcements.slice(0, 3).map((ann: any, idx: number) => (
+                        <div key={ann.id || idx} className="flex items-start gap-2 text-[11px] text-slate-200">
+                          <Star className="w-3.5 h-3.5 text-[#F98A5B] mt-0.5 shrink-0" />
+                          <span className="line-clamp-2 leading-relaxed">{ann.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <Link
+                    href="/events"
+                    className="inline-flex items-center gap-1 text-xs font-bold text-[#F98A5B] hover:text-white transition-colors pt-2"
+                  >
+                    View Notice Board <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex items-start gap-2 text-[11px] text-slate-200">
-                    <Star className="w-3.5 h-3.5 text-[#F98A5B] mt-0.5 shrink-0" />
-                    Hackathon 2025 registrations are now open!
+              ) : (
+                <div className="glass-iedc p-5 rounded-3xl border border-white/10 shadow-xl space-y-3 flex flex-col justify-between">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-300 uppercase tracking-wider border-b border-white/10 pb-2">
+                    <Megaphone className="w-4 h-4 text-[#EC3A74]" />
+                    Announcements
                   </div>
-                  <div className="flex items-start gap-2 text-[11px] text-slate-400">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-[#6249A3] mt-0.5 shrink-0" />
-                    YIP &amp; KSUM applications submitted.
+                  <div className="py-3 text-center space-y-1.5">
+                    <Megaphone className="w-7 h-7 text-slate-500 mx-auto" />
+                    <p className="text-xs font-bold text-white">No active announcements</p>
+                    <p className="text-[10px] text-slate-400">Check back later for updates and circulars.</p>
                   </div>
-                  <div className="flex items-start gap-2 text-[11px] text-slate-400">
-                    <Zap className="w-3.5 h-3.5 text-[#EC3A74] mt-0.5 shrink-0" />
-                    New certificate portal is live!
-                  </div>
+                  <Link
+                    href="/events"
+                    className="inline-flex items-center justify-center gap-1 text-xs font-bold text-[#F98A5B] hover:text-white transition-colors"
+                  >
+                    View Archive <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
                 </div>
-                <Link
-                  href="/events"
-                  className="inline-flex items-center gap-1 text-xs font-bold text-[#F98A5B] hover:text-white transition-colors"
-                >
-                  View All <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
-              </div>
+              )}
             </div>
           </div>
 
@@ -509,66 +656,136 @@ export default function HomePage() {
           </Link>
         </div>
 
-        {/* 4 Feature Preview Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {[
-            {
-              name: 'ANSHADH PK',
-              role: 'Student Lead-I',
-              dept: 'Electronics Engineering',
-              grad: 'Class of 2027',
-              insta: 'panshadh'
-            },
-            {
-              name: 'FAHEEMA FARHANATH P',
-              role: 'Student Lead-II',
-              dept: 'Electrical Engineering',
-              grad: 'Class of 2027',
-              insta: 'faheemafarhanath'
-            },
-            {
-              name: 'ANAGHA C',
-              role: 'Community Lead',
-              dept: 'Electrical Engineering',
-              grad: 'Class of 2027',
-              insta: 'canagha'
-            },
-            {
-              name: 'NITHYA K',
-              role: 'Branding & Marketing Lead',
-              dept: 'Electronics Engineering',
-              grad: 'Class of 2027',
-              insta: 'nithyamadhavan'
-            }
-          ].map((lead) => (
-            <div
-              key={lead.name}
-              className="p-6 rounded-3xl bg-neutral-900/60 border border-white/10 hover:border-white/25 flex flex-col justify-between space-y-4 shadow-xl transition-all group"
-            >
-              <div className="space-y-4">
-                <div className="w-16 h-16 rounded-2xl bg-[#F98A5B]/10 border border-[#F98A5B]/30 flex items-center justify-center group-hover:border-[#F98A5B] transition-colors">
-                  <span className="text-xl font-black text-[#F98A5B]">
-                    {lead.name.split(' ').map((n) => n[0]).join('').substring(0, 2)}
-                  </span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] font-mono font-bold text-[#F98A5B] block">{lead.role}</span>
-                  <h3 className="text-base font-bold text-white group-hover:text-[#F98A5B] transition-colors leading-snug">
-                    {lead.name}
-                  </h3>
-                  <span className="text-xs text-neutral-400 block mt-0.5">{lead.dept}</span>
-                </div>
+        {/* Dynamic Student Leads & Executive Members Grid */}
+        {teamLoading ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="animate-pulse flex flex-col items-center space-y-4">
+                <div className="w-48 h-72 rounded-2xl bg-white/5" />
+                <div className="h-4 w-32 bg-white/10 rounded" />
+                <div className="h-3 w-24 bg-white/5 rounded" />
               </div>
+            ))}
+          </div>
+        ) : teamMembers.length === 0 ? (
+          <div className="text-center py-12 text-neutral-400 text-sm">
+            No student leads found.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {teamMembers.slice(0, 8).map((lead, idx) => (
+              <AnimatedProfileCard
+                key={lead.id}
+                member={lead}
+                index={idx}
+                containerHeight="h-72 sm:h-80"
+                layoutVariant="preview"
+                showCardBackgroundInPreview={false}
+              />
+            ))}
+          </div>
+        )}
+      </section>
 
-              <div className="pt-3 border-t border-white/5 flex items-center justify-between text-xs text-neutral-400">
-                <span className="text-[10px] font-mono">{lead.grad}</span>
-                <span className="text-[10px] font-mono text-[#F98A5B]">@{lead.insta}</span>
+      {/* ═══════════════════════════════════════════════════════
+          OPTIONAL FEATURED INSTAGRAM REEL / JOURNEY SPOTLIGHT
+          Only rendered if enabled by CMS administrator
+      ═══════════════════════════════════════════════════════ */}
+      {(() => {
+        const featuredReel = homepageData.settings?.footerSocial?.featuredReel;
+        if (!featuredReel?.enabled || !featuredReel?.reelUrl) return null;
+
+        const officialInstaUrl =
+          homepageData.settings?.footerSocial?.officialInstagramUrl ||
+          'https://www.instagram.com/iedc_gpc_pmna/';
+        const officialUsername =
+          homepageData.settings?.footerSocial?.officialInstagramUsername ||
+          '@iedc_gpc_pmna';
+
+        return (
+          <section className="py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10 border-t border-white/10">
+            <div className="max-w-4xl mx-auto p-6 sm:p-8 rounded-3xl bg-[#141418] border border-white/10 shadow-2xl relative overflow-hidden">
+              {/* Subtle ambient gradient glow */}
+              <div className="absolute -right-20 -top-20 w-72 h-72 rounded-full bg-gradient-to-br from-[#833AB4]/15 via-[#FD1D1D]/15 to-[#FCB045]/15 blur-3xl pointer-events-none" />
+
+              <div className="flex flex-col md:flex-row items-center gap-6 relative z-10">
+                {/* Thumbnail or Instagram Preview Poster */}
+                <div className="w-full md:w-56 h-64 sm:h-72 rounded-2xl overflow-hidden bg-black/60 border border-white/10 relative shrink-0 flex items-center justify-center group">
+                  {featuredReel.thumbnailUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={featuredReel.thumbnailUrl}
+                      alt={featuredReel.caption || 'Featured IEDC Instagram Reel'}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-gradient-to-br from-[#833AB4]/25 via-[#FD1D1D]/20 to-[#FCB045]/20 text-center space-y-3">
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#833AB4] via-[#FD1D1D] to-[#FCB045] flex items-center justify-center text-white shadow-lg shadow-[#FD1D1D]/25">
+                        <Instagram className="w-7 h-7" />
+                      </div>
+                      <div className="space-y-1">
+                        <span className="text-xs font-mono font-bold text-white uppercase tracking-wider block">
+                          Instagram Reel
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-mono">
+                          {officialUsername}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Floating Reel Badge */}
+                  <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-black/75 backdrop-blur-md border border-white/20 text-[10px] font-mono text-white flex items-center gap-1.5 shadow">
+                    <Film className="w-3 h-3 text-[#FCB045]" />
+                    <span>Featured Reel</span>
+                  </div>
+                </div>
+
+                {/* Reel Info & Action Buttons */}
+                <div className="flex-1 space-y-4 text-center md:text-left">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-mono text-[#F98A5B]">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>FROM OUR COMMUNITY &amp; JOURNEY</span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                      Follow Our Student Innovation Journey
+                    </h3>
+                    <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
+                      {featuredReel.caption ||
+                        'Watch highlights of hackathons, student prototype showcases, hardware maker bootcamps, and innovation triumphs on our official Instagram.'}
+                    </p>
+                  </div>
+
+                  <div className="pt-2 flex flex-wrap items-center justify-center md:justify-start gap-3">
+                    <a
+                      href={featuredReel.reelUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label="Watch featured Reel on Instagram"
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#833AB4] via-[#FD1D1D] to-[#FCB045] hover:brightness-110 text-white font-bold text-xs shadow-lg shadow-[#FD1D1D]/20 transition-all hover:scale-105"
+                    >
+                      <Instagram className="w-4 h-4" />
+                      <span>Watch Reel on Instagram</span>
+                      <ExternalLink className="w-3.5 h-3.5 ml-0.5" />
+                    </a>
+
+                    <a
+                      href={officialInstaUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white font-medium text-xs transition-colors"
+                    >
+                      <span>Follow {officialUsername}</span>
+                    </a>
+                  </div>
+                </div>
               </div>
             </div>
-          ))}
-        </div>
-      </section>
+          </section>
+        );
+      })()}
 
     </div>
   );

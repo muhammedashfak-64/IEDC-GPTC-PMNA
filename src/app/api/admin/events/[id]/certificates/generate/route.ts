@@ -21,7 +21,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   try {
     const result = await generateProgramCertificates(id, options, auth);
-    return NextResponse.json({ success: true, ...result });
+    return NextResponse.json(result);
   } catch (err: any) {
     console.error('Error generating program certificates:', err);
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

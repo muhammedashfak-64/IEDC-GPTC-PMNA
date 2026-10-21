@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { UserCheck, ShieldCheck, Mail, Phone, Share2, ExternalLink } from 'lucide-react';
+import AnimatedProfileCard from '@/components/team/AnimatedProfileCard';
 
 export default function PublicCommitteePage() {
   const [faculty, setFaculty] = useState<any[]>([]);
@@ -62,41 +63,19 @@ export default function PublicCommitteePage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {faculty.map((fac) => (
-            <div key={fac.id} className="p-6 sm:p-8 rounded-3xl bg-[#121216] border border-white/10 space-y-4 flex flex-col justify-between shadow-xl">
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <img
-                    src={fac.photoUrl || '/college-logo.png'}
-                    alt={fac.name}
-                    className="w-20 h-20 rounded-2xl object-cover border-2 border-white/15 shadow"
-                  />
-                  <div>
-                    <h3 className="font-extrabold text-white text-lg">{fac.name}</h3>
-                    <p className="text-xs text-amber-300 font-bold">{fac.designation}</p>
-                    <span className="text-[11px] text-slate-400 font-mono block mt-0.5">{fac.department}</span>
-                  </div>
-                </div>
-
-                <p className="text-xs text-slate-300 leading-relaxed bg-[#18181D] p-4 rounded-2xl border border-white/5">
-                  {fac.bio}
-                </p>
-              </div>
-
-              <div className="pt-3 border-t border-white/5 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
-                <div className="flex items-center gap-2">
-                  <Mail className="w-3.5 h-3.5 text-slate-400" />
-                  <a href={`mailto:${fac.email}`} className="hover:text-white font-mono">{fac.email}</a>
-                </div>
-                {fac.phone && (
-                  <div className="flex items-center gap-2 font-mono">
-                    <Phone className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{fac.phone}</span>
-                  </div>
-                )}
-              </div>
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl">
+          {faculty.map((fac, idx) => (
+            <AnimatedProfileCard
+              key={fac.id}
+              member={{
+                ...fac,
+                role: fac.designation || 'Faculty Coordinator',
+                category: 'Faculty Leadership'
+              }}
+              index={idx}
+              containerHeight="h-80 sm:h-96"
+              layoutVariant="faculty"
+            />
           ))}
         </div>
       </section>
@@ -113,50 +92,18 @@ export default function PublicCommitteePage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {committee.map((mem) => (
-            <div key={mem.id} className="p-6 rounded-3xl bg-[#121216] border border-white/10 space-y-4 flex flex-col justify-between text-center items-center shadow-lg group hover:border-white/20 transition-all">
-              <div className="space-y-3 w-full flex flex-col items-center">
-                {mem.photoUrl ? (
-                  <img
-                    src={mem.photoUrl}
-                    alt={mem.name}
-                    className="w-24 h-24 rounded-2xl object-cover border-2 border-white/10 shadow group-hover:scale-105 transition-transform duration-300"
-                  />
-                ) : (
-                  <div className="w-24 h-24 rounded-2xl bg-neutral-800 border-2 border-[#F98A5B]/30 flex items-center justify-center shadow group-hover:border-[#F98A5B] transition-colors">
-                    <span className="text-xl font-black text-[#F98A5B]">
-                      {mem.name.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
-                    </span>
-                  </div>
-                )}
-
-                <div>
-                  <h3 className="font-bold text-white text-base leading-snug">{mem.name}</h3>
-                  <p className="text-xs text-cyan-300 font-bold mt-0.5">{mem.position}</p>
-                  <span className="text-[10px] font-mono text-slate-400 block">{mem.department}</span>
-                </div>
-
-                <p className="text-xs text-slate-400 line-clamp-3 leading-relaxed text-left w-full bg-[#18181D] p-3 rounded-xl border border-white/5">
-                  {mem.bio || 'Organizing bootcamps, workshops, and prototype hackathons.'}
-                </p>
-              </div>
-
-              <div className="pt-3 border-t border-white/5 flex items-center justify-between w-full text-xs text-slate-400">
-                <span className="text-[10px] font-mono">{mem.academicYear}</span>
-                {mem.linkedinUrl && (
-                  <a
-                    href={mem.linkedinUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    title="Profile link"
-                    className="p-1 text-slate-400 hover:text-white transition-colors"
-                  >
-                    <Share2 className="w-4 h-4" />
-                  </a>
-                )}
-              </div>
-            </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          {committee.map((mem, idx) => (
+            <AnimatedProfileCard
+              key={mem.id}
+              member={{
+                ...mem,
+                role: mem.role || mem.position || 'Executive Member'
+              }}
+              index={idx}
+              containerHeight="h-72 sm:h-80"
+              layoutVariant="team"
+            />
           ))}
         </div>
       </section>

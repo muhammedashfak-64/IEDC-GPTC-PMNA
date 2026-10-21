@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     if (full_name && (mobile_number || password)) {
       const phoneToUse = mobile_number || password;
       const { retrieveStudentCertificate } = await import('@/lib/serverStore');
-      const result = retrieveStudentCertificate(event_id, full_name, phoneToUse);
+      const result = await retrieveStudentCertificate(event_id, full_name, phoneToUse);
       if (!result.success || !result.certificate) {
         return NextResponse.json(
           { success: false, error: result.error || 'No published certificate was found for the supplied details.' },

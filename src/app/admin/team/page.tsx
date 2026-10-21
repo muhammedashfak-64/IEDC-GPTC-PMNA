@@ -28,27 +28,18 @@ import {
   Archive,
   RefreshCw,
   LayoutGrid,
-  List
+  List,
+  Sparkles,
+  Sliders,
+  Check
 } from 'lucide-react';
 import { InstagramIcon as Instagram, LinkedInIcon as Linkedin } from '@/components/SocialIcons';
+import AnimatedProfileCard, { ProfileCardData } from '@/components/team/AnimatedProfileCard';
 
-interface TeamMember {
-  id: string;
-  name: string;
-  role: string;
-  category: string;
-  department: string;
-  email?: string;
-  contact?: string;
+export interface TeamMember extends ProfileCardData {
   showEmailPublicly?: boolean;
   showContactPublicly?: boolean;
-  graduationDate?: string;
-  photoUrl?: string;
-  instagramUsername?: string;
-  instagramUrl?: string;
-  linkedinUrl?: string;
-  bio?: string;
-  displayOrder: number;
+  showSocialPublicly?: boolean;
   status: 'Published' | 'Draft' | 'Archived';
   verificationFlag?: string;
   createdAt?: string;
@@ -102,6 +93,58 @@ export default function AdminTeamPage() {
   // Selection for bulk actions
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  // Quick No-Background Photo Upload directly from table or cards
+  const [quickUploadMemberId, setQuickUploadMemberId] = useState<string | null>(null);
+  const quickFileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleTriggerQuickUpload = (memberId: string) => {
+    setQuickUploadMemberId(memberId);
+    quickFileInputRef.current?.click();
+  };
+
+  const handleQuickFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !quickUploadMemberId) return;
+
+    try {
+      addToast('Uploading', 'Uploading transparent cutout image...', 'info');
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('folder', 'team');
+
+      const res = await fetch('/api/admin/upload', {
+        method: 'POST',
+        body: fd
+      });
+      const data = await res.json();
+      if (data.success && data.url) {
+        // Save to member record
+        const updateRes = await fetch(`/api/admin/team?id=${quickUploadMemberId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            photoUrl: data.url,
+            isTransparent: true
+          })
+        });
+        const updateData = await updateRes.json();
+        if (updateData.success) {
+          addToast('Success', 'No-background photo uploaded and linked!', 'success');
+          fetchMembers();
+        } else {
+          addToast('Error', updateData.error || 'Failed to update member photo', 'error');
+        }
+      } else {
+        addToast('Upload Error', data.error || 'Failed to upload photo', 'error');
+      }
+    } catch (err: any) {
+      addToast('Error', err.message || 'Upload failed', 'error');
+    } finally {
+      setQuickUploadMemberId(null);
+      if (quickFileInputRef.current) quickFileInputRef.current.value = '';
+    }
+  };
+
   // Upload state
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -117,6 +160,7 @@ export default function AdminTeamPage() {
     contact: '',
     showEmailPublicly: false,
     showContactPublicly: false,
+    showSocialPublicly: true,
     graduationDate: '31/05/2027',
     photoUrl: '',
     instagramUsername: '',
@@ -125,7 +169,16 @@ export default function AdminTeamPage() {
     bio: '',
     displayOrder: 1,
     status: 'Published',
-    verificationFlag: ''
+    verificationFlag: '',
+    imagePosition: 'bottom',
+    imageScale: 1.0,
+    animationEnabled: true,
+    animationStyle: 'fade-up',
+    animationDelay: 0,
+    glowEnabled: true,
+    glowIntensity: 'subtle',
+    bgStyle: 'radial-light',
+    isTransparent: true
   };
   const [formData, setFormData] = useState<Partial<TeamMember>>(initialForm);
 
@@ -189,6 +242,7 @@ export default function AdminTeamPage() {
       contact: member.contact || '',
       showEmailPublicly: !!member.showEmailPublicly,
       showContactPublicly: !!member.showContactPublicly,
+      showSocialPublicly: member.showSocialPublicly !== false,
       graduationDate: member.graduationDate || '',
       photoUrl: member.photoUrl || '',
       instagramUsername: member.instagramUsername || '',
@@ -197,7 +251,16 @@ export default function AdminTeamPage() {
       bio: member.bio || '',
       displayOrder: member.displayOrder,
       status: member.status,
-      verificationFlag: member.verificationFlag || ''
+      verificationFlag: member.verificationFlag || '',
+      imagePosition: member.imagePosition || 'bottom',
+      imageScale: member.imageScale !== undefined ? Number(member.imageScale) : 1.0,
+      animationEnabled: member.animationEnabled !== false,
+      animationStyle: member.animationStyle || 'fade-up',
+      animationDelay: member.animationDelay !== undefined ? Number(member.animationDelay) : 0,
+      glowEnabled: member.glowEnabled !== false,
+      glowIntensity: member.glowIntensity || 'subtle',
+      bgStyle: member.bgStyle || 'radial-light',
+      isTransparent: member.isTransparent !== false
     });
     setPreviewTab('form');
     setShowModal(true);
@@ -209,24 +272,33 @@ export default function AdminTeamPage() {
     setFormData((prev) => ({
       ...prev,
       instagramUsername: clean,
-      instagramUrl: clean ? `https://instagram.com/${clean}` : ''
+      instagramUrl: clean ? `https://www.instagram.com/${clean}/` : ''
     }));
   };
 
-  // Handle photo upload
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Process file upload directly from PC
+  const processUpload = async (file: File) => {
     if (!file) return;
 
-    // Check size (< 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      addToast('File too large', 'Image must be under 5MB', 'error');
+    // Check size (< 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      addToast('File too large', 'Image must be under 10MB', 'error');
       return;
     }
 
+    const isPngOrWebp =
+      file.type === 'image/png' ||
+      file.type === 'image/webp' ||
+      /\.(png|webp)$/i.test(file.name);
+    const isJpg =
+      file.type === 'image/jpeg' ||
+      /\.(jpg|jpeg)$/i.test(file.name);
+
     try {
       setUploading(true);
-      setUploadProgress(25);
+      setUploadProgress(20);
 
       const fd = new FormData();
       fd.append('file', file);
@@ -238,13 +310,24 @@ export default function AdminTeamPage() {
         body: fd
       });
 
-      setUploadProgress(80);
+      setUploadProgress(85);
       const data = await res.json();
 
       if (data.success && data.url) {
-        setFormData((prev) => ({ ...prev, photoUrl: data.url }));
+        setFormData((prev) => ({
+          ...prev,
+          photoUrl: data.url,
+          isTransparent: isPngOrWebp ? true : (prev.isTransparent ?? false)
+        }));
         setUploadProgress(100);
-        addToast('Photo Uploaded', 'Image uploaded successfully.', 'success');
+
+        if (isPngOrWebp) {
+          addToast('Cutout Photo Uploaded', 'Transparent image loaded and prepared for animation.', 'success');
+        } else if (isJpg) {
+          addToast('Photo Uploaded', 'JPG photo uploaded. Note: JPG does not support alpha transparency.', 'info');
+        } else {
+          addToast('Photo Uploaded', 'Image uploaded successfully.', 'success');
+        }
       } else {
         addToast('Upload Error', data.error || 'Failed to upload photo', 'error');
       }
@@ -254,6 +337,29 @@ export default function AdminTeamPage() {
       setUploading(false);
       setTimeout(() => setUploadProgress(0), 1000);
     }
+  };
+
+  // Handle photo upload via file input
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processUpload(file);
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) processUpload(file);
   };
 
   // Save member
@@ -381,8 +487,8 @@ export default function AdminTeamPage() {
       `"${m.id}"`,
       `"${m.name.replace(/"/g, '""')}"`,
       `"${m.role.replace(/"/g, '""')}"`,
-      `"${m.category.replace(/"/g, '""')}"`,
-      `"${m.department.replace(/"/g, '""')}"`,
+      `"${(m.category || '').replace(/"/g, '""')}"`,
+      `"${(m.department || '').replace(/"/g, '""')}"`,
       `"${(m.email || '').replace(/"/g, '""')}"`,
       `"${(m.contact || '').replace(/"/g, '""')}"`,
       `"${(m.graduationDate || '').replace(/"/g, '""')}"`,
@@ -432,6 +538,7 @@ export default function AdminTeamPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
+
           <button
             onClick={handleExportCSV}
             className="px-3.5 py-2 rounded-xl bg-neutral-900 border border-white/10 hover:border-white/20 text-neutral-300 hover:text-white text-xs font-semibold flex items-center gap-2 transition-colors"
@@ -660,13 +767,24 @@ export default function AdminTeamPage() {
                           </div>
                         )}
                         <div>
-                          <div className="font-bold text-white flex items-center gap-1.5">
+                          <div className="font-bold text-white flex items-center gap-1.5 flex-wrap">
                             <span>{member.name}</span>
                             {member.verificationFlag && (
                               <span title={member.verificationFlag} className="text-amber-400">
                                 <AlertTriangle className="w-3.5 h-3.5" />
                               </span>
                             )}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleTriggerQuickUpload(member.id);
+                              }}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 border border-emerald-500/30 text-[10px] font-mono cursor-pointer transition-colors"
+                              title="Upload No-Background Photo directly from PC"
+                            >
+                              <Upload className="w-2.5 h-2.5" />
+                              <span>Upload Cutout</span>
+                            </button>
                           </div>
                           {member.graduationDate && (
                             <span className="text-[10px] font-mono text-neutral-500 flex items-center gap-1">
@@ -748,6 +866,13 @@ export default function AdminTeamPage() {
                     <td className="p-3 text-right">
                       <div className="inline-flex items-center gap-1">
                         <button
+                          onClick={() => handleTriggerQuickUpload(member.id)}
+                          className="p-1.5 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 transition-colors"
+                          title="Upload Member Photo"
+                        >
+                          <Upload className="w-3.5 h-3.5" />
+                        </button>
+                        <button
                           onClick={() => handleOpenEdit(member)}
                           className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-neutral-300 hover:text-white transition-colors"
                           title="Edit Member"
@@ -772,80 +897,39 @@ export default function AdminTeamPage() {
       ) : (
         /* CARD PREVIEW VIEW */
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filtered.map((member) => (
-            <div
-              key={member.id}
-              className="p-5 rounded-2xl bg-neutral-900/60 border border-white/10 flex flex-col justify-between space-y-4 shadow-xl"
-            >
-              <div className="space-y-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    {member.photoUrl ? (
-                      <img
-                        src={member.photoUrl}
-                        alt={member.name}
-                        className="w-14 h-14 rounded-2xl object-cover border border-white/10"
-                      />
-                    ) : (
-                      <div className="w-14 h-14 rounded-2xl bg-neutral-800 border border-[#F98A5B]/30 flex items-center justify-center">
-                        <span className="font-bold text-[#F98A5B] text-base">
-                          {member.name.split(' ').map((n) => n[0]).join('').substring(0, 2)}
-                        </span>
-                      </div>
-                    )}
-                    <div>
-                      <span className="text-[10px] font-mono text-[#F98A5B] font-bold block">{member.role}</span>
-                      <h4 className="font-bold text-white text-sm">{member.name}</h4>
-                      <span className="text-[11px] text-neutral-400 block">{member.department}</span>
-                    </div>
-                  </div>
-
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-mono ${
-                      member.status === 'Published' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-yellow-500/20 text-yellow-400'
-                    }`}
-                  >
-                    {member.status}
-                  </span>
-                </div>
-
-                {member.verificationFlag && (
-                  <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-[10px] text-amber-200 flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                    <span className="truncate">{member.verificationFlag}</span>
-                  </div>
-                )}
+          {filtered.map((member, idx) => (
+            <div key={member.id} className="relative group/adminCard flex flex-col justify-between">
+              {/* Floating quick action buttons for admin */}
+              <div className="absolute top-3 right-3 z-30 flex items-center gap-1.5 opacity-90 group-hover/adminCard:opacity-100 transition-opacity">
+                <button
+                  onClick={() => handleTriggerQuickUpload(member.id)}
+                  className="p-1.5 rounded-lg bg-neutral-900/90 hover:bg-emerald-500 text-emerald-400 hover:text-neutral-950 border border-emerald-500/30 shadow-lg transition-colors cursor-pointer"
+                  title="Upload Member Photo"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => handleOpenEdit(member)}
+                  className="p-1.5 rounded-lg bg-neutral-900/90 hover:bg-[#F98A5B] text-white hover:text-neutral-950 border border-white/20 shadow-lg transition-colors cursor-pointer"
+                  title="Edit Member"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setDeleteConfirmMember(member)}
+                  className="p-1.5 rounded-lg bg-neutral-900/90 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 shadow-lg transition-colors cursor-pointer"
+                  title="Delete Member"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
               </div>
 
-              <div className="pt-3 border-t border-white/5 flex items-center justify-between text-xs">
-                {member.instagramUsername ? (
-                  <a
-                    href={member.instagramUrl || `https://instagram.com/${member.instagramUsername}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1 text-[#E1306C] text-[11px] font-mono"
-                  >
-                    <Instagram className="w-3 h-3" /> @{member.instagramUsername}
-                  </a>
-                ) : (
-                  <span className="text-neutral-500 text-[11px]">No Instagram</span>
-                )}
-
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => handleOpenEdit(member)}
-                    className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-neutral-300"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => setDeleteConfirmMember(member)}
-                    className="p-1.5 rounded-lg bg-rose-500/10 text-rose-400"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
+              <AnimatedProfileCard
+                member={member}
+                index={idx}
+                containerHeight="h-72"
+                layoutVariant="team"
+              />
             </div>
           ))}
         </div>
@@ -903,71 +987,121 @@ export default function AdminTeamPage() {
             {/* TAB 1: FORM */}
             {previewTab === 'form' ? (
               <form onSubmit={handleSave} className="space-y-5">
-                {/* Photo Upload Zone */}
-                <div className="p-4 rounded-2xl bg-neutral-950 border border-white/10 space-y-3">
-                  <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                    <ImageIcon className="w-3.5 h-3.5 text-[#F98A5B]" />
-                    Profile Photograph (JPG, PNG, WebP &bull; Max 5MB)
-                  </span>
+                {/* Photo Upload Zone (Drag-and-Drop + File Picker) */}
+                <div
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  className={`p-5 rounded-2xl border transition-all space-y-4 ${
+                    isDragging
+                      ? 'border-[#F98A5B] bg-[#F98A5B]/10 shadow-lg shadow-[#F98A5B]/20'
+                      : 'bg-neutral-950 border-white/10 hover:border-white/20'
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <ImageIcon className="w-4 h-4 text-[#F98A5B]" />
+                      Profile Photograph Upload (Transparent Cutout PNG / WebP)
+                    </span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-neutral-300">
+                      PNG &bull; WebP &bull; JPG (Max 10MB)
+                    </span>
+                  </div>
 
-                  <div className="flex flex-col sm:flex-row items-center gap-4">
-                    {/* Preview Box */}
-                    <div className="w-24 h-24 rounded-2xl bg-neutral-900 border border-white/10 overflow-hidden flex items-center justify-center shrink-0 relative">
+                  <p className="text-[11px] text-neutral-400 leading-relaxed">
+                    Upload a portrait photo from your computer. For optimal presentation, use photos with
+                    a <strong>transparent background</strong> (cutout PNG or WebP). The website will automatically
+                    render the cutout above an elegant soft light-gray gradient with ambient glow and smooth entrance animations.
+                  </p>
+
+                  <div className="flex flex-col sm:flex-row items-center gap-5">
+                    {/* Visual Preview Box */}
+                    <div
+                      className="w-28 h-28 rounded-2xl border border-white/15 overflow-hidden flex items-end justify-center shrink-0 relative shadow-inner"
+                      style={{
+                        background: formData.isTransparent !== false
+                          ? 'radial-gradient(circle at 50% 60%, #f8fafc 0%, #cbd5e1 100%)'
+                          : '#17171a'
+                      }}
+                    >
                       {formData.photoUrl ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
                         <img
                           src={formData.photoUrl}
                           alt="Preview"
-                          className="w-full h-full object-cover"
+                          className={`w-full h-full ${
+                            formData.isTransparent !== false ? 'object-contain object-bottom' : 'object-cover'
+                          }`}
+                          style={{
+                            transform: `scale(${formData.imageScale || 1.0})`,
+                            filter: formData.isTransparent !== false ? 'drop-shadow(0 6px 12px rgba(0,0,0,0.15))' : undefined
+                          }}
                         />
                       ) : (
-                        <div className="text-center p-2">
-                          <span className="text-lg font-bold text-[#F98A5B]">
+                        <div className="w-full h-full flex flex-col items-center justify-center p-2 text-center">
+                          <span className="text-lg font-black text-neutral-700">
                             {formData.name ? formData.name.substring(0, 2).toUpperCase() : 'PHOTO'}
                           </span>
-                          <span className="text-[9px] text-neutral-500 block">Default Placeholder</span>
+                          <span className="text-[8px] font-mono text-neutral-500 uppercase tracking-widest mt-1">
+                            Placeholder
+                          </span>
                         </div>
                       )}
 
                       {uploading && (
-                        <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center text-[10px] text-white">
-                          <RefreshCw className="w-4 h-4 animate-spin text-[#F98A5B] mb-1" />
-                          <span>{uploadProgress}%</span>
+                        <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center text-[10px] text-white">
+                          <RefreshCw className="w-5 h-5 animate-spin text-[#F98A5B] mb-1.5" />
+                          <span className="font-mono font-bold">{uploadProgress}%</span>
                         </div>
                       )}
                     </div>
 
-                    <div className="flex-1 space-y-2 w-full">
+                    <div className="flex-1 space-y-3 w-full">
                       <div className="flex flex-wrap items-center gap-2">
                         <input
                           type="file"
                           ref={fileInputRef}
                           onChange={handleFileUpload}
-                          accept="image/jpeg,image/png,image/webp,image/jpg"
+                          accept="image/png,image/webp,image/jpeg,image/jpg"
                           className="hidden"
                         />
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
                           disabled={uploading}
-                          className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-semibold flex items-center gap-2 transition-colors disabled:opacity-50"
+                          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#F98A5B] to-[#fa753e] hover:brightness-110 text-neutral-950 font-bold text-xs flex items-center gap-2 shadow-lg shadow-[#F98A5B]/20 transition-all disabled:opacity-50 cursor-pointer"
                         >
-                          <Upload className="w-3.5 h-3.5 text-[#F98A5B]" />
-                          <span>{formData.photoUrl ? 'Replace Photo' : 'Upload Photograph'}</span>
+                          <Upload className="w-4 h-4 text-neutral-950" />
+                          <span>{formData.photoUrl ? 'Replace Photo' : 'Upload Photo (JPG, PNG, WebP)'}</span>
                         </button>
 
                         {formData.photoUrl && (
                           <button
                             type="button"
                             onClick={() => setFormData((p) => ({ ...p, photoUrl: '' }))}
-                            className="px-3 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold"
+                            className="px-3.5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold transition-colors cursor-pointer"
                           >
                             Remove Photo
                           </button>
                         )}
                       </div>
 
-                      <div className="space-y-1">
-                        <label className="text-[10px] text-neutral-500">Or Paste Image URL directly:</label>
+                      {/* Transparency Checkbox */}
+                      <label className="flex items-center gap-2.5 cursor-pointer text-xs text-neutral-300">
+                        <input
+                          type="checkbox"
+                          checked={formData.isTransparent !== false}
+                          onChange={(e) => setFormData((p) => ({ ...p, isTransparent: e.target.checked }))}
+                          className="w-4 h-4 rounded accent-[#F98A5B] cursor-pointer"
+                        />
+                        <span className="font-semibold text-white">
+                          Transparent Background Cutout (renders above soft light-gray gradient)
+                        </span>
+                      </label>
+
+                      {/* Direct URL input fallback */}
+                      <div className="space-y-1 pt-1">
+                        <label className="text-[10px] text-neutral-500 font-mono">Or paste existing image URL:</label>
                         <input
                           type="url"
                           placeholder="https://..."
@@ -977,6 +1111,144 @@ export default function AdminTeamPage() {
                         />
                       </div>
                     </div>
+                  </div>
+                </div>
+
+                {/* ANIMATION & PROFILE PRESENTATION CONTROLS */}
+                <div className="p-5 rounded-2xl bg-neutral-950/80 border border-white/10 space-y-4">
+                  <div className="flex items-center justify-between border-b border-white/10 pb-3">
+                    <span className="text-xs font-bold text-white flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-[#F98A5B]" />
+                      <span>Cutout Presentation &amp; Scroll Animation Settings</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-neutral-400">Customizable Per Profile</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                    {/* Image Position */}
+                    <div className="space-y-1.5">
+                      <label className="font-semibold text-neutral-300 flex items-center justify-between">
+                        <span>Display Position</span>
+                        <span className="text-[10px] text-neutral-500 font-mono">Vertical align</span>
+                      </label>
+                      <select
+                        value={formData.imagePosition || 'bottom'}
+                        onChange={(e) => setFormData((p) => ({ ...p, imagePosition: e.target.value as any }))}
+                        className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-white/10 text-white text-xs focus:outline-none focus:border-[#F98A5B]"
+                      >
+                        <option value="bottom">Bottom-Aligned (Ground Level Cutout)</option>
+                        <option value="center">Center-Aligned</option>
+                        <option value="top">Top-Aligned</option>
+                      </select>
+                    </div>
+
+                    {/* Image Scale */}
+                    <div className="space-y-1.5">
+                      <label className="font-semibold text-neutral-300 flex items-center justify-between">
+                        <span>Image Scale / Size</span>
+                        <span className="text-[10px] text-[#F98A5B] font-mono font-bold">
+                          {Math.round((formData.imageScale || 1.0) * 100)}%
+                        </span>
+                      </label>
+                      <div className="flex items-center gap-2 pt-1">
+                        <input
+                          type="range"
+                          min="0.85"
+                          max="1.20"
+                          step="0.05"
+                          value={formData.imageScale || 1.0}
+                          onChange={(e) => setFormData((p) => ({ ...p, imageScale: parseFloat(e.target.value) }))}
+                          className="w-full accent-[#F98A5B] cursor-pointer"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Animation Style */}
+                    <div className="space-y-1.5">
+                      <label className="font-semibold text-neutral-300">Animation Style</label>
+                      <select
+                        value={formData.animationStyle || 'fade-up'}
+                        onChange={(e) => setFormData((p) => ({ ...p, animationStyle: e.target.value as any }))}
+                        className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-white/10 text-white text-xs focus:outline-none focus:border-[#F98A5B]"
+                      >
+                        <option value="fade-up">Fade Up (Smooth ascent &amp; fade)</option>
+                        <option value="soft-reveal">Soft Reveal (Gentle zoom &amp; glow)</option>
+                        <option value="gentle-float">Gentle Float (Smooth levitation)</option>
+                      </select>
+                    </div>
+
+                    {/* Light Background Style */}
+                    <div className="space-y-1.5">
+                      <label className="font-semibold text-neutral-300">Light Background Preset</label>
+                      <select
+                        value={formData.bgStyle || 'radial-light'}
+                        onChange={(e) => setFormData((p) => ({ ...p, bgStyle: e.target.value as any }))}
+                        className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-white/10 text-white text-xs focus:outline-none focus:border-[#F98A5B]"
+                      >
+                        <option value="radial-light">Radial Light (Soft off-white illumination)</option>
+                        <option value="soft-slate">Soft Slate (Architectural cool cement)</option>
+                        <option value="glass-glow">Glass Glow (Translucent frosted halo)</option>
+                        <option value="minimal">Minimal (Clean matte light gray)</option>
+                      </select>
+                    </div>
+
+                    {/* Ambient Glow Intensity */}
+                    <div className="space-y-1.5">
+                      <label className="font-semibold text-neutral-300">Ambient Glow Intensity</label>
+                      <select
+                        value={formData.glowIntensity || 'subtle'}
+                        onChange={(e) => setFormData((p) => ({ ...p, glowIntensity: e.target.value as any }))}
+                        className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-white/10 text-white text-xs focus:outline-none focus:border-[#F98A5B]"
+                      >
+                        <option value="subtle">Subtle (Tasteful soft illumination)</option>
+                        <option value="medium">Medium (Enhanced backlight)</option>
+                        <option value="vibrant">Vibrant (High-contrast glow)</option>
+                      </select>
+                    </div>
+
+                    {/* Animation Delay */}
+                    <div className="space-y-1.5">
+                      <label className="font-semibold text-neutral-300 flex items-center justify-between">
+                        <span>Entrance Delay</span>
+                        <span className="text-[10px] text-neutral-500 font-mono">
+                          {formData.animationDelay || 0}s
+                        </span>
+                      </label>
+                      <select
+                        value={formData.animationDelay || 0}
+                        onChange={(e) => setFormData((p) => ({ ...p, animationDelay: parseFloat(e.target.value) }))}
+                        className="w-full px-3 py-2 rounded-xl bg-neutral-900 border border-white/10 text-white text-xs focus:outline-none focus:border-[#F98A5B]"
+                      >
+                        <option value="0">0.0s (Immediate on scroll enter)</option>
+                        <option value="0.1">0.10s (Gentle stagger)</option>
+                        <option value="0.2">0.20s (Medium delay)</option>
+                        <option value="0.3">0.30s (Deliberate entrance)</option>
+                        <option value="0.4">0.40s</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Toggles: Animation & Glow */}
+                  <div className="pt-2 border-t border-white/5 flex flex-wrap items-center gap-6 text-xs">
+                    <label className="flex items-center gap-2 cursor-pointer text-neutral-300 hover:text-white">
+                      <input
+                        type="checkbox"
+                        checked={formData.animationEnabled !== false}
+                        onChange={(e) => setFormData((p) => ({ ...p, animationEnabled: e.target.checked }))}
+                        className="w-4 h-4 rounded accent-[#F98A5B] cursor-pointer"
+                      />
+                      <span>Enable Scroll Entrance &amp; Float Animation</span>
+                    </label>
+
+                    <label className="flex items-center gap-2 cursor-pointer text-neutral-300 hover:text-white">
+                      <input
+                        type="checkbox"
+                        checked={formData.glowEnabled !== false}
+                        onChange={(e) => setFormData((p) => ({ ...p, glowEnabled: e.target.checked }))}
+                        className="w-4 h-4 rounded accent-[#F98A5B] cursor-pointer"
+                      />
+                      <span>Enable Soft Radial Glow Behind Cutout</span>
+                    </label>
                   </div>
                 </div>
 
@@ -1129,23 +1401,55 @@ export default function AdminTeamPage() {
                 </div>
 
                 {/* Social Profiles Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Instagram Username */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-semibold text-neutral-300 flex items-center gap-1.5">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
                       <Instagram className="w-3.5 h-3.5 text-[#E1306C]" />
-                      Instagram Username
+                      Social Media Profiles
+                    </span>
+                    <label className="flex items-center gap-2 text-[11px] text-neutral-300 cursor-pointer bg-white/5 px-2.5 py-1 rounded-lg border border-white/10 hover:bg-white/10 transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={formData.showSocialPublicly !== false}
+                        onChange={(e) => setFormData((p) => ({ ...p, showSocialPublicly: e.target.checked }))}
+                        className="rounded accent-[#F98A5B] cursor-pointer"
+                      />
+                      <span>Show social links publicly on card</span>
                     </label>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Instagram Username */}
+                    <div className="space-y-1">
+                      <label className="text-xs font-semibold text-neutral-300 flex items-center gap-1.5">
+                        <Instagram className="w-3.5 h-3.5 text-[#E1306C]" />
+                        Instagram Username
+                      </label>
                     <div className="relative">
                       <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500 font-mono text-xs">@</span>
                       <input
                         type="text"
-                        placeholder="username (auto-generates link)"
+                        placeholder="e.g. _aasshfaakk_"
                         value={formData.instagramUsername || ''}
                         onChange={(e) => handleInstagramUsernameChange(e.target.value)}
-                        className="w-full pl-8 pr-3.5 py-2 rounded-xl bg-neutral-950 border border-white/10 text-white text-xs focus:outline-none focus:border-[#F98A5B]"
+                        className="w-full pl-8 pr-3.5 py-2 rounded-xl bg-neutral-950 border border-white/10 text-white text-xs focus:outline-none focus:border-[#F98A5B] font-mono"
                       />
                     </div>
+                  </div>
+
+                  {/* Instagram Profile URL */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-neutral-300 flex items-center gap-1.5">
+                      <Instagram className="w-3.5 h-3.5 text-[#E1306C]" />
+                      Instagram Profile URL
+                    </label>
+                    <input
+                      type="url"
+                      placeholder="https://www.instagram.com/_aasshfaakk_/"
+                      value={formData.instagramUrl || ''}
+                      onChange={(e) => setFormData((p) => ({ ...p, instagramUrl: e.target.value }))}
+                      className="w-full px-3.5 py-2 rounded-xl bg-neutral-950 border border-white/10 text-white text-xs focus:outline-none focus:border-[#F98A5B] font-mono"
+                    />
                   </div>
 
                   {/* LinkedIn URL */}
@@ -1163,6 +1467,7 @@ export default function AdminTeamPage() {
                     />
                   </div>
                 </div>
+              </div>
 
                 {/* Short Bio */}
                 <div className="space-y-1">
@@ -1222,110 +1527,57 @@ export default function AdminTeamPage() {
               </form>
             ) : (
               /* TAB 2: LIVE CARD PREVIEW */
-              <div className="py-6 flex flex-col items-center justify-center space-y-4">
-                <span className="text-xs font-mono text-neutral-400">
-                  Live Preview: Exactly how this member will appear on the public /team portal
-                </span>
-
-                <div className="w-full max-w-sm rounded-3xl bg-neutral-900 border border-white/20 overflow-hidden shadow-2xl flex flex-col justify-between">
-                  <div>
-                    {/* Photo / Avatar */}
-                    <div className="relative h-56 w-full bg-neutral-800 flex items-center justify-center overflow-hidden border-b border-white/5">
-                      {formData.photoUrl ? (
-                        <img
-                          src={formData.photoUrl}
-                          alt={formData.name || 'Preview'}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center space-y-2 bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-950">
-                          <div className="w-20 h-20 rounded-2xl bg-[#F98A5B]/10 border border-[#F98A5B]/30 flex items-center justify-center">
-                            <span className="text-2xl font-black text-[#F98A5B]">
-                              {formData.name ? formData.name.substring(0, 2).toUpperCase() : 'PM'}
-                            </span>
-                          </div>
-                          <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-widest">
-                            IEDC Student Lead
-                          </span>
-                        </div>
-                      )}
-
-                      <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-md border border-white/10 text-[10px] font-mono text-neutral-300">
-                        {formData.category || 'Executive Members'}
-                      </div>
-
-                      {formData.graduationDate && (
-                        <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-md border border-white/10 text-[10px] font-mono text-neutral-400 flex items-center gap-1">
-                          <GraduationCap className="w-3 h-3 text-[#F98A5B]" />
-                          <span>{formData.graduationDate}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Details */}
-                    <div className="p-5 space-y-2.5">
-                      <span className="text-[11px] font-mono font-bold text-[#F98A5B] block">
-                        {formData.role || 'Role'}
-                      </span>
-                      <h4 className="text-lg font-bold text-white">{formData.name || 'Member Name'}</h4>
-                      <p className="text-xs text-neutral-400">{formData.department || 'Department'}</p>
-
-                      {formData.bio && (
-                        <p className="text-xs text-neutral-400 line-clamp-3 leading-relaxed pt-1">
-                          {formData.bio}
-                        </p>
-                      )}
-
-                      {/* Contact items if visible */}
-                      {(formData.showEmailPublicly || formData.showContactPublicly) && (
-                        <div className="pt-2 border-t border-white/5 space-y-1 text-[11px] text-neutral-400">
-                          {formData.showEmailPublicly && formData.email && (
-                            <div className="flex items-center gap-1.5">
-                              <Mail className="w-3 h-3 text-[#F98A5B]" />
-                              <span>{formData.email}</span>
-                            </div>
-                          )}
-                          {formData.showContactPublicly && formData.contact && (
-                            <div className="flex items-center gap-1.5">
-                              <Phone className="w-3 h-3 text-emerald-400" />
-                              <span>{formData.contact}</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Card Social Footer */}
-                  <div className="p-4 pt-3 border-t border-white/5 bg-black/20 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {formData.instagramUsername ? (
-                        <span className="px-2.5 py-1 rounded-xl bg-[#E1306C]/15 border border-[#E1306C]/30 text-[#E1306C] text-xs font-mono flex items-center gap-1.5">
-                          <Instagram className="w-3.5 h-3.5" />
-                          <span>@{formData.instagramUsername}</span>
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-mono text-neutral-600">No Instagram</span>
-                      )}
-
-                      {formData.linkedinUrl && (
-                        <span className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-neutral-400">
-                          <Linkedin className="w-3.5 h-3.5" />
-                        </span>
-                      )}
-                    </div>
-
-                    <span className="text-[10px] font-mono text-neutral-500">#{formData.displayOrder || 1}</span>
-                  </div>
+              <div className="py-6 flex flex-col items-center justify-center space-y-5">
+                <div className="text-center space-y-1">
+                  <span className="text-xs font-mono font-bold text-[#F98A5B] flex items-center justify-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" /> Interactive Public Live Preview
+                  </span>
+                  <p className="text-xs text-neutral-400 max-w-md">
+                    This is the live component rendered with real-time transparent cutout layering,
+                    soft background styling, and smooth scroll animations as it appears on the public site.
+                  </p>
                 </div>
 
-                <div className="pt-4 flex justify-center">
+                <div className="w-full max-w-sm">
+                  <AnimatedProfileCard
+                    member={{
+                      id: formData.id || 'preview',
+                      name: formData.name || 'Member Full Name',
+                      role: formData.role || 'Student Lead',
+                      category: formData.category || 'Student Leads',
+                      department: formData.department || 'Engineering Department',
+                      graduationDate: formData.graduationDate,
+                      photoUrl: formData.photoUrl,
+                      instagramUsername: formData.instagramUsername,
+                      instagramUrl: formData.instagramUrl,
+                      linkedinUrl: formData.linkedinUrl,
+                      bio: formData.bio || 'Passionate student engineer driving innovation programs, technical bootcamps, and Maker Space projects.',
+                      displayOrder: formData.displayOrder || 1,
+                      email: formData.showEmailPublicly ? formData.email : undefined,
+                      contact: formData.showContactPublicly ? formData.contact : undefined,
+                      imagePosition: formData.imagePosition || 'bottom',
+                      imageScale: formData.imageScale || 1.0,
+                      animationEnabled: formData.animationEnabled !== false,
+                      animationStyle: formData.animationStyle || 'fade-up',
+                      animationDelay: formData.animationDelay || 0,
+                      glowEnabled: formData.glowEnabled !== false,
+                      glowIntensity: formData.glowIntensity || 'subtle',
+                      bgStyle: formData.bgStyle || 'radial-light',
+                      isTransparent: formData.isTransparent !== false
+                    }}
+                    index={0}
+                    containerHeight="h-72"
+                    layoutVariant="team"
+                  />
+                </div>
+
+                <div className="pt-2 flex justify-center">
                   <button
                     type="button"
                     onClick={() => setPreviewTab('form')}
-                    className="px-5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold"
+                    className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer"
                   >
-                    Back to Edit Form
+                    <span>Back to Edit Form</span>
                   </button>
                 </div>
               </div>
@@ -1364,6 +1616,15 @@ export default function AdminTeamPage() {
           </div>
         </div>
       )}
+
+      {/* Hidden file input for one-click quick upload on table/card rows */}
+      <input
+        type="file"
+        ref={quickFileInputRef}
+        onChange={handleQuickFileChange}
+        accept="image/png,image/webp,image/jpeg,image/jpg"
+        className="hidden"
+      />
     </div>
   );
 }

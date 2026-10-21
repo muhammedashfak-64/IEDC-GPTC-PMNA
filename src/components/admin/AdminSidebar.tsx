@@ -102,7 +102,7 @@ export const AdminSidebar: React.FC = () => {
         { id: 'team', name: '17. Team & Members', href: '/admin/team', icon: UserCheck },
         { id: 'faculty-coordinators', name: '18. Faculty Coordinators', href: '/admin/faculty-coordinators', icon: ShieldCheck, facultyOnly: true, badge: 'Faculty' },
         { id: 'notifications', name: '20. Notifications', href: '/admin/notifications', icon: Bell },
-        { id: 'users', name: '22. User Management', href: '/admin/users', icon: UserCog, facultyOnly: true, badge: 'Faculty' },
+        { id: 'users', name: '22. Operator & Access Management', href: '/admin/users', icon: UserCog, facultyOnly: true, badge: 'Admin' },
         { id: 'settings', name: '23. Website Settings', href: '/admin/settings', icon: Settings, facultyOnly: true, badge: 'Faculty' },
         { id: 'profile', name: '25. My Profile', href: '/admin/profile', icon: User }
       ]
@@ -166,12 +166,18 @@ export const AdminSidebar: React.FC = () => {
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span
                   className={`px-2 py-0.5 rounded-full text-[9px] font-mono font-extrabold uppercase tracking-wider ${
-                    isFaculty
+                    user.role === 'main_admin'
+                      ? 'bg-purple-500/15 text-purple-300 border border-purple-500/30'
+                      : isFaculty
                       ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
                       : 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
                   }`}
                 >
-                  {isFaculty ? 'Faculty Coordinator' : 'Student Lead'}
+                  {user.role === 'main_admin'
+                    ? 'Main Administrator'
+                    : isFaculty
+                    ? 'Faculty Coordinator'
+                    : 'Student Lead'}
                 </span>
               </div>
             </div>

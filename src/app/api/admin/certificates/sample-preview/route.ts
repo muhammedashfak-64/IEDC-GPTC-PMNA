@@ -1,0 +1,78 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { requireAdminAuth } from '@/lib/adminAuthHelper';
+import { generateSingleCertificatePdf } from '@/lib/certificateGenerator';
+import path from 'path';
+import fs from 'fs';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+export async function POST(req: NextRequest) {
+  const { user, errorResponse } = requireAdminAuth(req);
+  if (errorResponse) return errorResponse;
+
+  try {
+    const body = await req.json();
+    const {
+      eventId,
+      recipientName = 'MUHAMMED ASHFAK O',
+      programName = 'Drone Innovation Workshop & Hackathon',
+      programDate = new Date().toISOString().split('T')[0],
+      organizingBody = 'the IEDC Cell, Government Polytechnic College Perinthalmanna',
+      certificateType = 'Participation',
+      awardCategory = 'First Prize Winner',
+      customParagraph,
+      templateConfig = {},
+      certificateTemplateUrl,
+      recipientPhotoUrl
+    } = body;
+
+    let resolvedTemplatePath: string | undefined = undefined;
+    if (certificateTemplateUrl) {
+      if (fs.existsSync(certificateTemplateUrl)) {
+        resolvedTemplatePath = certificateTemplateUrl;
+      } else {
+        const localPath = path.join(process.cwd(), 'public', certificateTemplateUrl.replace(/^\//, ''));
+        if (fs.existsSync(localPath)) {
+          resolvedTemplatePath = localPath;
+        }
+      }
+    }
+
+    const previewCertId = `PREVIEW-${Date.now()}`;
+    const isWinner =
+      certificateType.toLowerCase().includes('achievement') ||
+      certificateType.toLowerCase().includes('winner');
+
+    const generated = await generateSingleCertificatePdf(
+      {
+        certificateId: previewCertId,
+        recipientName,
+        programName,
+        programDate,
+        organizingBody,
+        certificateType: isWinner ? 'Achievement' : 'Participation',
+        awardCategory: isWinner ? awardCategory : undefined,
+        customParagraph,
+        recipientPhotoUrl,
+        customTemplatePath: resolvedTemplatePath
+      },
+      templateConfig
+    );
+
+    // Save as test_generated_certificate.pdf for live preview in iframes
+    const previewDest = path.join(process.cwd(), 'public', 'templates', 'test_generated_certificate.pdf');
+    fs.writeFileSync(previewDest, generated.pdfBytes);
+
+    const timestamp = Date.now();
+    return NextResponse.json({
+      success: true,
+      message: 'Sample certificate preview generated successfully.',
+      pdfUrl: `/templates/test_generated_certificate.pdf?t=${timestamp}`,
+      downloadUrl: `/certificates/${previewCertId}.pdf`
+    });
+  } catch (err: any) {
+    console.error('Failed generating sample preview:', err);
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
+}

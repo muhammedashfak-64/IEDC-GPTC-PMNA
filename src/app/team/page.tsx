@@ -16,23 +16,9 @@ import {
   Filter
 } from 'lucide-react';
 import { InstagramIcon as Instagram, LinkedInIcon as Linkedin } from '@/components/SocialIcons';
+import AnimatedProfileCard, { ProfileCardData } from '@/components/team/AnimatedProfileCard';
 
-interface TeamMember {
-  id: string;
-  name: string;
-  role: string;
-  category: string;
-  department: string;
-  graduationDate?: string;
-  photoUrl?: string;
-  instagramUsername?: string;
-  instagramUrl?: string;
-  linkedinUrl?: string;
-  bio?: string;
-  displayOrder: number;
-  email?: string;
-  contact?: string;
-}
+export type TeamMember = ProfileCardData;
 
 export default function TeamPage() {
   const [members, setMembers] = useState<TeamMember[]>([]);
@@ -240,123 +226,14 @@ export default function TeamPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredMembers.map((member) => (
-            <div
+          {filteredMembers.map((member, idx) => (
+            <AnimatedProfileCard
               key={member.id}
-              className="group rounded-3xl bg-neutral-900/60 border border-white/10 overflow-hidden hover:border-white/25 hover:bg-neutral-900/90 transition-all duration-300 flex flex-col justify-between shadow-xl backdrop-blur-xl"
-            >
-              <div>
-                {/* Photo / Default Placeholder */}
-                <div className="relative h-56 w-full bg-gradient-to-b from-neutral-800/80 to-neutral-900 flex items-center justify-center overflow-hidden border-b border-white/5">
-                  {member.photoUrl ? (
-                    <img
-                      src={member.photoUrl}
-                      alt={member.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center space-y-2 bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-950">
-                      <div className="w-20 h-20 rounded-2xl bg-[#F98A5B]/10 border border-[#F98A5B]/30 flex items-center justify-center shadow-inner group-hover:border-[#F98A5B] transition-colors">
-                        <span className="text-2xl font-black text-[#F98A5B] tracking-wider">
-                          {getInitials(member.name)}
-                        </span>
-                      </div>
-                      <span className="text-[10px] font-mono text-neutral-500 uppercase tracking-widest">
-                        IEDC Student Lead
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Category Chip */}
-                  <div className="absolute top-3 left-3 px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-md border border-white/10 text-[10px] font-mono font-medium text-neutral-300">
-                    {member.category}
-                  </div>
-
-                  {/* Graduation Chip */}
-                  {member.graduationDate && (
-                    <div className="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/80 backdrop-blur-md border border-white/10 text-[10px] font-mono text-neutral-400 flex items-center gap-1">
-                      <GraduationCap className="w-3 h-3 text-[#F98A5B]" />
-                      <span>{formatGrad(member.graduationDate)}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Profile Information */}
-                <div className="p-5 space-y-3">
-                  <div className="space-y-1">
-                    <span className="inline-block text-[11px] font-mono font-bold text-[#F98A5B] tracking-wide">
-                      {member.role}
-                    </span>
-                    <h3 className="text-base font-bold text-white group-hover:text-[#F98A5B] transition-colors leading-snug">
-                      {member.name}
-                    </h3>
-                    <p className="text-xs text-neutral-400 font-medium">{member.department}</p>
-                  </div>
-
-                  {member.bio && (
-                    <p className="text-xs text-neutral-400 line-clamp-3 leading-relaxed">
-                      {member.bio}
-                    </p>
-                  )}
-
-                  {/* Public contact info if enabled by administrator */}
-                  {(member.email || member.contact) && (
-                    <div className="pt-2 border-t border-white/5 space-y-1 text-[11px] text-neutral-400">
-                      {member.email && (
-                        <div className="flex items-center gap-2">
-                          <Mail className="w-3 h-3 text-[#F98A5B]" />
-                          <span className="truncate">{member.email}</span>
-                        </div>
-                      )}
-                      {member.contact && (
-                        <div className="flex items-center gap-2">
-                          <Phone className="w-3 h-3 text-emerald-400" />
-                          <span>{member.contact}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Social Media Footer */}
-              <div className="p-4 pt-3 border-t border-white/5 bg-black/20 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {/* Instagram Button */}
-                  {member.instagramUrl ? (
-                    <a
-                      href={member.instagramUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      title={member.instagramUsername ? `@${member.instagramUsername} on Instagram` : 'Instagram Profile'}
-                      className="p-2 rounded-xl bg-gradient-to-tr from-[#FD1D1D]/20 via-[#E1306C]/20 to-[#833AB4]/20 hover:from-[#FD1D1D]/40 hover:to-[#833AB4]/40 border border-[#E1306C]/40 text-[#E1306C] hover:text-white transition-all flex items-center gap-1.5 text-xs font-semibold"
-                    >
-                      <Instagram className="w-3.5 h-3.5" />
-                      {member.instagramUsername && (
-                        <span className="text-[10px] font-mono">@{member.instagramUsername}</span>
-                      )}
-                    </a>
-                  ) : (
-                    <span className="text-[10px] font-mono text-neutral-600">No Instagram</span>
-                  )}
-
-                  {/* LinkedIn Button */}
-                  {member.linkedinUrl && (
-                    <a
-                      href={member.linkedinUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      title="LinkedIn Profile"
-                      className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-neutral-400 hover:text-[#0077B5] transition-colors"
-                    >
-                      <Linkedin className="w-3.5 h-3.5" />
-                    </a>
-                  )}
-                </div>
-
-                <span className="text-[10px] font-mono text-neutral-500">#{member.displayOrder}</span>
-              </div>
-            </div>
+              member={member}
+              index={idx}
+              containerHeight="h-72 sm:h-80"
+              layoutVariant="team"
+            />
           ))}
         </div>
       )}

@@ -159,10 +159,6 @@ export default function VerifyPage() {
             <span>{loading ? 'Verifying Details...' : 'Find & Retrieve My Certificate'}</span>
           </button>
         </form>
-
-        <div className="text-[11px] text-slate-400 text-center bg-white/5 p-3 rounded-2xl border border-white/10">
-          Sample Reference Participant: <span className="text-white font-bold">ADARSH P</span> · Mobile: <span className="font-mono text-[#F98A5B] font-bold">9847112233</span>
-        </div>
       </div>
 
       {/* Error Message */}

@@ -16,6 +16,26 @@ export const Navbar: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [logos, setLogos] = useState({
+    iedcGptcPmnaLogoUrl: '/iedc-gptc-pmna-logo.png',
+    collegeLogoUrl: '/college-logo.png',
+    iedcLogoUrl: '/iedc-logo.png'
+  });
+
+  React.useEffect(() => {
+    fetch('/api/public/settings')
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.success && json.data) {
+          setLogos({
+            iedcGptcPmnaLogoUrl: json.data.iedcGptcPmnaLogoUrl || '/iedc-gptc-pmna-logo.png',
+            collegeLogoUrl: json.data.collegeLogoUrl || '/college-logo.png',
+            iedcLogoUrl: json.data.iedcLogoUrl || '/iedc-logo.png'
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const navLinks = [
     { name: 'Home', href: '/' },
@@ -43,26 +63,46 @@ export const Navbar: React.FC = () => {
       <header className="sticky top-0 z-40 w-full bg-[#0F0F10]/90 border-b border-white/10 backdrop-blur-2xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
           
-          {/* Institutional Crests & Branding */}
-          <Link href="/" className="flex items-center gap-3 group shrink-0">
-            <img
-              src="/iedc-logo.png"
-              alt="IEDC Logo"
-              style={{ width: '38px', height: 'auto' }}
-              className="drop-shadow-lg"
-            />
-            <img
-              src="/college-logo.png"
-              alt="GPTC Crest"
-              style={{ width: '32px', height: 'auto' }}
-              className="drop-shadow-lg"
-            />
-            <div className="flex flex-col">
-              <span className="font-black text-xl tracking-wider text-white">IEDC</span>
-              <span className="text-[9px] text-slate-300 font-bold uppercase tracking-widest leading-none">
-                GPTC PERINTHALMANNA
-              </span>
-            </div>
+          {/* Institutional Crests & Branding - Order: 1. IEDC GPTC PMNA, 2. College Crest, 3. Official IEDC */}
+          <Link href="/" className="flex items-center gap-2.5 sm:gap-3 group shrink-0" title="IEDC GPTC PMNA">
+            {/* 1. IEDC GPTC PMNA Logo */}
+            {logos.iedcGptcPmnaLogoUrl && (
+              <img
+                src={logos.iedcGptcPmnaLogoUrl}
+                alt="IEDC GPTC PMNA"
+                className="h-9 sm:h-11 w-auto max-w-[130px] sm:max-w-[155px] object-contain drop-shadow-md transition-transform group-hover:scale-105 duration-200"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                }}
+              />
+            )}
+
+            {/* Subtle Divider */}
+            <div className="hidden sm:block h-6 w-px bg-white/15" />
+
+            {/* 2. Government Polytechnic College, Perinthalmanna Logo */}
+            {logos.collegeLogoUrl && (
+              <img
+                src={logos.collegeLogoUrl}
+                alt="Government Polytechnic College Perinthalmanna"
+                className="h-8 sm:h-9 w-auto max-w-[38px] sm:max-w-[42px] object-contain drop-shadow-md transition-transform group-hover:scale-105 duration-200"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                }}
+              />
+            )}
+
+            {/* 3. Official Kerala IEDC Logo */}
+            {logos.iedcLogoUrl && (
+              <img
+                src={logos.iedcLogoUrl}
+                alt="Kerala IEDC"
+                className="h-8 sm:h-9 w-auto max-w-[38px] sm:max-w-[42px] object-contain drop-shadow-md transition-transform group-hover:scale-105 duration-200"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                }}
+              />
+            )}
           </Link>
 
           {/* Desktop Navigation Links - ZERO Login Buttons */}
