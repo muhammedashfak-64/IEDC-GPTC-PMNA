@@ -81,7 +81,7 @@
       "instagramUsername": "_aasshfaakk_",
       "instagramUrl": "https://www.instagram.com/_aasshfaakk_/",
       "staffId": "ADMIN001",
-      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80",
+      "avatar": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/website-assets/avatars/WhatsApp_Image_2026-10-02_at_7_26_47_PM_1792565874344.jpeg",
       "permissions": [
         "all",
         "events",
@@ -98,7 +98,7 @@
       "lastLoginAt": "2026-10-20T18:25:12.234Z",
       "linkedProfileId": null,
       "linkedProfileType": null,
-      "updatedAt": "2026-10-20T19:04:37.986Z"
+      "updatedAt": "2026-10-21T06:58:23.108Z"
     },
     {
       "id": "usr-faculty-01",
@@ -506,20 +506,24 @@
       "studentCoordinator": "Rahul V",
       "createdBy": "usr-faculty-01",
       "createdAt": "2026-10-20T02:26:41.770Z",
-      "updatedAt": "2026-10-20T14:32:38.023Z",
+      "updatedAt": "2026-10-21T06:56:36.779Z",
       "templateConfig": {
         "nameY": 305,
         "nameFontSize": 34,
         "nameColor": "#8B0000",
+        "paraX": 0,
         "paraY": 252,
         "paraFontSize": 12.5,
-        "paraMaxWidth": 580,
         "paraLineSpacing": 18,
+        "paraMaxWidth": 580,
+        "paraColor": "#1b222c",
+        "paraAlign": "center",
+        "paraBold": false,
         "showCertId": true,
         "certIdY": 45
       },
-      "certificateTemplateUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/website-assets/certificate-templates/FUBU_1792467609304.jpg",
-      "certificateParagraph": "In recognition of your outstanding participation and dedication in the State-Wide\nHands-on Workshop on 3D Designing, organized by the IEDC Cell, Government\nPolytechnic College Perinthalmanna, held on 21 July 2026.\n",
+      "certificateTemplateUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/website-assets/certificate-templates/IEDC_CERTIFICATE_TEMPLATE_1792565763716.jpg",
+      "certificateParagraph": "In recognition of your outstanding participation and dedication in the State-Wide\nHands-on Workshop on drone, organized by the IEDC Cell, Government\nPolytechnic College Perinthalmanna, held on 21 July 2026.\n",
       "certificateStatus": "Published",
       "quotaConfig": {
         "participationType": "Entire College",
@@ -608,7 +612,28 @@
         },
         "waitlistEnabled": true,
         "reallocationLogs": []
-      }
+      },
+      "winnerTemplateConfig": {
+        "nameY": 305,
+        "nameFontSize": 34,
+        "nameColor": "#8B0000",
+        "paraX": 0,
+        "paraY": 252,
+        "paraFontSize": 12.5,
+        "paraLineSpacing": 18,
+        "paraMaxWidth": 580,
+        "paraColor": "#1F2937",
+        "paraAlign": "center",
+        "paraBold": false,
+        "showCertId": true,
+        "certIdY": 45,
+        "subtitleY": 398,
+        "introY": 363
+      },
+      "certificateTitle": "CERTIFICATE OF PARTICIPATION",
+      "winnerCertificateTitle": "WINNER CERTIFICATE",
+      "winnerCertificateParagraph": "",
+      "awardCategory": "First Prize Winner"
     }
   ],
   "registrations": [
@@ -1557,13 +1582,13 @@
       "email": "panshadh@gmail.com",
       "certificateType": "Participant",
       "eventDate": "2026-10-20",
-      "issueDate": "2026-10-20",
+      "issueDate": "2026-10-21",
       "qrCodeUrl": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/IEDC-2026-43968",
-      "pdfStorageUrl": "/certificates/IEDC-2026-43968.pdf",
+      "pdfStorageUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/certificates/IEDC-2026-43968.pdf",
       "status": "Published",
       "downloadsCount": 7,
-      "issuedBy": "usr-faculty-01",
-      "issuedAt": "2026-10-20T14:32:59.860Z"
+      "issuedBy": "usr-mainadmin-01",
+      "issuedAt": "2026-10-21T06:45:37.191Z"
     },
     {
       "id": "cert-1792500537399-zqxb",
@@ -1576,13 +1601,13 @@
       "email": "faheemafarhanath213@gmail.com",
       "certificateType": "Participant",
       "eventDate": "2026-10-20",
-      "issueDate": "2026-10-20",
+      "issueDate": "2026-10-21",
       "qrCodeUrl": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/IEDC-2026-43345",
       "pdfStorageUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/certificates/IEDC-2026-43345.pdf",
       "status": "Published",
       "downloadsCount": 3,
-      "issuedBy": "usr-faculty-01",
-      "issuedAt": "2026-10-20T14:32:54.719Z"
+      "issuedBy": "usr-mainadmin-01",
+      "issuedAt": "2026-10-21T06:45:32.133Z"
     },
     {
       "id": "cert-1792496374240-tksr",
@@ -1595,13 +1620,13 @@
       "email": "muhammedashfako64@gmail.com",
       "certificateType": "Participant",
       "eventDate": "2026-10-20",
-      "issueDate": "2026-10-20",
+      "issueDate": "2026-10-21",
       "qrCodeUrl": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/IEDC-2026-58845",
       "pdfStorageUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/certificates/IEDC-2026-58845.pdf",
       "status": "Published",
-      "downloadsCount": 6,
-      "issuedBy": "usr-faculty-01",
-      "issuedAt": "2026-10-20T14:33:04.534Z"
+      "downloadsCount": 7,
+      "issuedBy": "usr-mainadmin-01",
+      "issuedAt": "2026-10-21T06:45:41.205Z"
     },
     {
       "id": "cert-1792483518096-7l97",
@@ -2577,6 +2602,66 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "log-1792565903112-iscy",
+      "userId": "usr-mainadmin-01",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "USER_UPDATE",
+      "details": "Updated operator profile @iedc.admin (main_admin)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T06:58:23.112Z"
+    },
+    {
+      "id": "log-1792565879132-0vat",
+      "userId": "usr-mainadmin-01",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "USER_UPDATE",
+      "details": "Updated operator profile @iedc.admin (main_admin)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T06:57:59.132Z"
+    },
+    {
+      "id": "log-1792565796783-8ywb",
+      "userId": "usr-mainadmin-01",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: DRONE WORKSHOP",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T06:56:36.783Z"
+    },
+    {
+      "id": "log-1792565141208-zeqs",
+      "userId": "usr-mainadmin-01",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "CERTIFICATES_PROGRAM_GENERATE",
+      "details": "Generated 3 certificates for event \"DRONE WORKSHOP\" (0 failed)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T06:45:41.208Z"
+    },
+    {
+      "id": "log-1792565083542-p285",
+      "userId": "usr-mainadmin-01",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: DRONE WORKSHOP",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T06:44:43.542Z"
+    },
+    {
+      "id": "log-1792565008398-ilxt",
+      "userId": "usr-mainadmin-01",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "CERTIFICATES_PROGRAM_GENERATE",
+      "details": "Generated 0 certificates for event \"Quota Automated Test Hackathon 2026\" (0 failed)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T06:43:28.398Z"
+    },
     {
       "id": "log-1792564471640-komq",
       "userId": "usr-mainadmin-01",
