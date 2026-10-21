@@ -1002,7 +1002,9 @@
       "markedBy": "Prof. Muhammed Rashid",
       "updatedAt": "2026-10-20T14:39:24.528Z",
       "certificateId": "IEDC-2026-86111",
-      "certificateGenerated": true
+      "certificateGenerated": true,
+      "passToken": "pass_7265672d3137393235303731",
+      "qrPayload": "IEDCPASS:evt-1792507055299:REG-2026-40445:pass_7265672d3137393235303731"
     },
     {
       "id": "reg-1792498112837-6ngo",
@@ -1024,7 +1026,9 @@
       "updatedAt": "2026-10-20T12:09:01.730Z",
       "certificateId": "IEDC-2026-43345",
       "certificateGenerated": true,
-      "attendance": "Present"
+      "attendance": "Present",
+      "passToken": "pass_7265672d3137393234393831",
+      "qrPayload": "IEDCPASS:evt-1792463201770:REG-2026-71901:pass_7265672d3137393234393831"
     },
     {
       "id": "reg-1792493721769-qddf",
@@ -1048,7 +1052,9 @@
       "markedBy": "Prof. Muhammed Rashid",
       "updatedAt": "2026-10-20T11:36:51.672Z",
       "certificateId": "IEDC-2026-43968",
-      "certificateGenerated": true
+      "certificateGenerated": true,
+      "passToken": "pass_7265672d3137393234393337",
+      "qrPayload": "IEDCPASS:evt-1792463201770:REG-2026-67230:pass_7265672d3137393234393337"
     },
     {
       "id": "reg-1792463300157-a637",
@@ -1072,7 +1078,9 @@
       "markedBy": "Prof. Muhammed Rashid",
       "updatedAt": "2026-10-20T03:40:55.914Z",
       "certificateId": "IEDC-2026-58845",
-      "certificateGenerated": true
+      "certificateGenerated": true,
+      "passToken": "pass_7265672d3137393234363333",
+      "qrPayload": "IEDCPASS:evt-1792463201770:REG-2026-53677:pass_7265672d3137393234363333"
     },
     {
       "id": "reg-1792461514384-7pfb",

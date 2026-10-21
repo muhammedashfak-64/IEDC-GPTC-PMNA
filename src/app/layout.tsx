@@ -40,7 +40,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="theme-color" content="#0F0F10" />
-        <link rel="icon" href="/iedc-logo.png" type="image/png" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="IEDC GPTC PMNA" />
+        <meta name="application-name" content="IEDC GPTC PMNA" />
+        <meta name="msapplication-TileColor" content="#0F0F10" />
+        <meta name="msapplication-TileImage" content="/icon-512.png" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+        <link rel="manifest" href="/manifest.webmanifest" />
       </head>
       <body className="bg-[#0F0F10] text-[#ECECEC] min-h-screen flex flex-col antialiased selection:bg-slate-300 selection:text-black relative font-sans">
         <AppProvider>
