@@ -340,6 +340,28 @@ export default function CertificateTemplatesPage() {
               </div>
             </div>
 
+            {/* Custom Paragraph Description */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[11px] text-slate-300 font-bold block">
+                  Custom Description / Appreciation Text
+                </label>
+                <span className="text-[10px] text-emerald-400 font-mono">
+                  Exact Case Preserved
+                </span>
+              </div>
+              <textarea
+                rows={3}
+                value={customDescription}
+                onChange={(e) => setCustomDescription(e.target.value)}
+                className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl p-3 text-xs text-white"
+                placeholder={certType === 'Achievement' ? 'In recognition of your outstanding achievement and winning performance in...' : 'In recognition of your outstanding participation and dedication in...'}
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Leave empty to use official template sentence, or type custom sentence with original capitalization preserved.
+              </p>
+            </div>
+
             {/* Optional Photo Toggle */}
             <div className="pt-2 border-t border-white/10 space-y-2">
               <label className="flex items-center gap-2 cursor-pointer text-xs text-white">

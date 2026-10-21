@@ -42,7 +42,12 @@ export async function POST(req: NextRequest) {
     const previewCertId = `PREVIEW-${Date.now()}`;
     const isWinner =
       certificateType.toLowerCase().includes('achievement') ||
-      certificateType.toLowerCase().includes('winner');
+      certificateType.toLowerCase().includes('winner') ||
+      certificateType.toLowerCase().includes('prize');
+
+    const formattedSubtitle = isWinner
+      ? (body.certificateSubtitle || (body.winnerCertificateTitle ? `— ${body.winnerCertificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : (body.certificateTitle ? `— ${body.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : '— OF ACHIEVEMENT —')))
+      : (body.certificateSubtitle || (body.certificateTitle ? `— ${body.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : undefined));
 
     const generated = await generateSingleCertificatePdf(
       {
@@ -52,7 +57,9 @@ export async function POST(req: NextRequest) {
         programDate,
         organizingBody,
         certificateType: isWinner ? 'Achievement' : 'Participation',
-        awardCategory: isWinner ? awardCategory : undefined,
+        awardCategory: isWinner ? (awardCategory || 'First Prize Winner') : undefined,
+        certificateSubtitle: formattedSubtitle,
+        recipientIntro: isWinner ? (body.recipientIntro || 'THIS CERTIFICATE IS AWARDED TO') : undefined,
         customParagraph,
         recipientPhotoUrl,
         customTemplatePath: resolvedTemplatePath
@@ -60,16 +67,22 @@ export async function POST(req: NextRequest) {
       templateConfig
     );
 
-    // Save as test_generated_certificate.pdf for live preview in iframes
-    const previewDest = path.join(process.cwd(), 'public', 'templates', 'test_generated_certificate.pdf');
+    // Save as test_generated_certificate.pdf or test_winner_certificate.pdf for live preview in iframes
+    const outputName = isWinner ? 'test_winner_certificate.pdf' : 'test_generated_certificate.pdf';
+    const templatesDir = path.join(process.cwd(), 'public', 'templates');
+    if (!fs.existsSync(templatesDir)) {
+      fs.mkdirSync(templatesDir, { recursive: true });
+    }
+    const previewDest = path.join(templatesDir, outputName);
     fs.writeFileSync(previewDest, generated.pdfBytes);
 
     const timestamp = Date.now();
     return NextResponse.json({
       success: true,
-      message: 'Sample certificate preview generated successfully.',
-      pdfUrl: `/templates/test_generated_certificate.pdf?t=${timestamp}`,
-      downloadUrl: `/certificates/${previewCertId}.pdf`
+      message: `${isWinner ? 'Winner' : 'Participation'} certificate preview generated successfully.`,
+      pdfUrl: `/templates/${outputName}?t=${timestamp}`,
+      downloadUrl: `/certificates/${previewCertId}.pdf`,
+      isWinner
     });
   } catch (err: any) {
     console.error('Failed generating sample preview:', err);

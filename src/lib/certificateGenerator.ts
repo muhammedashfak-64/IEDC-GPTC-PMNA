@@ -26,11 +26,14 @@ export interface CertificateConfig {
   nameY: number; // default 305
   nameFontSize: number; // default 32
   nameColor: string | [number, number, number]; // Hex string or RGB 0-1
+  paraX?: number; // if undefined, auto-aligned within paraMaxWidth
   paraY: number; // default 252
   paraFontSize: number; // default 12
   paraLineSpacing: number; // default 17
   paraMaxWidth: number; // default 580
   paraColor: string | [number, number, number]; // Hex string or RGB 0-1
+  paraAlign?: 'center' | 'left' | 'right'; // default 'center'
+  paraBold?: boolean; // default false
   showCertId: boolean; // default true
   certIdY: number; // default 45
   // Type B Header Positions
@@ -48,11 +51,14 @@ export const DEFAULT_CERT_CONFIG: CertificateConfig = {
   nameY: 305,
   nameFontSize: 32,
   nameColor: [139 / 255, 0, 0],
+  paraX: undefined,
   paraY: 252,
   paraFontSize: 12,
   paraLineSpacing: 17,
   paraMaxWidth: 580,
   paraColor: [31 / 255, 41 / 255, 55 / 255],
+  paraAlign: 'center',
+  paraBold: false,
   showCertId: true,
   certIdY: 45,
   subtitleY: 398,
@@ -64,9 +70,25 @@ export const DEFAULT_CERT_CONFIG: CertificateConfig = {
   photoHeight: 95
 };
 
+const NAMED_COLORS: Record<string, [number, number, number]> = {
+  red: [1, 0, 0],
+  darkred: [139 / 255, 0, 0],
+  maroon: [139 / 255, 0, 0],
+  navy: [26 / 255, 36 / 255, 86 / 255],
+  blue: [0, 0, 1],
+  black: [0, 0, 0],
+  white: [1, 1, 1],
+  gray: [0.5, 0.5, 0.5],
+  darkgray: [0.2, 0.2, 0.2],
+  green: [0, 0.5, 0],
+  gold: [218 / 255, 165 / 255, 32 / 255],
+  charcoal: [31 / 255, 41 / 255, 55 / 255]
+};
+
 /**
- * Safely parse any color representation (hex string #RRGGBB, #RGB, rgb(...) string, or array of numbers)
+ * Safely parse any color representation (hex string #RRGGBB, #RGB, named color, rgb(...) string, object, or array of numbers)
  * into a valid pdf-lib RGB tuple: [r, g, b] where each channel is a float between 0.0 and 1.0.
+ * Prevents errors like "'red' must be of type 'number', but was actually of type 'string'".
  */
 export function normalizeColorToRgb(
   color: any,
@@ -74,7 +96,26 @@ export function normalizeColorToRgb(
 ): [number, number, number] {
   if (!color) return fallback;
 
-  // Case 1: Array of numbers
+  // Case 1: Object with red/green/blue or r/g/b keys
+  if (typeof color === 'object' && !Array.isArray(color)) {
+    const rawR = color.red !== undefined ? color.red : color.r;
+    const rawG = color.green !== undefined ? color.green : color.g;
+    const rawB = color.blue !== undefined ? color.blue : color.b;
+
+    if (rawR !== undefined && rawG !== undefined && rawB !== undefined) {
+      const numR = parseFloat(String(rawR));
+      const numG = parseFloat(String(rawG));
+      const numB = parseFloat(String(rawB));
+      if (!isNaN(numR) && !isNaN(numG) && !isNaN(numB)) {
+        const r = numR > 1.0 ? Math.min(1, Math.max(0, numR / 255)) : Math.min(1, Math.max(0, numR));
+        const g = numG > 1.0 ? Math.min(1, Math.max(0, numG / 255)) : Math.min(1, Math.max(0, numG));
+        const b = numB > 1.0 ? Math.min(1, Math.max(0, numB / 255)) : Math.min(1, Math.max(0, numB));
+        return [r, g, b];
+      }
+    }
+  }
+
+  // Case 2: Array of numbers
   if (Array.isArray(color) && color.length >= 3) {
     const isAlready01 = color.slice(0, 3).every(
       (c) => typeof c === 'number' && !isNaN(c) && c >= 0 && c <= 1.0
@@ -90,9 +131,15 @@ export function normalizeColorToRgb(
     }
   }
 
-  // Case 2: String
+  // Case 3: String
   if (typeof color === 'string') {
-    const str = color.trim();
+    const str = color.trim().toLowerCase();
+
+    // Named color lookup
+    if (NAMED_COLORS[str]) {
+      return NAMED_COLORS[str];
+    }
+
     // Hex string
     const hex = str.replace(/^#/, '');
     if (hex.length === 6) {
@@ -136,25 +183,36 @@ export function normalizeNumber(
 }
 
 /**
- * Word wrap helper for PDF canvas text
+ * Word wrap helper for PDF canvas text that respects explicit newlines
+ * while soft-wrapping lines exceeding maxWidth.
  */
 function wrapText(text: string, maxWidth: number, font: any, fontSize: number): string[] {
-  const words = text.split(/\s+/);
-  const lines: string[] = [];
-  let currentLine = '';
+  if (!text) return [];
+  const paragraphs = text.split(/\r?\n/);
+  const resultLines: string[] = [];
 
-  for (const word of words) {
-    const testLine = currentLine ? `${currentLine} ${word}` : word;
-    const testWidth = font.widthOfTextAtSize(testLine, fontSize);
-    if (testWidth <= maxWidth) {
-      currentLine = testLine;
-    } else {
-      if (currentLine) lines.push(currentLine);
-      currentLine = word;
+  for (const paragraph of paragraphs) {
+    if (!paragraph.trim()) {
+      resultLines.push('');
+      continue;
     }
+    const words = paragraph.split(/\s+/).filter(Boolean);
+    let currentLine = '';
+
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      const testWidth = font.widthOfTextAtSize(testLine, fontSize);
+      if (testWidth <= maxWidth) {
+        currentLine = testLine;
+      } else {
+        if (currentLine) resultLines.push(currentLine);
+        currentLine = word;
+      }
+    }
+    if (currentLine) resultLines.push(currentLine);
   }
-  if (currentLine) lines.push(currentLine);
-  return lines;
+
+  return resultLines;
 }
 
 /**
@@ -173,15 +231,18 @@ export async function generateSingleCertificatePdf(
     : [31 / 255, 41 / 255, 55 / 255];
 
   const cfg = {
-    nameX: config.nameX !== undefined && config.nameX !== null ? normalizeNumber(config.nameX, 0) : undefined,
+    nameX: config.nameX !== undefined && config.nameX !== null && !isNaN(Number(config.nameX)) && Number(config.nameX) !== 0 ? normalizeNumber(config.nameX, 0) : undefined,
     nameY: normalizeNumber(config.nameY, DEFAULT_CERT_CONFIG.nameY),
     nameFontSize: normalizeNumber(config.nameFontSize, DEFAULT_CERT_CONFIG.nameFontSize, 10, 60),
     nameColor: normalizeColorToRgb(config.nameColor, defaultNameColor as [number, number, number]),
+    paraX: config.paraX !== undefined && config.paraX !== null && !isNaN(Number(config.paraX)) && Number(config.paraX) !== 0 ? normalizeNumber(config.paraX, 0) : undefined,
     paraY: normalizeNumber(config.paraY, DEFAULT_CERT_CONFIG.paraY),
     paraFontSize: normalizeNumber(config.paraFontSize, DEFAULT_CERT_CONFIG.paraFontSize, 8, 30),
-    paraLineSpacing: normalizeNumber(config.paraLineSpacing, DEFAULT_CERT_CONFIG.paraLineSpacing, 10, 40),
+    paraLineSpacing: normalizeNumber(config.paraLineSpacing, DEFAULT_CERT_CONFIG.paraLineSpacing, 10, 50),
     paraMaxWidth: normalizeNumber(config.paraMaxWidth, DEFAULT_CERT_CONFIG.paraMaxWidth, 200, 800),
     paraColor: normalizeColorToRgb(config.paraColor, defaultParaColor as [number, number, number]),
+    paraAlign: (config.paraAlign === 'left' || config.paraAlign === 'right' ? config.paraAlign : 'center') as 'center' | 'left' | 'right',
+    paraBold: Boolean(config.paraBold),
     showCertId: config.showCertId !== undefined ? Boolean(config.showCertId) : DEFAULT_CERT_CONFIG.showCertId,
     certIdY: normalizeNumber(config.certIdY, DEFAULT_CERT_CONFIG.certIdY),
     subtitleY: normalizeNumber(config.subtitleY, DEFAULT_CERT_CONFIG.subtitleY || 398),
@@ -335,25 +396,40 @@ export async function generateSingleCertificatePdf(
 
   if (!paraText) {
     if (isTypeB) {
-      const category = params.awardCategory || params.role || 'WINNER';
-      paraText = `IN RECOGNITION OF YOUR OUTSTANDING ACHIEVEMENT AS ${category.toUpperCase()} in the ${params.programName}, organized by ${orgBody}, held on ${params.programDate}.`;
+      const category = params.awardCategory || params.role || 'Winner';
+      paraText = `In recognition of your outstanding achievement as ${category} in the ${params.programName}, organized by ${orgBody}, held on ${params.programDate}.`;
     } else {
       const roleText = params.role && params.role !== 'Participant' ? ` as ${params.role}` : '';
       paraText = `In recognition of your outstanding participation and dedication${roleText} in the ${params.programName}, organized by ${orgBody}, held on ${params.programDate}.`;
     }
   }
 
-  // 5. Word-wrap and draw paragraph lines centered
-  const paraLines = wrapText(paraText, cfg.paraMaxWidth, fontRegular, cfg.paraFontSize);
+  // 5. Word-wrap and draw paragraph lines with alignment and font styling
+  const fontForPara = cfg.paraBold ? fontBold : fontRegular;
+  const paraLines = wrapText(paraText, cfg.paraMaxWidth, fontForPara, cfg.paraFontSize);
   let currentY = cfg.paraY;
   for (const line of paraLines) {
-    const lineWidth = fontRegular.widthOfTextAtSize(line, cfg.paraFontSize);
-    const lineX = (width - lineWidth) / 2;
+    if (!line) {
+      currentY -= cfg.paraLineSpacing;
+      continue;
+    }
+    const lineWidth = fontForPara.widthOfTextAtSize(line, cfg.paraFontSize);
+    let lineX: number;
+    if (cfg.paraAlign === 'left') {
+      lineX = cfg.paraX !== undefined && cfg.paraX > 0 ? cfg.paraX : (width - cfg.paraMaxWidth) / 2;
+    } else if (cfg.paraAlign === 'right') {
+      const rightEdge = cfg.paraX !== undefined && cfg.paraX > 0 ? cfg.paraX : (width + cfg.paraMaxWidth) / 2;
+      lineX = rightEdge - lineWidth;
+    } else {
+      // centered
+      lineX = cfg.paraX !== undefined && cfg.paraX > 0 ? cfg.paraX - lineWidth / 2 : (width - lineWidth) / 2;
+    }
+
     page.drawText(line, {
       x: lineX,
       y: currentY,
       size: cfg.paraFontSize,
-      font: fontRegular,
+      font: fontForPara,
       color: rgb(cfg.paraColor[0], cfg.paraColor[1], cfg.paraColor[2])
     });
     currentY -= cfg.paraLineSpacing;

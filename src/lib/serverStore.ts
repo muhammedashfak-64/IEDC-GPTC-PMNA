@@ -1007,20 +1007,53 @@ export async function ensureCertificatePdfExists(cert: any): Promise<string> {
       return `/certificates/${pdfFileName}`;
     }
 
+    const db = loadDb();
+    const event = (db.events || []).find((e: any) => e.id === cert.eventId);
+
     const isWinner =
       cert.certificateType?.toLowerCase().includes('winner') ||
       cert.certificateType?.toLowerCase().includes('achievement') ||
-      cert.certificateType?.toLowerCase().includes('prize');
+      cert.certificateType?.toLowerCase().includes('prize') ||
+      event?.certificateType === 'Achievement';
+
+    const customParagraph = isWinner
+      ? (event?.winnerCertificateParagraph || undefined)
+      : (event?.certificateParagraph || undefined);
+
+    const targetConfig = isWinner
+      ? (event?.winnerTemplateConfig || event?.templateConfig || {})
+      : (event?.templateConfig || {});
+
+    const formattedSubtitle = isWinner
+      ? (event?.winnerCertificateTitle ? `— ${event.winnerCertificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : '— OF ACHIEVEMENT —')
+      : (event?.certificateTitle ? `— ${event.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : undefined);
+
+    let resolvedTemplatePath: string | undefined = undefined;
+    if (event?.certificateTemplateUrl) {
+      if (fs.existsSync(event.certificateTemplateUrl)) {
+        resolvedTemplatePath = event.certificateTemplateUrl;
+      } else {
+        const localPath = path.join(process.cwd(), 'public', event.certificateTemplateUrl.replace(/^\//, ''));
+        if (fs.existsSync(localPath)) {
+          resolvedTemplatePath = localPath;
+        }
+      }
+    }
 
     const result = await generateSingleCertificatePdf({
       certificateId: certId,
       recipientName: cert.participantName,
       programName: cert.eventName,
       programDate: cert.eventDate || cert.issueDate || new Date().toISOString().split('T')[0],
+      organizingBody: event?.organizingBody || undefined,
       role: cert.certificateType,
       certificateType: isWinner ? 'Achievement' : 'Participation',
-      awardCategory: isWinner ? (cert.awardCategory || 'Winner') : undefined
-    });
+      awardCategory: isWinner ? (cert.awardCategory || event?.awardCategory || 'Winner') : undefined,
+      certificateSubtitle: formattedSubtitle,
+      recipientIntro: isWinner ? 'THIS CERTIFICATE IS AWARDED TO' : undefined,
+      customParagraph,
+      customTemplatePath: resolvedTemplatePath
+    }, targetConfig);
 
     return result.publicUrl || `/certificates/${pdfFileName}`;
   } catch (err: any) {
@@ -1373,7 +1406,24 @@ export async function generateProgramCertificates(
     }
 
     try {
-      const isWinner = recipient.role?.toLowerCase().includes('winner') || event.certificateType === 'Achievement';
+      const isWinner =
+        recipient.role?.toLowerCase().includes('winner') ||
+        recipient.role?.toLowerCase().includes('prize') ||
+        recipient.role?.toLowerCase().includes('award') ||
+        event.certificateType === 'Achievement';
+
+      const customParagraph = isWinner
+        ? (event.winnerCertificateParagraph || undefined)
+        : (event.certificateParagraph || undefined);
+
+      const targetConfig = isWinner
+        ? (event.winnerTemplateConfig || event.templateConfig || undefined)
+        : (event.templateConfig || undefined);
+
+      const formattedSubtitle = isWinner
+        ? (event.winnerCertificateTitle ? `— ${event.winnerCertificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : '— OF ACHIEVEMENT —')
+        : (event.certificateTitle ? `— ${event.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : undefined);
+
       const generated = await generateSingleCertificatePdf(
         {
           certificateId: certId,
@@ -1384,10 +1434,12 @@ export async function generateProgramCertificates(
           customParagraph,
           role: recipient.role,
           certificateType: isWinner ? 'Achievement' : 'Participation',
-          awardCategory: event.awardCategory || (isWinner ? 'Winner' : undefined),
+          awardCategory: isWinner ? (event.awardCategory || recipient.role || 'Winner') : undefined,
+          certificateSubtitle: formattedSubtitle,
+          recipientIntro: isWinner ? 'THIS CERTIFICATE IS AWARDED TO' : undefined,
           customTemplatePath: resolvedTemplatePath
         },
-        templateConfig
+        targetConfig
       );
 
       const initialStatus =
@@ -1442,7 +1494,7 @@ export async function generateProgramCertificates(
       phone: (reg.phone || '').trim().replace(/\D/g, ''),
       email: reg.email || '',
       registerNumber: reg.registerNumber || reg.id,
-      role: 'Participant',
+      role: reg.role || reg.position || reg.award || 'Participant',
       sourceType: 'participant',
       sourceId: reg.id
     });

@@ -29,7 +29,12 @@ import {
   AlertTriangle,
   Sparkles,
   ExternalLink,
-  Layers
+  Layers,
+  Trophy,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Bold
 } from 'lucide-react';
 import FileUpload from '@/components/admin/FileUpload';
 import ProgramQuotaManager from '@/components/admin/ProgramQuotaManager';
@@ -88,19 +93,46 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
   const [previewCert, setPreviewCert] = useState<any>(null);
   const [downloadingZip, setDownloadingZip] = useState(false);
   const [liveSamplePdf, setLiveSamplePdf] = useState('/templates/test_generated_certificate.pdf');
+  const [participationSamplePdf, setParticipationSamplePdf] = useState('/templates/test_generated_certificate.pdf');
+  const [winnerSamplePdf, setWinnerSamplePdf] = useState('/templates/test_winner_certificate.pdf');
+  const [previewTarget, setPreviewTarget] = useState<'participation' | 'winner'>('participation');
   const [sampleGenerating, setSampleGenerating] = useState(false);
+  const [certTemplateTab, setCertTemplateTab] = useState<'participation' | 'winner'>('participation');
 
-  // Template Config State
+  // Participation Template Config State
   const [templateConfig, setTemplateConfig] = useState({
     nameY: 305,
     nameFontSize: 34,
     nameColor: '#8B0000',
+    paraX: 0,
     paraY: 252,
     paraFontSize: 12.5,
     paraMaxWidth: 580,
     paraLineSpacing: 18,
+    paraColor: '#1F2937',
+    paraAlign: 'center',
+    paraBold: false,
     showCertId: true,
     certIdY: 45
+  });
+
+  // Winner Template Config State
+  const [winnerTemplateConfig, setWinnerTemplateConfig] = useState({
+    nameY: 305,
+    nameFontSize: 34,
+    nameColor: '#8B0000',
+    paraX: 0,
+    paraY: 252,
+    paraFontSize: 12.5,
+    paraMaxWidth: 580,
+    paraLineSpacing: 18,
+    paraColor: '#1F2937',
+    paraAlign: 'center',
+    paraBold: false,
+    showCertId: true,
+    certIdY: 45,
+    subtitleY: 398,
+    introY: 363
   });
 
   // Load all program data
@@ -120,6 +152,9 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
           setProgram(found);
           if (found.templateConfig) {
             setTemplateConfig((prev) => ({ ...prev, ...found.templateConfig }));
+          }
+          if (found.winnerTemplateConfig) {
+            setWinnerTemplateConfig((prev) => ({ ...prev, ...found.winnerTemplateConfig }));
           }
         }
       }
@@ -359,10 +394,14 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
   };
 
   // Generate Sample Preview using a real participant from attendance
-  const handleGenerateSample = async () => {
+  const handleGenerateSample = async (type: 'participation' | 'winner' = certTemplateTab) => {
     try {
       setSampleGenerating(true);
+      const isWinner = type === 'winner';
       const sampleParticipant = registrations.find((r) => r.attendance === 'Present')?.studentName || registrations[0]?.studentName || 'MUHAMMED ASHFAK O';
+      const configToUse = isWinner ? winnerTemplateConfig : templateConfig;
+      const customPara = isWinner ? program?.winnerCertificateParagraph : program?.certificateParagraph;
+
       const res = await fetch('/api/admin/certificates/sample-preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -371,15 +410,27 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
           recipientName: sampleParticipant,
           programName: program?.title || 'Innovation Workshop',
           programDate: program?.date || new Date().toISOString().split('T')[0],
-          customParagraph: program?.certificateParagraph || undefined,
+          certificateType: isWinner ? 'Achievement' : 'Participation',
+          certificateTitle: isWinner
+            ? (program?.winnerCertificateTitle || 'WINNER CERTIFICATE')
+            : (program?.certificateTitle || 'CERTIFICATE OF PARTICIPATION'),
+          awardCategory: program?.awardCategory || 'First Prize Winner',
+          customParagraph: customPara || undefined,
           certificateTemplateUrl: program?.certificateTemplateUrl || undefined,
-          templateConfig
+          templateConfig: configToUse
         })
       });
       const json = await res.json();
       if (res.ok && json.success) {
+        if (isWinner) {
+          setWinnerSamplePdf(json.pdfUrl);
+          setPreviewTarget('winner');
+        } else {
+          setParticipationSamplePdf(json.pdfUrl);
+          setPreviewTarget('participation');
+        }
         setLiveSamplePdf(json.pdfUrl);
-        addToast(`Sample preview generated for ${sampleParticipant}`, 'success');
+        addToast(`${isWinner ? 'Winner' : 'Participation'} sample preview generated for ${sampleParticipant}`, 'success');
       } else {
         throw new Error(json.error || 'Failed generating sample preview');
       }
@@ -387,6 +438,72 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
       addToast(e.message, 'error');
     } finally {
       setSampleGenerating(false);
+    }
+  };
+
+  // Save template settings (both Participation & Winner configurations)
+  const handleSaveConfiguration = async () => {
+    try {
+      const cleanTemplateConfig = {
+        nameY: Number(templateConfig.nameY) || 305,
+        nameFontSize: Number(templateConfig.nameFontSize) || 34,
+        nameColor: templateConfig.nameColor || '#8B0000',
+        paraX: Number(templateConfig.paraX) || 0,
+        paraY: Number(templateConfig.paraY) || 252,
+        paraFontSize: Number(templateConfig.paraFontSize) || 12.5,
+        paraLineSpacing: Number(templateConfig.paraLineSpacing) || 18,
+        paraMaxWidth: Number(templateConfig.paraMaxWidth) || 580,
+        paraColor: templateConfig.paraColor || '#1F2937',
+        paraAlign: templateConfig.paraAlign || 'center',
+        paraBold: Boolean(templateConfig.paraBold),
+        showCertId: Boolean(templateConfig.showCertId),
+        certIdY: Number(templateConfig.certIdY) || 45
+      };
+
+      const cleanWinnerConfig = {
+        nameY: Number(winnerTemplateConfig.nameY) || 305,
+        nameFontSize: Number(winnerTemplateConfig.nameFontSize) || 34,
+        nameColor: winnerTemplateConfig.nameColor || '#8B0000',
+        paraX: Number(winnerTemplateConfig.paraX) || 0,
+        paraY: Number(winnerTemplateConfig.paraY) || 252,
+        paraFontSize: Number(winnerTemplateConfig.paraFontSize) || 12.5,
+        paraLineSpacing: Number(winnerTemplateConfig.paraLineSpacing) || 18,
+        paraMaxWidth: Number(winnerTemplateConfig.paraMaxWidth) || 580,
+        paraColor: winnerTemplateConfig.paraColor || '#1F2937',
+        paraAlign: winnerTemplateConfig.paraAlign || 'center',
+        paraBold: Boolean(winnerTemplateConfig.paraBold),
+        showCertId: Boolean(winnerTemplateConfig.showCertId),
+        certIdY: Number(winnerTemplateConfig.certIdY) || 45,
+        subtitleY: Number(winnerTemplateConfig.subtitleY) || 398,
+        introY: Number(winnerTemplateConfig.introY) || 363
+      };
+
+      const res = await fetch('/api/admin/events', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id,
+          templateConfig: cleanTemplateConfig,
+          winnerTemplateConfig: cleanWinnerConfig,
+          certificateTitle: program.certificateTitle || 'CERTIFICATE OF PARTICIPATION',
+          certificateParagraph: program.certificateParagraph || '',
+          winnerCertificateTitle: program.winnerCertificateTitle || 'WINNER CERTIFICATE',
+          winnerCertificateParagraph: program.winnerCertificateParagraph || '',
+          awardCategory: program.awardCategory || 'First Prize Winner',
+          certificateTemplateUrl: program.certificateTemplateUrl || ''
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        addToast('Template configuration saved successfully', 'success');
+        if (json.data) {
+          setProgram((prev: any) => ({ ...prev, ...json.data }));
+        }
+      } else {
+        throw new Error(json.error || 'Failed saving configuration');
+      }
+    } catch (e: any) {
+      addToast(e.message, 'error');
     }
   };
 
@@ -1027,28 +1144,35 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
       )}
 
       {/* ======================================================== */}
-      {/* TAB 4: CERTIFICATE TEMPLATE & VISUAL DESIGNER            */}
+      {/* TAB 4: CERTIFICATE TEMPLATES & VISUAL DESIGNER           */}
       {/* ======================================================== */}
       {activeTab === 'template' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Controls Panel */}
           <div className="lg:col-span-5 space-y-4">
             <div className="glass-iedc p-5 rounded-2xl border border-white/10 space-y-4">
-              <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Sliders className="w-4 h-4 text-[#F98A5B]" /> Template Visual Configuration
-              </h3>
-
-              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300">
-                <span className="font-bold text-white">Master Template: </span>
-                Official ADARSH P reference certificate design with vector artwork, border mosaic cubes, signatures, and logos.
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                  <Sliders className="w-4 h-4 text-[#F98A5B]" /> Certificate Designer & Presets
+                </h3>
+                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-400">
+                  Vector Engine
+                </span>
               </div>
 
+              {/* Master Template Notice */}
+              <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300">
+                <span className="font-bold text-white">Master Template: </span>
+                Official vector artwork with mosaic border cubes, institutional logos, and authentic signatures preserved.
+              </div>
+
+              {/* Custom Master Template Upload */}
               <div>
                 <label className="text-xs font-bold text-slate-300 uppercase block mb-1">
-                  Upload Custom Reference Template (Optional)
+                  Upload Custom Master File (Optional)
                 </label>
                 <FileUpload
-                  label="Certificate Template File"
+                  label="Certificate Master File"
                   value={program?.certificateTemplateUrl || ''}
                   onChange={(url) => setProgram((p: any) => ({ ...p, certificateTemplateUrl: url }))}
                   folder="certificate-templates"
@@ -1056,92 +1180,437 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                 />
               </div>
 
-              <div className="space-y-3 pt-2 border-t border-white/10">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] text-slate-400 block mb-1">Name Y Position (pt)</label>
-                    <input
-                      type="number"
-                      value={templateConfig.nameY}
-                      onChange={(e) => setTemplateConfig({ ...templateConfig, nameY: Number(e.target.value) })}
-                      className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-slate-400 block mb-1">Name Font Size (pt)</label>
-                    <input
-                      type="number"
-                      value={templateConfig.nameFontSize}
-                      onChange={(e) => setTemplateConfig({ ...templateConfig, nameFontSize: Number(e.target.value) })}
-                      className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
-                    />
-                  </div>
+              {/* Sub-Tabs: Participation vs Winner Configuration */}
+              <div className="pt-2 border-t border-white/10 space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCertTemplateTab('participation');
+                      setPreviewTarget('participation');
+                      setLiveSamplePdf(participationSamplePdf);
+                    }}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      certTemplateTab === 'participation'
+                        ? 'bg-[#F98A5B]/20 border-[#F98A5B] text-white shadow-md shadow-[#F98A5B]/10'
+                        : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Award className="w-3.5 h-3.5 text-[#F98A5B]" />
+                    <span>Participation Cert</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCertTemplateTab('winner');
+                      setPreviewTarget('winner');
+                      setLiveSamplePdf(winnerSamplePdf);
+                    }}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                      certTemplateTab === 'winner'
+                        ? 'bg-amber-500/20 border-amber-500 text-white shadow-md shadow-amber-500/10'
+                        : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Winner Cert</span>
+                  </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] text-slate-400 block mb-1">Paragraph Y Position (pt)</label>
-                    <input
-                      type="number"
-                      value={templateConfig.paraY}
-                      onChange={(e) => setTemplateConfig({ ...templateConfig, paraY: Number(e.target.value) })}
-                      className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-slate-400 block mb-1">Paragraph Font Size (pt)</label>
-                    <input
-                      type="number"
-                      value={templateConfig.paraFontSize}
-                      onChange={(e) => setTemplateConfig({ ...templateConfig, paraFontSize: Number(e.target.value) })}
-                      className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
-                    />
-                  </div>
-                </div>
+                {/* ======================================================== */}
+                {/* SUB-TAB A: PARTICIPATION CONFIGURATION                   */}
+                {/* ======================================================== */}
+                {certTemplateTab === 'participation' && (
+                  <div className="space-y-3 pt-2">
+                    {/* Certificate Title */}
+                    <div>
+                      <label className="text-[11px] text-slate-400 block mb-1">
+                        Certificate Title / Heading
+                      </label>
+                      <input
+                        type="text"
+                        value={program?.certificateTitle || 'CERTIFICATE OF PARTICIPATION'}
+                        onChange={(e) => setProgram({ ...program, certificateTitle: e.target.value })}
+                        className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                        placeholder="CERTIFICATE OF PARTICIPATION"
+                      />
+                    </div>
 
-                <div>
-                  <label className="text-[11px] text-slate-400 block mb-1">Certificate Paragraph Template</label>
-                  <textarea
-                    rows={3}
-                    value={program?.certificateParagraph || ''}
-                    onChange={(e) => setProgram({ ...program, certificateParagraph: e.target.value })}
-                    className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl p-3 text-xs text-white"
-                    placeholder="In recognition of your outstanding participation and dedication in..."
-                  />
-                </div>
+                    {/* Participation Paragraph */}
+                    <div>
+                      <label className="text-[11px] text-slate-400 block mb-1">
+                        Participation Description / Paragraph
+                      </label>
+                      <textarea
+                        rows={3}
+                        value={program?.certificateParagraph || ''}
+                        onChange={(e) => setProgram({ ...program, certificateParagraph: e.target.value })}
+                        className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl p-3 text-xs text-white"
+                        placeholder="In recognition of your outstanding participation and dedication in..."
+                      />
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Preserves original capitalization as entered.
+                      </p>
+                    </div>
+
+                    {/* Typography & Coordinate Controls */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] text-slate-400 block mb-1">Name Y Position (pt)</label>
+                        <input
+                          type="number"
+                          value={templateConfig.nameY}
+                          onChange={(e) => setTemplateConfig({ ...templateConfig, nameY: Number(e.target.value) || 0 })}
+                          className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-400 block mb-1">Name Font Size (pt)</label>
+                        <input
+                          type="number"
+                          value={templateConfig.nameFontSize}
+                          onChange={(e) => setTemplateConfig({ ...templateConfig, nameFontSize: Number(e.target.value) || 0 })}
+                          className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] text-slate-400 block mb-1">Paragraph Y Position (pt)</label>
+                        <input
+                          type="number"
+                          value={templateConfig.paraY}
+                          onChange={(e) => setTemplateConfig({ ...templateConfig, paraY: Number(e.target.value) || 0 })}
+                          className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-400 block mb-1">Paragraph Font Size (pt)</label>
+                        <input
+                          type="number"
+                          value={templateConfig.paraFontSize}
+                          onChange={(e) => setTemplateConfig({ ...templateConfig, paraFontSize: Number(e.target.value) || 0 })}
+                          className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] text-slate-400 block mb-1">Line Spacing (pt)</label>
+                        <input
+                          type="number"
+                          value={templateConfig.paraLineSpacing}
+                          onChange={(e) => setTemplateConfig({ ...templateConfig, paraLineSpacing: Number(e.target.value) || 0 })}
+                          className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-400 block mb-1">Max Paragraph Width (pt)</label>
+                        <input
+                          type="number"
+                          value={templateConfig.paraMaxWidth}
+                          onChange={(e) => setTemplateConfig({ ...templateConfig, paraMaxWidth: Number(e.target.value) || 0 })}
+                          className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] text-slate-400 block mb-1">Text Alignment</label>
+                        <select
+                          value={templateConfig.paraAlign || 'center'}
+                          onChange={(e: any) => setTemplateConfig({ ...templateConfig, paraAlign: e.target.value })}
+                          className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
+                        >
+                          <option value="center">Centered</option>
+                          <option value="left">Left Aligned</option>
+                          <option value="right">Right Aligned</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-400 block mb-1">Paragraph Font Color</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={typeof templateConfig.paraColor === 'string' ? templateConfig.paraColor : '#1F2937'}
+                            onChange={(e) => setTemplateConfig({ ...templateConfig, paraColor: e.target.value })}
+                            className="w-7 h-7 rounded border border-white/10 bg-transparent cursor-pointer p-0"
+                          />
+                          <input
+                            type="text"
+                            value={typeof templateConfig.paraColor === 'string' ? templateConfig.paraColor : '#1F2937'}
+                            onChange={(e) => setTemplateConfig({ ...templateConfig, paraColor: e.target.value })}
+                            className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-2 py-1 text-xs text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(templateConfig.paraBold)}
+                          onChange={(e) => setTemplateConfig({ ...templateConfig, paraBold: e.target.checked })}
+                          className="rounded border-white/20 text-[#F98A5B] focus:ring-0"
+                        />
+                        <span>Bold Paragraph Text</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(templateConfig.showCertId)}
+                          onChange={(e) => setTemplateConfig({ ...templateConfig, showCertId: e.target.checked })}
+                          className="rounded border-white/20 text-[#F98A5B] focus:ring-0"
+                        />
+                        <span>Show Certificate ID</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* ======================================================== */}
+                {/* SUB-TAB B: WINNER CONFIGURATION                          */}
+                {/* ======================================================== */}
+                {certTemplateTab === 'winner' && (
+                  <div className="space-y-3 pt-2">
+                    {/* Certificate Title */}
+                    <div>
+                      <label className="text-[11px] text-amber-300 font-bold block mb-1">
+                        Winner Certificate Title / Heading
+                      </label>
+                      <input
+                        type="text"
+                        value={program?.winnerCertificateTitle || 'WINNER CERTIFICATE'}
+                        onChange={(e) => setProgram({ ...program, winnerCertificateTitle: e.target.value })}
+                        className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                        placeholder="WINNER CERTIFICATE or CERTIFICATE OF ACHIEVEMENT"
+                      />
+                    </div>
+
+                    {/* Award Position / Category */}
+                    <div>
+                      <label className="text-[11px] text-amber-300 font-bold block mb-1">
+                        Winner Position / Award Category
+                      </label>
+                      <input
+                        type="text"
+                        value={program?.awardCategory || 'First Prize Winner'}
+                        onChange={(e) => setProgram({ ...program, awardCategory: e.target.value })}
+                        className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                        placeholder="e.g. First Prize Winner, Second Prize, Best Innovation"
+                      />
+                    </div>
+
+                    {/* Winner Description / Paragraph */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] text-amber-300 font-bold block">
+                          Winner Description / Paragraph
+                        </label>
+                        <span className="text-[10px] text-emerald-400 font-mono font-bold">
+                          ✓ Exact Case Preserved
+                        </span>
+                      </div>
+                      <textarea
+                        rows={3}
+                        value={program?.winnerCertificateParagraph || ''}
+                        onChange={(e) => setProgram({ ...program, winnerCertificateParagraph: e.target.value })}
+                        className="w-full bg-[#0B0B0D] border border-white/15 focus:border-amber-400 rounded-xl p-3 text-xs text-white"
+                        placeholder="In recognition of your outstanding achievement and winning performance in the Drone Workshop, organized by the IEDC Cell, Government Polytechnic College Perinthalmanna."
+                      />
+
+                      {/* Warning if empty */}
+                      {!program?.winnerCertificateParagraph?.trim() && (
+                        <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-start gap-2 mt-2">
+                          <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                          <div>
+                            <div className="font-bold">Winner description is empty</div>
+                            <div className="text-[11px] text-amber-200/80">
+                              Enter the complete winner appreciation sentence manually. It will NOT fall back to or copy the participant description.
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      <p className="text-[10px] text-slate-500 mt-1">
+                        Stored and retrieved independently. Never appends or reuses the participant paragraph.
+                      </p>
+                    </div>
+
+                    {/* Typography & Coordinate Controls for Winner */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] text-slate-400 block mb-1">Name Y Position (pt)</label>
+                        <input
+                          type="number"
+                          value={winnerTemplateConfig.nameY}
+                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, nameY: Number(e.target.value) || 0 })}
+                          className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-400 block mb-1">Name Font Size (pt)</label>
+                        <input
+                          type="number"
+                          value={winnerTemplateConfig.nameFontSize}
+                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, nameFontSize: Number(e.target.value) || 0 })}
+                          className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] text-slate-400 block mb-1">Description Y Position (pt)</label>
+                        <input
+                          type="number"
+                          value={winnerTemplateConfig.paraY}
+                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, paraY: Number(e.target.value) || 0 })}
+                          className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-400 block mb-1">Description Font Size (pt)</label>
+                        <input
+                          type="number"
+                          value={winnerTemplateConfig.paraFontSize}
+                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, paraFontSize: Number(e.target.value) || 0 })}
+                          className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] text-slate-400 block mb-1">Description X Position (pt, 0=auto)</label>
+                        <input
+                          type="number"
+                          value={winnerTemplateConfig.paraX || 0}
+                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, paraX: Number(e.target.value) || 0 })}
+                          className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-400 block mb-1">Line Spacing (pt)</label>
+                        <input
+                          type="number"
+                          value={winnerTemplateConfig.paraLineSpacing}
+                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, paraLineSpacing: Number(e.target.value) || 0 })}
+                          className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] text-slate-400 block mb-1">Max Description Width (pt)</label>
+                        <input
+                          type="number"
+                          value={winnerTemplateConfig.paraMaxWidth}
+                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, paraMaxWidth: Number(e.target.value) || 0 })}
+                          className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-400 block mb-1">Text Alignment</label>
+                        <select
+                          value={winnerTemplateConfig.paraAlign || 'center'}
+                          onChange={(e: any) => setWinnerTemplateConfig({ ...winnerTemplateConfig, paraAlign: e.target.value })}
+                          className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
+                        >
+                          <option value="center">Centered</option>
+                          <option value="left">Left Aligned</option>
+                          <option value="right">Right Aligned</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-[11px] text-slate-400 block mb-1">Subtitle Y Position (pt)</label>
+                        <input
+                          type="number"
+                          value={winnerTemplateConfig.subtitleY || 398}
+                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, subtitleY: Number(e.target.value) || 0 })}
+                          className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[11px] text-slate-400 block mb-1">Font Color</label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={typeof winnerTemplateConfig.paraColor === 'string' ? winnerTemplateConfig.paraColor : '#1F2937'}
+                            onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, paraColor: e.target.value })}
+                            className="w-7 h-7 rounded border border-white/10 bg-transparent cursor-pointer p-0"
+                          />
+                          <input
+                            type="text"
+                            value={typeof winnerTemplateConfig.paraColor === 'string' ? winnerTemplateConfig.paraColor : '#1F2937'}
+                            onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, paraColor: e.target.value })}
+                            className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-2 py-1 text-xs text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1">
+                      <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(winnerTemplateConfig.paraBold)}
+                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, paraBold: e.target.checked })}
+                          className="rounded border-white/20 text-amber-500 focus:ring-0"
+                        />
+                        <span>Bold Winner Description</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-300">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(winnerTemplateConfig.showCertId)}
+                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, showCertId: e.target.checked })}
+                          className="rounded border-white/20 text-amber-500 focus:ring-0"
+                        />
+                        <span>Show Certificate ID</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
               </div>
 
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  disabled={sampleGenerating}
-                  onClick={handleGenerateSample}
-                  className="flex-1 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${sampleGenerating ? 'animate-spin' : ''}`} />
-                  <span>{sampleGenerating ? 'Generating Sample...' : 'Generate Sample Preview'}</span>
-                </button>
+              {/* Action Buttons */}
+              <div className="flex flex-col gap-2 pt-3 border-t border-white/10">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={sampleGenerating}
+                    onClick={() => handleGenerateSample('participation')}
+                    className="flex-1 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${sampleGenerating && previewTarget === 'participation' ? 'animate-spin' : ''}`} />
+                    <span>Sample Participation</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={sampleGenerating}
+                    onClick={() => handleGenerateSample('winner')}
+                    className="flex-1 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <Trophy className={`w-3.5 h-3.5 ${sampleGenerating && previewTarget === 'winner' ? 'animate-spin' : ''}`} />
+                    <span>Sample Winner</span>
+                  </button>
+                </div>
 
                 <button
-                  onClick={async () => {
-                    try {
-                      const res = await fetch('/api/admin/events', {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          id,
-                          templateConfig,
-                          certificateParagraph: program.certificateParagraph,
-                          certificateTemplateUrl: program.certificateTemplateUrl
-                        })
-                      });
-                      const json = await res.json();
-                      if (json.success) addToast('Template settings saved successfully', 'success');
-                    } catch (e: any) {
-                      addToast(e.message, 'error');
-                    }
-                  }}
-                  className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-[#F98A5B] to-[#EC3A74] text-white font-bold text-xs shadow-md shadow-[#F98A5B]/20 cursor-pointer"
+                  type="button"
+                  onClick={handleSaveConfiguration}
+                  className="w-full py-2.5 rounded-xl bg-gradient-to-r from-[#F98A5B] to-[#EC3A74] text-white font-bold text-xs shadow-md shadow-[#F98A5B]/20 cursor-pointer hover:opacity-95 transition-opacity"
                 >
                   Save Configuration
                 </button>
@@ -1149,17 +1618,50 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
             </div>
           </div>
 
-          {/* Live Preview Canvas */}
+          {/* Right Column: Live Master PDF Preview Canvas */}
           <div className="lg:col-span-7 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-300">Live Certificate Render Preview</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              {/* Preview Mode Switcher */}
+              <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-white/10">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewTarget('participation');
+                    setLiveSamplePdf(participationSamplePdf);
+                  }}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                    previewTarget === 'participation'
+                      ? 'bg-[#F98A5B] text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Participation Preview
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPreviewTarget('winner');
+                    setLiveSamplePdf(winnerSamplePdf);
+                  }}
+                  className={`px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                    previewTarget === 'winner'
+                      ? 'bg-amber-500 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Winner Preview
+                </button>
+              </div>
+
+              {/* Actions */}
               <div className="flex items-center gap-3">
                 <a
                   href={liveSamplePdf}
-                  download={`IEDC_Sample_Certificate_${id}.pdf`}
+                  download={`IEDC_${previewTarget === 'winner' ? 'Winner' : 'Participation'}_Sample_${id}.pdf`}
                   className="text-xs font-bold text-emerald-400 hover:underline flex items-center gap-1"
                 >
-                  <Download className="w-3.5 h-3.5" /> Download Sample PDF
+                  <Download className="w-3.5 h-3.5" /> Download PDF
                 </a>
                 <a
                   href={liveSamplePdf}
@@ -1171,11 +1673,11 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
               </div>
             </div>
 
-            <div className="aspect-[1.414/1] w-full min-h-[400px] rounded-2xl border border-white/15 bg-neutral-900/60 overflow-hidden shadow-2xl relative flex items-center justify-center">
+            <div className="aspect-[1.414/1] w-full min-h-[420px] rounded-2xl border border-white/15 bg-neutral-900/60 overflow-hidden shadow-2xl relative flex items-center justify-center">
               <iframe
                 src={`${liveSamplePdf}#toolbar=0&navpanes=0&scrollbar=0`}
                 className="w-full h-full border-0 pointer-events-auto"
-                title="Certificate Preview"
+                title="Certificate Live Engine Preview"
               />
             </div>
           </div>

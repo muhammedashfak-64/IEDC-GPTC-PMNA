@@ -21,7 +21,7 @@ async function safeDbOp(operationName: string, op: () => Promise<any>) {
 // -------------------------------------------------------------
 export async function syncEventToSupabase(event: any, isUpdate = false) {
   return safeDbOp('syncEventToSupabase', async () => {
-    const row = {
+    const baseRow = {
       id: event.id,
       title: event.title,
       category: event.category || 'Workshop',
@@ -43,10 +43,30 @@ export async function syncEventToSupabase(event: any, isUpdate = false) {
       updated_at: new Date().toISOString()
     };
 
+    const fullRow = {
+      ...baseRow,
+      certificate_title: event.certificateTitle || 'CERTIFICATE OF PARTICIPATION',
+      certificate_paragraph: event.certificateParagraph || null,
+      certificate_template_url: event.certificateTemplateUrl || null,
+      template_config: event.templateConfig || null,
+      winner_certificate_title: event.winnerCertificateTitle || 'CERTIFICATE OF ACHIEVEMENT',
+      winner_certificate_paragraph: event.winnerCertificateParagraph || null,
+      winner_template_config: event.winnerTemplateConfig || null,
+      award_category: event.awardCategory || null
+    };
+
     if (isUpdate) {
-      return supabaseAdmin.from('events').upsert(row, { onConflict: 'id' });
+      const res = await supabaseAdmin.from('events').upsert(fullRow, { onConflict: 'id' });
+      if (res?.error && res.error.message?.includes('column')) {
+        return supabaseAdmin.from('events').upsert(baseRow, { onConflict: 'id' });
+      }
+      return res;
     }
-    return supabaseAdmin.from('events').insert(row);
+    const insertRes = await supabaseAdmin.from('events').insert(fullRow);
+    if (insertRes?.error && insertRes.error.message?.includes('column')) {
+      return supabaseAdmin.from('events').insert(baseRow);
+    }
+    return insertRes;
   });
 }
 

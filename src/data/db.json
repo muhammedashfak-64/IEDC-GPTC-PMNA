@@ -306,7 +306,45 @@
         ],
         "isStatewide": true
       },
-      "updatedAt": "2026-10-20T18:06:39.289Z"
+      "updatedAt": "2026-10-21T06:34:31.617Z",
+      "templateConfig": {
+        "nameY": 305,
+        "nameFontSize": 34,
+        "nameColor": "#8B0000",
+        "paraX": 0,
+        "paraY": 252,
+        "paraFontSize": 12.5,
+        "paraLineSpacing": 18,
+        "paraMaxWidth": 580,
+        "paraColor": "#1F2937",
+        "paraAlign": "center",
+        "paraBold": false,
+        "showCertId": true,
+        "certIdY": 45
+      },
+      "winnerTemplateConfig": {
+        "nameY": 305,
+        "nameFontSize": 34,
+        "nameColor": "#8B0000",
+        "paraX": 0,
+        "paraY": 252,
+        "paraFontSize": 12.5,
+        "paraLineSpacing": 18,
+        "paraMaxWidth": 580,
+        "paraColor": "#1F2937",
+        "paraAlign": "center",
+        "paraBold": false,
+        "showCertId": true,
+        "certIdY": 45,
+        "subtitleY": 398,
+        "introY": 363
+      },
+      "certificateTitle": "CERTIFICATE OF PARTICIPATION",
+      "certificateParagraph": "",
+      "winnerCertificateTitle": "WINNER CERTIFICATE",
+      "winnerCertificateParagraph": "In recognition of your outstanding achievement and winning performance in the Drone Workshop, organized by the IEDC Cell, Government Polytechnic College Perinthalmanna.",
+      "awardCategory": "First Prize Winner",
+      "certificateTemplateUrl": ""
     },
     {
       "id": "evt-1792507055299",
@@ -2539,6 +2577,16 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "log-1792564471640-komq",
+      "userId": "usr-mainadmin-01",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: Quota Automated Test Hackathon 2026",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T06:34:31.640Z"
+    },
     {
       "id": "log-1792556518552-ibpa",
       "userId": "usr-mainadmin-01",
