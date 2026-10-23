@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/adminAuthHelper';
-import { generateSingleCertificatePdf } from '@/lib/certificateGenerator';
+import { generateSingleCertificatePdf, resolveTemplateFile } from '@/lib/certificateGenerator';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 // In-memory cache for generated sample preview buffers
 let cachedParticipationPdf: Uint8Array | null = null;
@@ -97,14 +98,7 @@ export async function POST(req: NextRequest) {
 
     let resolvedTemplatePath: string | undefined = undefined;
     if (certificateTemplateUrl) {
-      if (fs.existsSync(certificateTemplateUrl)) {
-        resolvedTemplatePath = certificateTemplateUrl;
-      } else {
-        const localPath = path.join(process.cwd(), 'public', certificateTemplateUrl.replace(/^\//, ''));
-        if (fs.existsSync(localPath)) {
-          resolvedTemplatePath = localPath;
-        }
-      }
+      resolvedTemplatePath = await resolveTemplateFile(certificateTemplateUrl);
     }
 
     const previewCertId = `PREVIEW-${Date.now()}`;

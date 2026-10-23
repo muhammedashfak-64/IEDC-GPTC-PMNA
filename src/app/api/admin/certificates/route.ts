@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/adminAuthHelper';
 import { getCertificates, createCertificate, bulkCreateCertificates, updateCertificate, deleteCertificate } from '@/lib/serverStore';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
 export async function GET(req: NextRequest) {
   const { errorResponse } = requireAdminAuth(req);
   if (errorResponse) return errorResponse;

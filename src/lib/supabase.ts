@@ -1,16 +1,21 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder-iedc.supabase.co';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-anon-key';
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://nxlaazpcbvzxmdboqlxe.supabase.co';
+const supabaseAnonKey =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  'sb_publishable_cFnnnURY7SkKzPdU1AVjhw_qbM4QOPZ';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export { supabaseAdmin } from './supabaseAdmin';
 
 export const isSupabaseConfigured = () => {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key) return false;
-  if (key.includes('placeholder') || key.includes('demo-live-key') || key.includes('.demo')) return false;
-  return true;
+  return Boolean(
+    supabaseUrl &&
+    supabaseAnonKey &&
+    !supabaseUrl.includes('placeholder') &&
+    !supabaseAnonKey.includes('placeholder')
+  );
 };
 
 export async function testSupabaseConnection(): Promise<{ connected: boolean; message: string }> {

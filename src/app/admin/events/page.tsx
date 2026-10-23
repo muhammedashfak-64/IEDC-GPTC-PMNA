@@ -21,7 +21,8 @@ import {
   Award,
   Upload,
   ArrowUpRight,
-  Sparkles
+  Sparkles,
+  RefreshCw
 } from 'lucide-react';
 import FileUpload from '@/components/admin/FileUpload';
 
@@ -29,6 +30,8 @@ export default function AdminEventsPage() {
   const { addToast } = useAdmin();
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategory, setFilterCategory] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
@@ -58,14 +61,21 @@ export default function AdminEventsPage() {
 
   const loadEvents = () => {
     setLoading(true);
+    setLoadError(null);
     fetch('/api/admin/events')
       .then((res) => res.json())
       .then((json) => {
-        if (json.success && json.data) {
+        if (json.success && Array.isArray(json.data)) {
           setEvents(json.data);
+        } else {
+          setLoadError(json.error || 'Failed to load events from database.');
+          addToast('Database Error', json.error || 'Failed to load events', 'error');
         }
       })
-      .catch(console.error)
+      .catch((err) => {
+        setLoadError(err.message || 'Connection error');
+        addToast('Connection Error', err.message, 'error');
+      })
       .finally(() => setLoading(false));
   };
 
@@ -135,9 +145,12 @@ export default function AdminEventsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dupPayload)
       });
-      if (res.ok) {
+      const json = await res.json();
+      if (res.ok && json.success) {
         addToast('Event Duplicated', `Created draft copy of ${evt.title}`, 'success');
         loadEvents();
+      } else {
+        addToast('Duplicate Failed', json.error || 'Server rejected event duplicate', 'error');
       }
     } catch (err: any) {
       addToast('Error', err.message, 'error');
@@ -152,9 +165,12 @@ export default function AdminEventsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: evt.id, status: newStatus })
       });
-      if (res.ok) {
+      const json = await res.json();
+      if (res.ok && json.success) {
         addToast('Status Updated', `Event marked as ${newStatus}`, 'info');
         loadEvents();
+      } else {
+        addToast('Status Update Failed', json.error || 'Could not update event status', 'error');
       }
     } catch (err: any) {
       addToast('Error', err.message, 'error');
@@ -162,13 +178,16 @@ export default function AdminEventsPage() {
   };
 
   const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`Are you sure you want to delete event "${title}"?`)) return;
+    if (!confirm(`Are you sure you want to permanently delete event "${title}"? This will remove it from the authoritative database.`)) return;
 
     try {
       const res = await fetch(`/api/admin/events?id=${id}`, { method: 'DELETE' });
-      if (res.ok) {
+      const json = await res.json();
+      if (res.ok && json.success) {
         addToast('Event Deleted', `Removed ${title} from database.`, 'info');
         loadEvents();
+      } else {
+        addToast('Delete Failed', json.error || 'Could not delete event', 'error');
       }
     } catch (err: any) {
       addToast('Error', err.message, 'error');
@@ -177,7 +196,9 @@ export default function AdminEventsPage() {
 
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
 
+    setSubmitting(true);
     try {
       if (editingEvent) {
         const res = await fetch('/api/admin/events', {
@@ -185,10 +206,13 @@ export default function AdminEventsPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: editingEvent.id, ...formData })
         });
-        if (res.ok) {
+        const json = await res.json();
+        if (res.ok && json.success) {
           addToast('Event Updated', `Saved changes to ${formData.title}`, 'success');
           setShowModal(false);
           loadEvents();
+        } else {
+          addToast('Update Failed', json.error || 'Server rejected event update', 'error');
         }
       } else {
         const res = await fetch('/api/admin/events', {
@@ -196,14 +220,19 @@ export default function AdminEventsPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(formData)
         });
-        if (res.ok) {
+        const json = await res.json();
+        if (res.ok && json.success) {
           addToast('Event Created', `Created new event: ${formData.title}`, 'success');
           setShowModal(false);
           loadEvents();
+        } else {
+          addToast('Creation Failed', json.error || 'Server rejected event creation', 'error');
         }
       }
     } catch (err: any) {
-      addToast('Error', err.message, 'error');
+      addToast('Error', err.message || 'Network error saving event', 'error');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -232,13 +261,24 @@ export default function AdminEventsPage() {
           </p>
         </div>
 
-        <button
-          onClick={openCreateModal}
-          className="px-5 py-2.5 rounded-xl bg-white text-black font-extrabold text-xs flex items-center gap-2 hover:bg-slate-200 cursor-pointer shadow-sm transition-all"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Add New Event</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadEvents}
+            disabled={loading}
+            className="px-4 py-2.5 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+            title="Refresh from authoritative database"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <span>Sync</span>
+          </button>
+          <button
+            onClick={openCreateModal}
+            className="px-5 py-2.5 rounded-xl bg-white text-black font-extrabold text-xs flex items-center gap-2 hover:bg-slate-200 cursor-pointer shadow-sm transition-all"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Add New Event</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -614,15 +654,24 @@ export default function AdminEventsPage() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold text-xs"
+                  disabled={submitting}
+                  className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold text-xs disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-white text-black hover:bg-slate-200 font-extrabold text-xs"
+                  disabled={submitting}
+                  className="flex-1 py-2.5 rounded-xl bg-white text-black hover:bg-slate-200 font-extrabold text-xs disabled:opacity-50 flex items-center justify-center gap-2"
                 >
-                  {editingEvent ? 'Save Changes' : 'Create & Publish'}
+                  {submitting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving to Supabase...</span>
+                    </>
+                  ) : (
+                    editingEvent ? 'Save Changes' : 'Create & Publish'
+                  )}
                 </button>
               </div>
             </form>

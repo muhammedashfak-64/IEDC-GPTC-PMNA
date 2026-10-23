@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getEvents, loadDb } from '@/lib/serverStore';
+import { getEventsAsync, loadDb } from '@/lib/serverStore';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
   try {
     const hasCertsOnly = req.nextUrl.searchParams.get('hasCertificates') === 'true';
-    let publishedEvents = getEvents(true);
+    let publishedEvents = await getEventsAsync(true);
 
     if (hasCertsOnly) {
       const db = loadDb();

@@ -3,11 +3,15 @@ import path from 'path';
 import os from 'os';
 import crypto from 'crypto';
 import JSZip from 'jszip';
+import { revalidatePath } from 'next/cache';
 import { generateSingleCertificatePdf, generateSingleCertificatePng, resolveTemplateFile } from './certificateGenerator';
 import { supabase } from '@/lib/supabase';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import {
   syncEventToSupabase,
   deleteEventFromSupabase,
+  packEventForSupabase,
+  unpackEventFromSupabase,
   syncTeamMemberToSupabase,
   deleteTeamMemberFromSupabase,
   syncCertificateToSupabase,
@@ -49,14 +53,6 @@ let lastDbMtime = 0;
 
 export function loadDb(): any {
   if (memoryDb) return memoryDb;
-  try {
-    const tmpFile = path.join(os.tmpdir(), 'iedc_db.json');
-    if (fs.existsSync(tmpFile)) {
-      const raw = fs.readFileSync(tmpFile, 'utf-8');
-      memoryDb = JSON.parse(raw);
-      return memoryDb;
-    }
-  } catch {}
 
   try {
     if (fs.existsSync(DB_FILE)) {
@@ -71,6 +67,16 @@ export function loadDb(): any {
   } catch (err) {
     console.error('Error loading db.json:', err);
   }
+
+  try {
+    const tmpFile = path.join(os.tmpdir(), 'iedc_db.json');
+    if (fs.existsSync(tmpFile)) {
+      const raw = fs.readFileSync(tmpFile, 'utf-8');
+      memoryDb = JSON.parse(raw);
+      return memoryDb;
+    }
+  } catch {}
+
   return memoryDb || {};
 }
 
@@ -298,8 +304,33 @@ export function updateSettings(newSettings: any, user: AuthUser) {
 }
 
 // -------------------------------------------------------------
-// EVENTS MODULE
+// EVENTS MODULE (SUPABASE AUTHORITATIVE DATABASE WITH LOCAL CACHE)
 // -------------------------------------------------------------
+export async function fetchEventsFromDatabase(): Promise<any[]> {
+  const db = loadDb();
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('events')
+      .select('*')
+      .order('date', { ascending: false });
+
+    if (error) {
+      console.warn('[serverStore] Error querying events from Supabase:', error.message);
+      return db.events || [];
+    }
+
+    if (data && Array.isArray(data)) {
+      const unpacked = data.map((row) => unpackEventFromSupabase(row));
+      db.events = unpacked;
+      saveDb(db);
+      return unpacked;
+    }
+  } catch (err: any) {
+    console.warn('[serverStore] Exception querying events from Supabase:', err?.message || err);
+  }
+  return db.events || [];
+}
+
 export function getEvents(publishedOnly = false) {
   const db = loadDb();
   const list = db.events || [];
@@ -309,12 +340,25 @@ export function getEvents(publishedOnly = false) {
   return list;
 }
 
-export function createEvent(eventData: any, user: AuthUser) {
+export async function getEventsAsync(publishedOnly = false) {
+  const list = await fetchEventsFromDatabase();
+  if (publishedOnly) {
+    return list.filter((e: any) => e.status === 'Published');
+  }
+  return list;
+}
+
+export async function createEvent(eventData: any, user?: Partial<AuthUser> | null) {
+  if (!eventData.title?.trim()) {
+    throw new Error('Event title is required.');
+  }
+
   const db = loadDb();
   if (!db.events) db.events = [];
+
   const newEvt = {
-    id: `evt-${Date.now()}`,
-    title: eventData.title || 'Untitled Event',
+    id: eventData.id || `evt-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+    title: eventData.title.trim(),
     category: eventData.category || 'Workshop',
     level: eventData.level || 'College',
     date: eventData.date || new Date().toISOString().split('T')[0],
@@ -326,39 +370,136 @@ export function createEvent(eventData: any, user: AuthUser) {
     seatsAvailable: Number(eventData.seatsAvailable ?? eventData.totalSeats) || 60,
     bannerImage: eventData.bannerImage || 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80',
     brochureUrl: eventData.brochureUrl || '',
-    registrationOpen: eventData.registrationOpen ?? true,
-    certificateEligible: eventData.certificateEligible ?? true,
+    registrationLink: eventData.registrationLink || '',
+    registrationOpen: eventData.registrationOpen !== false,
+    certificateEligible: eventData.certificateEligible !== false,
     status: eventData.status || 'Published',
-    facultyCoordinator: eventData.facultyCoordinator || user.full_name,
+    facultyCoordinator: eventData.facultyCoordinator || (user as any)?.full_name || 'Coordinator',
     studentCoordinator: eventData.studentCoordinator || '',
-    createdBy: user.id,
-    createdAt: new Date().toISOString()
+    createdBy: user?.id || 'admin',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    quotaConfig: eventData.quotaConfig || null,
+    templateConfig: eventData.templateConfig || null,
+    winnerTemplateConfig: eventData.winnerTemplateConfig || null,
+    certificateTitle: eventData.certificateTitle || '',
+    certificateParagraph: eventData.certificateParagraph || '',
+    winnerCertificateTitle: eventData.winnerCertificateTitle || '',
+    winnerCertificateParagraph: eventData.winnerCertificateParagraph || '',
+    awardCategory: eventData.awardCategory || '',
+    certificateTemplateUrl: eventData.certificateTemplateUrl || '',
+    certificateStatus: eventData.certificateStatus || eventData.status || 'Draft'
   };
-  db.events.unshift(newEvt);
+
+  // 1. Authoritative insert into Supabase
+  const packedRow = packEventForSupabase(newEvt);
+  const { error: insErr } = await supabaseAdmin.from('events').insert(packedRow);
+  if (insErr) {
+    console.error('[serverStore] Supabase insert event failed:', insErr);
+    throw new Error(`Failed to save event to database: ${insErr.message}`);
+  }
+
+  // 2. Persist to local memory & db.json cache
+  db.events = [newEvt, ...db.events.filter((e: any) => e.id !== newEvt.id)];
   saveDb(db);
-  syncEventToSupabase(newEvt, false).catch(() => {});
-  addAuditLog('EVENT_CREATE', user, `Created event: ${newEvt.title}`);
+
+  // 3. Add audit log
+  addAuditLog('EVENT_CREATE', user || null, `Created event: ${newEvt.title}`);
+
+  // 4. Safe route revalidation
+  try {
+    revalidatePath('/events');
+    revalidatePath('/');
+    revalidatePath('/register');
+    revalidatePath('/admin/events');
+  } catch {}
+
   return newEvt;
 }
 
-export function updateEvent(id: string, updates: any, user: AuthUser) {
+export async function updateEvent(id: string, updates: any, user?: Partial<AuthUser> | null) {
   const db = loadDb();
+  let existing = (db.events || []).find((e: any) => e.id === id);
+
+  if (!existing) {
+    const { data: remoteRow } = await supabaseAdmin.from('events').select('*').eq('id', id).single();
+    if (remoteRow) {
+      existing = unpackEventFromSupabase(remoteRow);
+    }
+  }
+
+  if (!existing) {
+    throw new Error(`Event with ID "${id}" not found.`);
+  }
+
+  const updatedEvt = {
+    ...existing,
+    ...updates,
+    id: existing.id, // Immutable stable database ID
+    updatedAt: new Date().toISOString()
+  };
+
+  // 1. Authoritative update in Supabase
+  const packedRow = packEventForSupabase(updatedEvt);
+  const { error: updErr } = await supabaseAdmin.from('events').update(packedRow).eq('id', id);
+  if (updErr) {
+    console.error('[serverStore] Supabase update event failed:', updErr);
+    throw new Error(`Failed to update event in database: ${updErr.message}`);
+  }
+
+  // 2. Update local memory & db.json cache
   const idx = (db.events || []).findIndex((e: any) => e.id === id);
-  if (idx === -1) return null;
-  db.events[idx] = { ...db.events[idx], ...updates, updatedAt: new Date().toISOString() };
+  if (idx !== -1) {
+    db.events[idx] = updatedEvt;
+  } else {
+    db.events.unshift(updatedEvt);
+  }
   saveDb(db);
-  syncEventToSupabase(db.events[idx], true).catch(() => {});
-  addAuditLog('EVENT_UPDATE', user, `Updated event: ${db.events[idx].title}`);
-  return db.events[idx];
+
+  // 3. Add audit log
+  addAuditLog('EVENT_UPDATE', user || null, `Updated event: ${updatedEvt.title}`);
+
+  // 4. Safe route revalidation
+  try {
+    revalidatePath('/events');
+    revalidatePath(`/events/${id}`);
+    revalidatePath(`/admin/events/${id}`);
+    revalidatePath('/');
+    revalidatePath('/register');
+    revalidatePath('/admin/events');
+  } catch {}
+
+  return updatedEvt;
 }
 
-export function deleteEvent(id: string, user: AuthUser) {
+export async function deleteEvent(id: string, user?: Partial<AuthUser> | null) {
   const db = loadDb();
-  const item = (db.events || []).find((e: any) => e.id === id);
+  const existing = (db.events || []).find((e: any) => e.id === id);
+
+  // 1. Authoritative deletion in Supabase
+  const { error: delErr } = await supabaseAdmin.from('events').delete().eq('id', id);
+  if (delErr) {
+    console.error('[serverStore] Supabase delete event failed:', delErr);
+    throw new Error(`Failed to delete event from database: ${delErr.message}`);
+  }
+
+  // 2. Remove from local store
   db.events = (db.events || []).filter((e: any) => e.id !== id);
   saveDb(db);
-  deleteEventFromSupabase(id).catch(() => {});
-  if (item) addAuditLog('EVENT_DELETE', user, `Deleted event: ${item.title}`);
+
+  // 3. Add audit log
+  if (existing) {
+    addAuditLog('EVENT_DELETE', user || null, `Deleted event: ${existing.title}`);
+  }
+
+  // 4. Safe route revalidation
+  try {
+    revalidatePath('/events');
+    revalidatePath('/');
+    revalidatePath('/register');
+    revalidatePath('/admin/events');
+  } catch {}
+
   return true;
 }
 
@@ -1043,6 +1184,8 @@ export function getCertificates(publishedOnly = false) {
   return list;
 }
 
+
+
 export async function ensureCertificatePdfExists(cert: any): Promise<string> {
   try {
     const certId = cert.certificateId;
@@ -1080,9 +1223,16 @@ export async function ensureCertificatePdfExists(cert: any): Promise<string> {
       ? (event?.winnerCertificateTitle ? `— ${event.winnerCertificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : '— OF ACHIEVEMENT —')
       : (event?.certificateTitle ? `— ${event.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : undefined);
 
-    const activeGlobalTemplate = (db.certificateTemplates || []).find((t: any) => t.isActive);
+    const allTemplates = getCertificateTemplates();
+    const activeGlobalTemplate = allTemplates.find((t: any) => t.isActive) || allTemplates[0];
     const templateToUse = event?.certificateTemplateUrl || activeGlobalTemplate?.cleanUrl || undefined;
     const resolvedTemplatePath = await resolveTemplateFile(templateToUse);
+    const defaultTemplateConfig = activeGlobalTemplate?.templateConfig || undefined;
+
+    const finalConfig = {
+      ...(defaultTemplateConfig || {}),
+      ...(targetConfig || {})
+    };
 
     const result = await generateSingleCertificatePdf({
       certificateId: certId,
@@ -1238,7 +1388,7 @@ export function getPublicCertificateForVerification(certId: string) {
   const cert = (db.certificates || []).find((c: any) => 
     c.certificateId?.toUpperCase() === clean || c.id?.toUpperCase() === clean
   );
-  if (!cert || cert.status !== 'Published') return null;
+  if (!cert || (cert.status !== 'Published' && cert.status !== 'Verified')) return null;
 
   return {
     certificateId: cert.certificateId,
@@ -1249,7 +1399,10 @@ export function getPublicCertificateForVerification(certId: string) {
     certificateType: cert.certificateType,
     issueDate: cert.issueDate,
     status: cert.status,
-    qrCodeUrl: cert.qrCodeUrl
+    qrCodeUrl: cert.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/${cert.certificateId}`,
+    pdfUrl: `/api/public/certificates/${cert.certificateId}/pdf`,
+    pngUrl: `/api/public/certificates/${cert.certificateId}/png`,
+    downloadUrl: `/api/public/certificates/${cert.certificateId}/pdf`
   };
 }
 
@@ -1573,6 +1726,13 @@ export async function generateProgramCertificates(
   const results: any[] = [];
   const failures: any[] = [];
 
+  // Pre-resolve master template and active typography presets once outside the recipient loop
+  const allTemplates = getCertificateTemplates();
+  const activeGlobalTemplate = allTemplates.find((t: any) => t.isActive) || allTemplates[0];
+  const templateToUse = event.certificateTemplateUrl || activeGlobalTemplate?.cleanUrl || undefined;
+  const preResolvedTemplatePath = await resolveTemplateFile(templateToUse);
+  const defaultTemplateConfig = activeGlobalTemplate?.templateConfig || undefined;
+
   // Helper to generate a single record
   async function processRecipient(recipient: {
     name: string;
@@ -1613,9 +1773,6 @@ export async function generateProgramCertificates(
     }
 
     const certId = existingCert?.certificateId || `IEDC-2026-${Math.floor(10000 + Math.random() * 90000)}`;
-    const activeGlobalTemplate = (db.certificateTemplates || []).find((t: any) => t.isActive);
-    const templateToUse = event.certificateTemplateUrl || activeGlobalTemplate?.cleanUrl || undefined;
-    const resolvedTemplatePath = await resolveTemplateFile(templateToUse);
 
     try {
       const isWinner =
@@ -1629,8 +1786,8 @@ export async function generateProgramCertificates(
         : (event.certificateParagraph || undefined);
 
       const targetConfig = isWinner
-        ? (event.winnerTemplateConfig || event.templateConfig || undefined)
-        : (event.templateConfig || undefined);
+        ? (event.winnerTemplateConfig || event.templateConfig || defaultTemplateConfig)
+        : (event.templateConfig || defaultTemplateConfig);
 
       const formattedSubtitle = isWinner
         ? (event.winnerCertificateTitle ? `— ${event.winnerCertificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : '— OF ACHIEVEMENT —')
@@ -1649,7 +1806,7 @@ export async function generateProgramCertificates(
           awardCategory: isWinner ? (event.awardCategory || recipient.role || 'Winner') : undefined,
           certificateSubtitle: formattedSubtitle,
           recipientIntro: isWinner ? 'THIS CERTIFICATE IS AWARDED TO' : undefined,
-          customTemplatePath: resolvedTemplatePath
+          customTemplatePath: preResolvedTemplatePath
         },
         targetConfig
       );
@@ -1676,7 +1833,7 @@ export async function generateProgramCertificates(
         pngStorageUrl: `/certificates/${certId}.png`,
         status: initialStatus,
         downloadsCount: existingCert?.downloadsCount || 0,
-        issuedBy: user.id || 'admin',
+        issuedBy: user?.id || 'admin',
         issuedAt: new Date().toISOString()
       };
 
@@ -1703,28 +1860,33 @@ export async function generateProgramCertificates(
     }
   }
 
-  for (const reg of eligibleRegistrations) {
-    await processRecipient({
+  // Build unified recipient list
+  const allRecipients = [
+    ...eligibleRegistrations.map((reg: any) => ({
       name: reg.studentName,
       phone: (reg.phone || '').trim().replace(/\D/g, ''),
       email: reg.email || '',
       registerNumber: reg.registerNumber || reg.id,
       role: reg.role || reg.position || reg.award || 'Participant',
-      sourceType: 'participant',
+      sourceType: 'participant' as const,
       sourceId: reg.id
-    });
-  }
-
-  for (const ldr of eligibleLeaders) {
-    await processRecipient({
+    })),
+    ...eligibleLeaders.map((ldr: any) => ({
       name: ldr.name,
       phone: (ldr.phone || '').trim().replace(/\D/g, ''),
       email: ldr.email || '',
       registerNumber: `LEAD-${ldr.id.slice(-4)}`,
       role: ldr.role || 'Student Lead',
-      sourceType: 'leader',
+      sourceType: 'leader' as const,
       sourceId: ldr.id
-    });
+    }))
+  ];
+
+  // Process concurrently in chunks of 5 for optimal performance without socket flooding
+  const chunkSize = 5;
+  for (let i = 0; i < allRecipients.length; i += chunkSize) {
+    const chunk = allRecipients.slice(i, i + chunkSize);
+    await Promise.all(chunk.map((recip) => processRecipient(recip)));
   }
 
   saveDb(db);
@@ -2816,34 +2978,37 @@ export function createBrochure(data: any, user: AuthUser) {
 export function getCertificateTemplates() {
   const db = loadDb();
   if (!db.certificateTemplates || db.certificateTemplates.length === 0) {
-    db.certificateTemplates = [
-      {
-        id: 'tpl-master-vector',
-        title: 'Official IEDC Master Certificate (Vector Reference)',
-        type: 'Vector PDF Master',
-        pdfUrl: '/templates/reference_certificate.pdf',
-        cleanUrl: '/templates/clean_master_template.pdf',
-        previewPdf: '/templates/test_generated_certificate.pdf',
-        isActive: true,
-        version: 1,
-        createdAt: new Date().toISOString(),
-        description: 'Preserves exact borders, logos, Principal Abdul Kader KT & Coordinator Anuroop P signatures, and typography.'
-      },
-      {
-        id: 'tpl-master-image',
-        title: 'Original Certificate Template High-Res Image (Reference A)',
-        type: 'High-Res PNG Master',
-        pdfUrl: '/uploads/certificate-templates/IEDC_PARTICIPATE_CERTICICATE_1792467393382.png',
-        cleanUrl: '/uploads/certificate-templates/IEDC_PARTICIPATE_CERTICICATE_1792467393382.png',
-        previewPdf: '/templates/test_generated_certificate.pdf',
-        isActive: false,
-        version: 1,
-        createdAt: new Date().toISOString(),
-        description: 'Master image template (6250x4419) with genuine page proportions and geometry.'
-      }
-    ];
+    db.certificateTemplates = [];
+  }
+
+  // Ensure default vector master is always present
+  const hasVectorMaster = db.certificateTemplates.some((t: any) => t.id === 'tpl-master-vector');
+  if (!hasVectorMaster) {
+    db.certificateTemplates.unshift({
+      id: 'tpl-master-vector',
+      title: 'Official IEDC Master Certificate (Vector Reference)',
+      type: 'Vector PDF Master',
+      pdfUrl: '/templates/reference_certificate.pdf',
+      cleanUrl: '/templates/clean_master_template.pdf',
+      previewPdf: '/templates/test_generated_certificate.pdf',
+      isActive: !db.certificateTemplates.some((t: any) => t.isActive),
+      version: 1,
+      createdAt: new Date().toISOString(),
+      description: 'Preserves exact borders, logos, Principal Abdul Kader KT & Coordinator Anuroop P signatures, and typography.'
+    });
     saveDb(db);
   }
+
+  // Sanitize any templates that lack cleanUrl
+  db.certificateTemplates.forEach((t: any) => {
+    if (!t.cleanUrl) {
+      t.cleanUrl = t.pdfUrl || t.url || t.backgroundImageUrl || '/templates/clean_master_template.pdf';
+    }
+    if (!t.pdfUrl) {
+      t.pdfUrl = t.cleanUrl;
+    }
+  });
+
   return db.certificateTemplates;
 }
 
@@ -2852,18 +3017,21 @@ export function saveCertificateTemplate(templateData: any, user: AuthUser) {
   if (!db.certificateTemplates) db.certificateTemplates = [];
 
   const id = templateData.id || `tpl-${Date.now()}`;
-  const isImage = !templateData.url?.toLowerCase().endsWith('.pdf');
+  const rawUrl = templateData.cleanUrl || templateData.url || templateData.pdfUrl || '';
+  const isImage = !rawUrl.toLowerCase().endsWith('.pdf');
   const newTpl = {
     id,
     title: String(templateData.title || 'Custom Certificate Template').trim(),
-    type: isImage ? 'Image Master' : 'PDF Master',
-    pdfUrl: templateData.url,
-    cleanUrl: templateData.url,
-    previewPdf: templateData.url,
+    type: templateData.type || (isImage ? 'Image Master' : 'PDF Master'),
+    url: rawUrl,
+    pdfUrl: templateData.pdfUrl || rawUrl,
+    cleanUrl: templateData.cleanUrl || rawUrl,
+    previewPdf: templateData.previewPdf || rawUrl,
     isActive: Boolean(templateData.isActive),
+    templateConfig: templateData.templateConfig || undefined,
     version: (db.certificateTemplates.length || 0) + 1,
     description: templateData.description || 'Custom uploaded certificate template.',
-    uploadedBy: user.full_name || user.username || 'Admin',
+    uploadedBy: user?.full_name || user?.username || 'Admin',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
@@ -2882,6 +3050,27 @@ export function saveCertificateTemplate(templateData: any, user: AuthUser) {
   saveDb(db);
   addAuditLog('CERTIFICATE_TEMPLATE_SAVE', user, `Saved certificate template "${newTpl.title}" (active: ${newTpl.isActive})`);
   return newTpl;
+}
+
+export function updateCertificateTemplate(templateId: string, updates: any, user: AuthUser) {
+  const db = loadDb();
+  if (!db.certificateTemplates) db.certificateTemplates = [];
+  const idx = db.certificateTemplates.findIndex((t: any) => t.id === templateId);
+  if (idx === -1) throw new Error(`Certificate template "${templateId}" not found`);
+
+  if (updates.isActive) {
+    db.certificateTemplates.forEach((t: any) => { t.isActive = false; });
+  }
+
+  db.certificateTemplates[idx] = {
+    ...db.certificateTemplates[idx],
+    ...updates,
+    updatedAt: new Date().toISOString()
+  };
+
+  saveDb(db);
+  addAuditLog('CERTIFICATE_TEMPLATE_UPDATE', user, `Updated certificate template "${db.certificateTemplates[idx].title}"`);
+  return db.certificateTemplates[idx];
 }
 
 export function setActiveCertificateTemplate(templateId: string, user: AuthUser) {
@@ -2904,6 +3093,10 @@ export function setActiveCertificateTemplate(templateId: string, user: AuthUser)
 export function deleteCertificateTemplate(templateId: string, user: AuthUser) {
   const db = loadDb();
   if (!db.certificateTemplates) return false;
+  if (templateId === 'tpl-master-vector') {
+    throw new Error('The Official IEDC Master Vector Certificate template is protected and cannot be deleted.');
+  }
+
   const idx = db.certificateTemplates.findIndex((t: any) => t.id === templateId);
   if (idx === -1) return false;
   const removed = db.certificateTemplates.splice(idx, 1)[0];

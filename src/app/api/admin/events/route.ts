@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/adminAuthHelper';
-import { getEvents, createEvent, updateEvent, deleteEvent } from '@/lib/serverStore';
+import { getEventsAsync, createEvent, updateEvent, deleteEvent } from '@/lib/serverStore';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
   const { user, errorResponse } = requireAdminAuth(req);
   if (errorResponse) return errorResponse;
 
-  const events = getEvents(false);
+  const events = await getEventsAsync(false);
   return NextResponse.json({ success: true, count: events.length, data: events });
 }
 
@@ -16,7 +19,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const created = createEvent(body, user);
+    const created = await createEvent(body, user);
     return NextResponse.json({ success: true, data: created }, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 400 });
@@ -32,7 +35,7 @@ export async function PUT(req: NextRequest) {
     const { id, ...updates } = body;
     if (!id) return NextResponse.json({ success: false, error: 'Event ID required' }, { status: 400 });
 
-    const updated = updateEvent(id, updates, user);
+    const updated = await updateEvent(id, updates, user);
     if (!updated) return NextResponse.json({ success: false, error: 'Event not found' }, { status: 404 });
 
     return NextResponse.json({ success: true, data: updated });
@@ -50,7 +53,7 @@ export async function DELETE(req: NextRequest) {
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ success: false, error: 'Event ID required' }, { status: 400 });
 
-    deleteEvent(id, user);
+    await deleteEvent(id, user);
     return NextResponse.json({ success: true, message: 'Event deleted successfully' });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 400 });

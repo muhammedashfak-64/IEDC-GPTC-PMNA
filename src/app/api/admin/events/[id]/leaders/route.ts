@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminUserFromRequest } from '@/lib/adminAuthHelper';
 import { getProgramLeaders, addProgramLeader, deleteProgramLeader } from '@/lib/serverStore';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = getAdminUserFromRequest(req);
   if (!auth) {

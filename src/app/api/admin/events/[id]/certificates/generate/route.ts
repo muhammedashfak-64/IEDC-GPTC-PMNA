@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAdminUserFromRequest } from '@/lib/adminAuthHelper';
 import { generateProgramCertificates } from '@/lib/serverStore';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = getAdminUserFromRequest(req);
   if (!auth) {

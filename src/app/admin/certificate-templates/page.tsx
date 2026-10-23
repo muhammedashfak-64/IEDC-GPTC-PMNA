@@ -14,7 +14,8 @@ import {
   Download,
   Image as ImageIcon,
   Trophy,
-  Award
+  Award,
+  Trash2
 } from 'lucide-react';
 import FileUpload from '@/components/admin/FileUpload';
 
@@ -24,7 +25,9 @@ export default function CertificateTemplatesPage() {
   const [newTitle, setNewTitle] = useState('');
   const [newTemplateUrl, setNewTemplateUrl] = useState('');
   const [generatingPreview, setGeneratingPreview] = useState(false);
+  const [savingPresets, setSavingPresets] = useState(false);
   const [livePdfUrl, setLivePdfUrl] = useState('/api/admin/certificates/sample-preview?type=participation');
+  const [selectedPreviewId, setSelectedPreviewId] = useState<string | null>(null);
 
   // Preview Form Controls
   const [previewName, setPreviewName] = useState('MUHAMMED ASHFAK O');
@@ -65,16 +68,6 @@ export default function CertificateTemplatesPage() {
       previewPdf: '/templates/test_generated_certificate.pdf',
       isActive: true,
       description: 'Preserves exact borders, logos, Principal Abdul Kader KT & Coordinator Anuroop P signatures, and typography.'
-    },
-    {
-      id: 'tpl-master-image',
-      title: 'Original Certificate Template High-Res Image (Reference A)',
-      type: 'High-Res PNG Master',
-      pdfUrl: '/uploads/certificate-templates/IEDC_PARTICIPATE_CERTICICATE_1792467393382.png',
-      cleanUrl: '/uploads/certificate-templates/IEDC_PARTICIPATE_CERTICICATE_1792467393382.png',
-      previewPdf: '/templates/test_generated_certificate.pdf',
-      isActive: false,
-      description: 'Master image template (6250x4419) with genuine page proportions and geometry.'
     }
   ]);
 
@@ -85,6 +78,10 @@ export default function CertificateTemplatesPage() {
       const json = await res.json();
       if (res.ok && json.success && Array.isArray(json.data) && json.data.length > 0) {
         setTemplates(json.data);
+        const activeTpl = json.data.find((t: any) => t.isActive) || json.data[0];
+        if (activeTpl?.templateConfig) {
+          setActiveConfig((prev) => ({ ...prev, ...activeTpl.templateConfig }));
+        }
       }
     } catch (e) {
       console.error('Failed to load templates:', e);
@@ -97,7 +94,7 @@ export default function CertificateTemplatesPage() {
     fetchTemplates();
   }, []);
 
-  const activeTemplate = templates.find((t) => t.isActive) || templates[0];
+  const activeTemplate = templates.find((t) => t.id === selectedPreviewId) || templates.find((t) => t.isActive) || templates[0];
 
   const handleSetActive = async (id: string) => {
     try {
@@ -109,23 +106,53 @@ export default function CertificateTemplatesPage() {
       const json = await res.json();
       if (res.ok && json.success) {
         setTemplates((prev) => prev.map((t) => ({ ...t, isActive: t.id === id })));
-        addToast('Active Template Updated & Persisted', 'success');
+        setSelectedPreviewId(id);
+        const target = templates.find((t) => t.id === id);
+        if (target?.templateConfig) {
+          setActiveConfig((prev) => ({ ...prev, ...target.templateConfig }));
+        }
+        addToast('Active Template Updated & Persisted', 'The selected template is now the master template for all future certificates.', 'success');
+        // Automatically regenerate preview using this template
+        triggerPreviewForTemplate(target || activeTemplate);
       } else {
         throw new Error(json.error || 'Failed to update active template');
       }
     } catch (err: any) {
-      addToast(err.message, 'error');
+      addToast('Error', err.message, 'error');
+    }
+  };
+
+  const handleDeleteTemplate = async (id: string, title: string) => {
+    if (id === 'tpl-master-vector') {
+      addToast('Protected Template', 'The official master vector certificate template cannot be deleted.', 'warning');
+      return;
+    }
+    if (!window.confirm(`Are you sure you want to delete template "${title}"?`)) return;
+
+    try {
+      const res = await fetch(`/api/admin/certificate-templates?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE'
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        addToast('Template Deleted', `Removed "${title}" from templates list.`, 'info');
+        fetchTemplates();
+      } else {
+        throw new Error(json.error || 'Failed to delete template');
+      }
+    } catch (err: any) {
+      addToast('Error', err.message, 'error');
     }
   };
 
   const handleAddTemplate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTitle.trim()) {
-      addToast('Template title is required.', 'error');
+      addToast('Validation', 'Template title is required.', 'error');
       return;
     }
     if (!newTemplateUrl) {
-      addToast('Please upload a PDF or image template from your computer.', 'error');
+      addToast('Validation', 'Please upload a PDF or image template from your computer.', 'error');
       return;
     }
 
@@ -136,21 +163,84 @@ export default function CertificateTemplatesPage() {
         body: JSON.stringify({
           title: newTitle.trim(),
           url: newTemplateUrl,
-          isActive: true
+          isActive: true,
+          templateConfig: activeConfig
         })
       });
       const json = await res.json();
       if (res.ok && json.success) {
-        addToast(`Uploaded and activated certificate template "${newTitle.trim()}"`, 'success');
+        addToast('Template Uploaded', `Uploaded and activated certificate template "${newTitle.trim()}"`, 'success');
         setShowModal(false);
+        const savedTpl = json.data;
         setNewTitle('');
         setNewTemplateUrl('');
-        fetchTemplates();
+        await fetchTemplates();
+        if (savedTpl) {
+          setSelectedPreviewId(savedTpl.id);
+          triggerPreviewForTemplate(savedTpl);
+        }
       } else {
         throw new Error(json.error || 'Failed saving template to database');
       }
     } catch (err: any) {
-      addToast(err.message, 'error');
+      addToast('Upload Error', err.message, 'error');
+    }
+  };
+
+  const handleSavePresets = async () => {
+    try {
+      setSavingPresets(true);
+      const targetId = activeTemplate?.id || 'tpl-master-vector';
+      const res = await fetch('/api/admin/certificate-templates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: targetId,
+          templateConfig: activeConfig
+        })
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        addToast('Presets Saved', `Typography & positioning presets persisted for "${activeTemplate?.title || 'Active Template'}".`, 'success');
+        fetchTemplates();
+      } else {
+        throw new Error(json.error || 'Failed saving presets');
+      }
+    } catch (err: any) {
+      addToast('Error', err.message, 'error');
+    } finally {
+      setSavingPresets(false);
+    }
+  };
+
+  const triggerPreviewForTemplate = async (tpl: any) => {
+    try {
+      setGeneratingPreview(true);
+      const tplUrl = tpl?.cleanUrl || tpl?.pdfUrl || tpl?.url;
+      const res = await fetch('/api/admin/certificates/sample-preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipientName: previewName,
+          programName: programTitle,
+          programDate: programDate,
+          certificateType: certType,
+          awardCategory: awardCategory,
+          customParagraph: customDescription || undefined,
+          templateConfig: activeConfig,
+          certificateTemplateUrl: tplUrl
+        })
+      });
+
+      const json = await res.json();
+      if (res.ok && json.success) {
+        const cacheBusted = `${json.pdfUrl}${json.pdfUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
+        setLivePdfUrl(cacheBusted);
+      }
+    } catch (e) {
+      console.warn('Silent preview generation exception:', e);
+    } finally {
+      setGeneratingPreview(false);
     }
   };
 
@@ -168,7 +258,7 @@ export default function CertificateTemplatesPage() {
           awardCategory: awardCategory,
           customParagraph: customDescription || undefined,
           templateConfig: activeConfig,
-          certificateTemplateUrl: activeTemplate?.cleanUrl || activeTemplate?.pdfUrl
+          certificateTemplateUrl: activeTemplate?.cleanUrl || activeTemplate?.pdfUrl || activeTemplate?.url
         })
       });
 
@@ -176,12 +266,12 @@ export default function CertificateTemplatesPage() {
       if (res.ok && json.success) {
         const cacheBusted = `${json.pdfUrl}${json.pdfUrl.includes('?') ? '&' : '?'}t=${Date.now()}`;
         setLivePdfUrl(cacheBusted);
-        addToast('Preview updated using active template engine!', 'success');
+        addToast('Live Preview Refreshed', 'Preview rendered using production certificate engine.', 'success');
       } else {
         throw new Error(json.error || 'Failed generating sample preview.');
       }
     } catch (err: any) {
-      addToast(err.message, 'error');
+      addToast('Preview Error', err.message, 'error');
     } finally {
       setGeneratingPreview(false);
     }
@@ -223,41 +313,85 @@ export default function CertificateTemplatesPage() {
             </h2>
 
             <div className="space-y-3">
-              {templates.map((tpl) => (
-                <div
-                  key={tpl.id}
-                  className={`p-4 rounded-2xl border transition-all space-y-3 ${
-                    tpl.isActive
-                      ? 'bg-[#18181E] border-emerald-500/40 shadow-xl'
-                      : 'bg-[#121216] border-white/10'
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-white text-sm">{tpl.title}</h3>
-                        {tpl.isActive && (
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
-                            Active Master
-                          </span>
+              {templates.map((tpl) => {
+                const isSelectedForPreview = (selectedPreviewId ? selectedPreviewId === tpl.id : tpl.isActive);
+                return (
+                  <div
+                    key={tpl.id}
+                    className={`p-4 rounded-2xl border transition-all space-y-3 ${
+                      tpl.isActive
+                        ? 'bg-[#18181E] border-emerald-500/40 shadow-xl'
+                        : isSelectedForPreview
+                        ? 'bg-[#15151A] border-[#F98A5B]/40 shadow-lg'
+                        : 'bg-[#121216] border-white/10 hover:border-white/20'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h3 className="font-bold text-white text-sm">{tpl.title}</h3>
+                          {tpl.isActive && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                              Active Master
+                            </span>
+                          )}
+                          {isSelectedForPreview && !tpl.isActive && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#F98A5B]/20 text-[#F98A5B] border border-[#F98A5B]/40">
+                              Currently Previewing
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] font-mono text-slate-400">{tpl.type}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedPreviewId(tpl.id);
+                            if (tpl.templateConfig) {
+                              setActiveConfig((prev) => ({ ...prev, ...tpl.templateConfig }));
+                            }
+                            triggerPreviewForTemplate(tpl);
+                          }}
+                          className={`px-2.5 py-1 rounded-lg border text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 ${
+                            isSelectedForPreview
+                              ? 'bg-[#F98A5B]/20 border-[#F98A5B] text-white'
+                              : 'bg-white/5 hover:bg-white/10 border-white/10 text-slate-300'
+                          }`}
+                          title="Preview this template in the right pane"
+                        >
+                          <Eye className="w-3 h-3 text-[#F98A5B]" />
+                          <span>Preview</span>
+                        </button>
+
+                        {!tpl.isActive && (
+                          <button
+                            type="button"
+                            onClick={() => handleSetActive(tpl.id)}
+                            className="px-2.5 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-xs font-bold text-emerald-300 transition-colors cursor-pointer"
+                          >
+                            Set Active
+                          </button>
+                        )}
+
+                        {tpl.id !== 'tpl-master-vector' && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteTemplate(tpl.id, tpl.title)}
+                            className="p-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-400 hover:text-rose-300 transition-colors cursor-pointer"
+                            title="Delete custom template"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         )}
                       </div>
-                      <span className="text-[11px] font-mono text-slate-400">{tpl.type}</span>
                     </div>
 
-                    {!tpl.isActive && (
-                      <button
-                        onClick={() => handleSetActive(tpl.id)}
-                        className="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-slate-300 transition-colors"
-                      >
-                        Set Active
-                      </button>
-                    )}
+                    <p className="text-xs text-slate-400">{tpl.description}</p>
                   </div>
-
-                  <p className="text-xs text-slate-400">{tpl.description}</p>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -433,10 +567,12 @@ export default function CertificateTemplatesPage() {
 
               <button
                 type="button"
-                onClick={() => addToast('Template configuration saved successfully!', 'success')}
-                className="py-2.5 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition-colors"
+                disabled={savingPresets}
+                onClick={handleSavePresets}
+                className="py-2.5 px-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition-colors cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
               >
-                Save Presets
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                <span>{savingPresets ? 'Saving...' : 'Save Presets'}</span>
               </button>
             </div>
           </div>

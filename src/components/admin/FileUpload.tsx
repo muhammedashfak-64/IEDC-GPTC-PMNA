@@ -115,13 +115,10 @@ export default function FileUpload({
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const isCurrentValueAnImage =
-    value &&
-    (value.match(/\.(jpg|jpeg|png|webp|gif|svg)(\?.*)?$/i) ||
-      value.startsWith('data:image') ||
-      (!isDocument && !isVideo));
-
-  const isCurrentValueADoc = value && (value.match(/\.(pdf|docx|doc|xlsx|csv)(\?.*)?$/i) || isDocument);
+  const hasDocExt = Boolean(value && value.match(/\.(pdf|docx|doc|xlsx|csv)(\?.*)?$/i));
+  const hasImgExt = Boolean(value && (value.match(/\.(jpg|jpeg|png|webp|gif|svg)(\?.*)?$/i) || value.startsWith('data:image')));
+  const isCurrentValueAnImage = hasImgExt || (!hasDocExt && !isDocument && !isVideo);
+  const isCurrentValueADoc = hasDocExt || isDocument;
 
   return (
     <div className="space-y-2">

@@ -19,54 +19,95 @@ async function safeDbOp(operationName: string, op: () => Promise<any>) {
 // -------------------------------------------------------------
 // EVENTS
 // -------------------------------------------------------------
+export function packEventForSupabase(event: any) {
+  const meta: Record<string, any> = {
+    registrationLink: event.registrationLink || event.registration_link || '',
+    registrationOpen: event.registrationOpen !== false,
+    certificateEligible: event.certificateEligible !== false,
+    facultyCoordinator: event.facultyCoordinator || '',
+    studentCoordinator: event.studentCoordinator || '',
+    certificateTitle: event.certificateTitle || '',
+    certificateParagraph: event.certificateParagraph || '',
+    certificateStatus: event.certificateStatus || event.status || 'Draft',
+    certificateTemplateUrl: event.certificateTemplateUrl || '',
+    templateConfig: event.templateConfig || null,
+    winnerCertificateTitle: event.winnerCertificateTitle || '',
+    winnerCertificateParagraph: event.winnerCertificateParagraph || '',
+    winnerTemplateConfig: event.winnerTemplateConfig || null,
+    awardCategory: event.awardCategory || '',
+    quotaConfig: event.quotaConfig || null
+  };
+
+  return {
+    id: event.id,
+    title: event.title || 'Untitled Event',
+    category: event.category || 'Workshop',
+    level: event.level || 'College',
+    date: event.date || new Date().toISOString().split('T')[0],
+    time: event.time || '10:00 AM - 04:00 PM',
+    venue: event.venue || 'Main Auditorium',
+    description: event.description || '',
+    speaker: event.speaker || '',
+    total_seats: Number(event.totalSeats ?? event.total_seats) || 60,
+    seats_available: Number(event.seatsAvailable ?? event.seats_available ?? event.totalSeats ?? event.total_seats) || 60,
+    banner_image: event.bannerImage || event.banner_image || '',
+    brochure_url: event.brochureUrl || event.brochure_url || '',
+    registration_link: JSON.stringify(meta),
+    status: event.status || 'Published',
+    updated_at: new Date().toISOString()
+  };
+}
+
+export function unpackEventFromSupabase(row: any) {
+  let meta: any = {};
+  if (row.registration_link && typeof row.registration_link === 'string' && row.registration_link.startsWith('{')) {
+    try {
+      meta = JSON.parse(row.registration_link);
+    } catch {}
+  }
+
+  return {
+    id: row.id,
+    title: row.title,
+    category: row.category,
+    level: row.level,
+    date: row.date,
+    time: row.time,
+    venue: row.venue,
+    description: row.description,
+    speaker: row.speaker,
+    totalSeats: Number(row.total_seats) || 0,
+    seatsAvailable: Number(row.seats_available) || 0,
+    bannerImage: row.banner_image,
+    brochureUrl: row.brochure_url,
+    registrationLink: meta.registrationLink || (typeof row.registration_link === 'string' && !row.registration_link.startsWith('{') ? row.registration_link : ''),
+    registrationOpen: meta.registrationOpen !== false,
+    certificateEligible: meta.certificateEligible !== false,
+    status: row.status,
+    facultyCoordinator: meta.facultyCoordinator || '',
+    studentCoordinator: meta.studentCoordinator || '',
+    certificateTitle: meta.certificateTitle || '',
+    certificateParagraph: meta.certificateParagraph || '',
+    certificateStatus: meta.certificateStatus || row.status || 'Draft',
+    certificateTemplateUrl: meta.certificateTemplateUrl || '',
+    templateConfig: meta.templateConfig || null,
+    winnerCertificateTitle: meta.winnerCertificateTitle || '',
+    winnerCertificateParagraph: meta.winnerCertificateParagraph || '',
+    winnerTemplateConfig: meta.winnerTemplateConfig || null,
+    awardCategory: meta.awardCategory || '',
+    quotaConfig: meta.quotaConfig || null,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
+}
+
 export async function syncEventToSupabase(event: any, isUpdate = false) {
   return safeDbOp('syncEventToSupabase', async () => {
-    const baseRow = {
-      id: event.id,
-      title: event.title,
-      category: event.category || 'Workshop',
-      level: event.level || 'College',
-      date: event.date,
-      time: event.time || '10:00 AM - 04:00 PM',
-      venue: event.venue || 'Main Auditorium',
-      description: event.description || '',
-      speaker: event.speaker || '',
-      total_seats: Number(event.totalSeats) || 60,
-      seats_available: Number(event.seatsAvailable ?? event.totalSeats) || 60,
-      banner_image: event.bannerImage || '',
-      brochure_url: event.brochureUrl || '',
-      registration_link: event.registrationLink || '',
-      status: event.status || 'Published',
-      quota_config: event.quotaConfig || null,
-      registration_start_date: event.registrationStartDate || null,
-      registration_closing_date: event.registrationClosingDate || null,
-      updated_at: new Date().toISOString()
-    };
-
-    const fullRow = {
-      ...baseRow,
-      certificate_title: event.certificateTitle || 'CERTIFICATE OF PARTICIPATION',
-      certificate_paragraph: event.certificateParagraph || null,
-      certificate_template_url: event.certificateTemplateUrl || null,
-      template_config: event.templateConfig || null,
-      winner_certificate_title: event.winnerCertificateTitle || 'CERTIFICATE OF ACHIEVEMENT',
-      winner_certificate_paragraph: event.winnerCertificateParagraph || null,
-      winner_template_config: event.winnerTemplateConfig || null,
-      award_category: event.awardCategory || null
-    };
-
+    const row = packEventForSupabase(event);
     if (isUpdate) {
-      const res = await supabaseAdmin.from('events').upsert(fullRow, { onConflict: 'id' });
-      if (res?.error && res.error.message?.includes('column')) {
-        return supabaseAdmin.from('events').upsert(baseRow, { onConflict: 'id' });
-      }
-      return res;
+      return supabaseAdmin.from('events').upsert(row, { onConflict: 'id' });
     }
-    const insertRes = await supabaseAdmin.from('events').insert(fullRow);
-    if (insertRes?.error && insertRes.error.message?.includes('column')) {
-      return supabaseAdmin.from('events').insert(baseRow);
-    }
-    return insertRes;
+    return supabaseAdmin.from('events').insert(row);
   });
 }
 
@@ -398,51 +439,44 @@ export async function syncAuditLogToSupabase(log: any) {
 // -------------------------------------------------------------
 export async function syncRegistrationToSupabase(reg: any, isUpdate = false) {
   return safeDbOp('syncRegistrationToSupabase', async () => {
+    let additionalNotes = reg.additionalNotes || reg.additional_notes || '';
+    const extraMeta: any = {};
+    if (reg.passToken) extraMeta.passToken = reg.passToken;
+    if (reg.qrPayload) extraMeta.qrPayload = reg.qrPayload;
+    if (reg.waitlistPosition != null) extraMeta.waitlistPosition = reg.waitlistPosition;
+    if (reg.district) extraMeta.district = reg.district;
+    if (reg.course) extraMeta.course = reg.course;
+    if (reg.attendance) extraMeta.attendance = reg.attendance;
+    if (reg.attendedAt) extraMeta.attendedAt = reg.attendedAt;
+    if (reg.participationCategory) extraMeta.participationCategory = reg.participationCategory;
+
+    if (Object.keys(extraMeta).length > 0 && !additionalNotes.includes('<!--IEDC_REG_META:')) {
+      additionalNotes = `${additionalNotes}<!--IEDC_REG_META:${JSON.stringify(extraMeta)}-->`;
+    }
+
     const row = {
       id: reg.id,
       registration_code: reg.registrationCode || reg.registration_code || `REG-2026-${reg.id.replace('reg-', '').padStart(5, '0')}`,
       event_id: reg.eventId || reg.event_id,
       event_title: reg.eventTitle || reg.event_title || 'Campus Event',
       student_name: reg.studentName || reg.student_name,
-      register_number: reg.registerNumber || reg.register_number,
+      register_number: reg.registerNumber || reg.register_number || '',
       email: reg.email,
       phone: reg.phone,
       department: reg.department || 'General',
       academic_year: reg.academicYear || reg.academic_year || '2nd Year',
       college_name: reg.collegeName || reg.college_name || 'Govt Polytechnic College Perinthalmanna',
-      participation_category: reg.participationCategory || reg.participation_category || 'Internal',
-      waitlist_position: reg.waitlistPosition ?? reg.waitlist_position ?? null,
-      district: reg.district || null,
-      course: reg.course || null,
-      additional_notes: reg.additionalNotes || reg.additional_notes || '',
+      additional_notes: additionalNotes,
       status: ['Confirmed', 'Pending', 'Attended', 'Cancelled', 'Waitlisted', 'Rejected'].includes(reg.status) ? reg.status : 'Confirmed',
       consent: reg.consent !== false,
       created_at: reg.registeredAt || reg.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
 
-    const fullRow = {
-      ...row,
-      pass_token: reg.passToken || null,
-      qr_payload: reg.qrPayload || null,
-      attendance_status: reg.attendance || (reg.status === 'Attended' ? 'Present' : 'Absent'),
-      attended_at: reg.attendedAt || null,
-      marked_by: reg.markedBy || null,
-      attendance_method: reg.attendanceMethod || null
-    };
-
     if (isUpdate) {
-      const res = await supabaseAdmin.from('registrations').upsert(fullRow, { onConflict: 'id' });
-      if (res?.error && res.error.message?.includes('column')) {
-        return supabaseAdmin.from('registrations').upsert(row, { onConflict: 'id' });
-      }
-      return res;
+      return supabaseAdmin.from('registrations').upsert(row, { onConflict: 'id' });
     }
-    const insertRes = await supabaseAdmin.from('registrations').insert(fullRow);
-    if (insertRes?.error && insertRes.error.message?.includes('column')) {
-      return supabaseAdmin.from('registrations').insert(row);
-    }
-    return insertRes;
+    return supabaseAdmin.from('registrations').insert(row);
   });
 }
 

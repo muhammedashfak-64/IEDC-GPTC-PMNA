@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { registerStudentForEvent, getEvents } from '@/lib/serverStore';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function POST(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
@@ -46,7 +49,7 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Consent to attend and adhere to event guidelines is required.' }, { status: 400 });
     }
 
-    const registration = registerStudentForEvent({
+    const registration = await registerStudentForEvent({
       eventId: id,
       studentName,
       registerNumber,

@@ -105,7 +105,7 @@ async function runTests() {
   // Test updating participation description with mixed casing
   const testParticipationDesc = 'In recognition of your Dedicated Participation in our Advanced AI Workshop.';
   testEvent.certificateParagraph = testParticipationDesc;
-  updateEvent(testEvent.id, { certificateParagraph: testParticipationDesc }, { id: 'admin', full_name: 'Admin' } as any);
+  await updateEvent(testEvent.id, { certificateParagraph: testParticipationDesc }, { id: 'admin', full_name: 'Admin' } as any);
 
   // Reload from db
   const reloadedDb = loadDb();
@@ -130,7 +130,7 @@ async function runTests() {
   // TEST B: Winner Certificate independent description and NO forced uppercase
   console.log('\n--- TEST B: WINNER CERTIFICATE INDEPENDENCE & NO FORCED UPPERCASE ---');
   const testWinnerDesc = 'In recognition of your outstanding achievement and First Prize winning performance in the Drone Workshop, organized by the IEDC Cell, Government Polytechnic College Perinthalmanna.';
-  updateEvent(testEvent.id, {
+  await updateEvent(testEvent.id, {
     winnerCertificateParagraph: testWinnerDesc,
     winnerCertificateTitle: 'WINNER CERTIFICATE'
   }, { id: 'admin', full_name: 'Admin' } as any);

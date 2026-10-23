@@ -38,7 +38,45 @@ export async function POST(req: Request) {
     const cleanReg = String(register_number).trim();
     const cleanPass = String(password).trim().replace(/\D/g, '');
 
-    // Search database
+    // 1. First check local authoritative store
+    const { getCertificates } = await import('@/lib/serverStore');
+    const localCerts = getCertificates(false);
+    const localMatch = localCerts.find((c: any) => {
+      const matchReg = cleanReg && String(c.registerNumber).trim().toLowerCase() === cleanReg.toLowerCase();
+      const matchId = certificate_id && String(c.certificateId).trim().toLowerCase() === certificate_id.toLowerCase();
+      return matchReg || matchId;
+    });
+
+    if (localMatch) {
+      const localPhone = String(localMatch.phone || '').replace(/\D/g, '').slice(-10);
+      if (localPhone && cleanPass !== localPhone && cleanPass.slice(-10) !== localPhone) {
+        return NextResponse.json(
+          { success: false, error: 'Invalid Password. Password should be your registered 10-digit mobile number.' },
+          { status: 401 }
+        );
+      }
+      return NextResponse.json({
+        success: true,
+        verified: true,
+        message: 'Certificate Authentication Successful',
+        certificate: {
+          certificate_id: localMatch.certificateId,
+          participant_name: localMatch.participantName,
+          register_number: localMatch.registerNumber,
+          event_name: localMatch.eventName,
+          event_date: localMatch.eventDate,
+          certificate_type: localMatch.certificateType,
+          status: localMatch.status || 'Verified',
+          qr_code_url: localMatch.qrCodeUrl || `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/${localMatch.certificateId}`,
+          verification_url: `/verify/${localMatch.certificateId}`,
+          pdf_storage_url: `/api/public/certificates/${localMatch.certificateId}/pdf`,
+          pdf_download_url: `/api/public/certificates/${localMatch.certificateId}/pdf`,
+          png_download_url: `/api/public/certificates/${localMatch.certificateId}/png`
+        }
+      });
+    }
+
+    // 2. Search Supabase if not found locally
     let query = supabase
       .from('certificates')
       .select('*')

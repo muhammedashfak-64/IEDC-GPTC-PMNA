@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getSettings, getEvents, getProjects, getPartners, getAnnouncements } from '@/lib/serverStore';
+import { getSettings, getEventsAsync, getProjects, getPartners, getAnnouncements } from '@/lib/serverStore';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -40,7 +40,7 @@ export async function GET() {
     };
 
     // All published events intended for public viewing
-    const allPublishedEvents = getEvents(true);
+    const allPublishedEvents = await getEventsAsync(true);
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 

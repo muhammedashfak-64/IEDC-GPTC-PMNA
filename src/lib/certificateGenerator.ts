@@ -578,42 +578,36 @@ export async function generateSingleCertificatePdf(
     } catch {}
   }
 
-  // 10. Upload to Supabase Storage if configured
-  let publicUrl = `/certificates/${fileName}`;
+  // 10. Supabase Storage: compute publicUrl and dispatch upload asynchronously in background
+  let publicUrl = `/api/public/certificates/${params.certificateId}/pdf`;
   if (isSupabaseAdminConfigured()) {
     try {
-      const uploadPromise = supabaseAdmin.storage
+      const { data: urlData } = supabaseAdmin.storage
+        .from('certificates')
+        .getPublicUrl(fileName);
+      if (urlData?.publicUrl) {
+        publicUrl = urlData.publicUrl;
+      }
+
+      // Non-blocking upload in background so batch certificate generation does not stall HTTP serverless threads
+      supabaseAdmin.storage
         .from('certificates')
         .upload(fileName, pdfBytes, {
           contentType: 'application/pdf',
           upsert: true
+        })
+        .catch((e: any) => {
+          console.warn(`Supabase storage background upload notice for ${fileName}:`, e?.message);
         });
-      const timeoutPromise = new Promise<{ error: any }>((resolve) =>
-        setTimeout(() => resolve({ error: new Error('Upload timed out after 20s') }), 20000)
-      );
-      const { error: uploadErr } = await Promise.race([uploadPromise, timeoutPromise]);
-
-      if (!uploadErr) {
-        const { data: urlData } = supabaseAdmin.storage
-          .from('certificates')
-          .getPublicUrl(fileName);
-        if (urlData?.publicUrl) {
-          publicUrl = urlData.publicUrl;
-        }
-      } else {
-        console.warn('Supabase storage upload warning (using local mirror):', uploadErr.message);
-      }
     } catch (e: any) {
-      console.warn('Supabase storage exception (using local mirror):', e.message);
+      // Local copy is already saved safely
     }
   }
 
-  // 11. Ensure companion high-resolution PNG is also rendered and cached
-  try {
-    await generateSingleCertificatePng(params, config);
-  } catch (pngErr: any) {
+  // 11. Companion high-resolution PNG rendered non-blockingly
+  generateSingleCertificatePng(params, config).catch((pngErr: any) => {
     console.warn(`Companion PNG generation notice for ${params.certificateId}:`, pngErr?.message);
-  }
+  });
 
   return {
     pdfBytes,
@@ -788,7 +782,7 @@ export async function generateSingleCertificatePng(
     } catch {}
   }
 
-  let publicUrl = `/certificates/${fileName}`;
+  let publicUrl = `/api/public/certificates/${params.certificateId}/png`;
   if (isSupabaseAdminConfigured()) {
     try {
       const uploadPromise = supabaseAdmin.storage
@@ -798,7 +792,7 @@ export async function generateSingleCertificatePng(
           upsert: true
         });
       const timeoutPromise = new Promise<{ error: any }>((resolve) =>
-        setTimeout(() => resolve({ error: new Error('Upload timed out after 20s') }), 20000)
+        setTimeout(() => resolve({ error: new Error('PNG Upload timed out after 2.5s') }), 2500)
       );
       const { error: uploadErr } = await Promise.race([uploadPromise, timeoutPromise]);
       if (!uploadErr) {
@@ -806,7 +800,7 @@ export async function generateSingleCertificatePng(
         if (urlData?.publicUrl) publicUrl = urlData.publicUrl;
       }
     } catch (e: any) {
-      console.warn('Supabase PNG storage upload warning:', e.message);
+      // Local copy saved safely
     }
   }
 

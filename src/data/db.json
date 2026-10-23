@@ -183,6 +183,254 @@
   ],
   "events": [
     {
+      "id": "evt-test-cert",
+      "title": "State-Level AI & Robotics Workshop 2026",
+      "category": "Workshop",
+      "level": "State",
+      "date": "24 October 2026",
+      "time": "09:30 AM - 04:30 PM",
+      "venue": "Main Auditorium",
+      "description": "",
+      "speaker": "",
+      "totalSeats": 60,
+      "seatsAvailable": 60,
+      "bannerImage": "",
+      "brochureUrl": "",
+      "registrationLink": "",
+      "registrationOpen": true,
+      "certificateEligible": true,
+      "status": "Published",
+      "facultyCoordinator": "",
+      "studentCoordinator": "",
+      "certificateTitle": "CERTIFICATE OF PARTICIPATION",
+      "certificateParagraph": "In recognition of your Dedicated Participation in our Advanced AI Workshop.",
+      "certificateStatus": "Published",
+      "certificateTemplateUrl": "",
+      "templateConfig": {
+        "nameY": 305,
+        "nameFontSize": 34,
+        "nameColor": "#8B0000",
+        "paraY": 252,
+        "paraFontSize": 12.5,
+        "paraMaxWidth": 580,
+        "paraLineSpacing": 18,
+        "paraColor": "#1F2937",
+        "paraAlign": "center",
+        "paraBold": false,
+        "showCertId": true,
+        "certIdY": 45
+      },
+      "winnerCertificateTitle": "WINNER CERTIFICATE",
+      "winnerCertificateParagraph": "In recognition of your outstanding achievement and First Prize winning performance in the Drone Workshop, organized by the IEDC Cell, Government Polytechnic College Perinthalmanna.",
+      "winnerTemplateConfig": {
+        "nameY": 305,
+        "nameFontSize": 34,
+        "nameColor": "#8B0000",
+        "paraX": 0,
+        "paraY": 252,
+        "paraFontSize": 12.5,
+        "paraMaxWidth": 580,
+        "paraLineSpacing": 18,
+        "paraColor": "#1F2937",
+        "paraAlign": "center",
+        "paraBold": false,
+        "showCertId": true,
+        "certIdY": 45,
+        "subtitleY": 398,
+        "introY": 363
+      },
+      "awardCategory": "First Prize Winner",
+      "quotaConfig": {
+        "participationType": "Statewide",
+        "singleClass": {
+          "department": "Mechanical Engineering",
+          "academicYear": "Second Year",
+          "maxSeats": 25
+        },
+        "classes": {
+          "Electronics Engineering__First Year": {
+            "department": "Electronics Engineering",
+            "academicYear": "First Year",
+            "enabled": true,
+            "maxSeats": 5
+          },
+          "Electronics Engineering__Second Year": {
+            "department": "Electronics Engineering",
+            "academicYear": "Second Year",
+            "enabled": true,
+            "maxSeats": 5
+          },
+          "Electronics Engineering__Third Year": {
+            "department": "Electronics Engineering",
+            "academicYear": "Third Year",
+            "enabled": true,
+            "maxSeats": 5
+          },
+          "Civil Engineering__First Year": {
+            "department": "Civil Engineering",
+            "academicYear": "First Year",
+            "enabled": true,
+            "maxSeats": 5
+          },
+          "Civil Engineering__Second Year": {
+            "department": "Civil Engineering",
+            "academicYear": "Second Year",
+            "enabled": true,
+            "maxSeats": 5
+          },
+          "Civil Engineering__Third Year": {
+            "department": "Civil Engineering",
+            "academicYear": "Third Year",
+            "enabled": true,
+            "maxSeats": 5
+          },
+          "Mechanical Engineering__First Year": {
+            "department": "Mechanical Engineering",
+            "academicYear": "First Year",
+            "enabled": true,
+            "maxSeats": 5
+          },
+          "Mechanical Engineering__Second Year": {
+            "department": "Mechanical Engineering",
+            "academicYear": "Second Year",
+            "enabled": true,
+            "maxSeats": 5
+          },
+          "Mechanical Engineering__Third Year": {
+            "department": "Mechanical Engineering",
+            "academicYear": "Third Year",
+            "enabled": true,
+            "maxSeats": 5
+          },
+          "Electrical and Electronics Engineering__First Year": {
+            "department": "Electrical and Electronics Engineering",
+            "academicYear": "First Year",
+            "enabled": true,
+            "maxSeats": 5
+          },
+          "Electrical and Electronics Engineering__Second Year": {
+            "department": "Electrical and Electronics Engineering",
+            "academicYear": "Second Year",
+            "enabled": true,
+            "maxSeats": 5
+          },
+          "Electrical and Electronics Engineering__Third Year": {
+            "department": "Electrical and Electronics Engineering",
+            "academicYear": "Third Year",
+            "enabled": true,
+            "maxSeats": 5
+          }
+        },
+        "externalQuota": {
+          "enabled": true,
+          "maxSeats": 30
+        },
+        "waitlistEnabled": true,
+        "reallocationLogs": []
+      },
+      "createdAt": "2026-10-23T02:12:42.83273+00:00",
+      "updatedAt": "2026-10-23T02:33:14.635Z"
+    },
+    {
+      "id": "evt-1792722633911",
+      "title": "Rapid Event B - Cloud Workshop",
+      "category": "Hackathon",
+      "level": "State",
+      "date": "2026-11-20",
+      "time": "09:00 AM - 05:00 PM",
+      "venue": "Lab Complex",
+      "description": "Testing concurrency",
+      "speaker": "",
+      "totalSeats": 50,
+      "seatsAvailable": 50,
+      "bannerImage": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80",
+      "brochureUrl": "",
+      "registrationLink": "",
+      "registrationOpen": true,
+      "certificateEligible": true,
+      "status": "Published",
+      "facultyCoordinator": "Coordinator",
+      "studentCoordinator": "",
+      "certificateTitle": "",
+      "certificateParagraph": "",
+      "certificateStatus": "Published",
+      "certificateTemplateUrl": "",
+      "templateConfig": null,
+      "winnerCertificateTitle": "",
+      "winnerCertificateParagraph": "",
+      "winnerTemplateConfig": null,
+      "awardCategory": "",
+      "quotaConfig": null,
+      "createdAt": "2026-10-23T02:30:34.524564+00:00",
+      "updatedAt": "2026-10-23T02:30:33.911+00:00"
+    },
+    {
+      "id": "evt-1792722633912",
+      "title": "Rapid Event C - Drone Bootcamp",
+      "category": "Hackathon",
+      "level": "State",
+      "date": "2026-11-20",
+      "time": "09:00 AM - 05:00 PM",
+      "venue": "Lab Complex",
+      "description": "Testing concurrency",
+      "speaker": "",
+      "totalSeats": 50,
+      "seatsAvailable": 50,
+      "bannerImage": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80",
+      "brochureUrl": "",
+      "registrationLink": "",
+      "registrationOpen": true,
+      "certificateEligible": true,
+      "status": "Published",
+      "facultyCoordinator": "Coordinator",
+      "studentCoordinator": "",
+      "certificateTitle": "",
+      "certificateParagraph": "",
+      "certificateStatus": "Published",
+      "certificateTemplateUrl": "",
+      "templateConfig": null,
+      "winnerCertificateTitle": "",
+      "winnerCertificateParagraph": "",
+      "winnerTemplateConfig": null,
+      "awardCategory": "",
+      "quotaConfig": null,
+      "createdAt": "2026-10-23T02:30:34.498997+00:00",
+      "updatedAt": "2026-10-23T02:30:33.912+00:00"
+    },
+    {
+      "id": "evt-1792722483510",
+      "title": "Automated E2E Test Event - AI Innovation Summit",
+      "category": "Workshop",
+      "level": "State",
+      "date": "2026-11-15",
+      "time": "10:00 AM - 04:00 PM",
+      "venue": "Main Seminar Hall, GPTC PMNA",
+      "description": "End-to-end testing of event creation, Supabase persistence, and revalidation.",
+      "speaker": "Dr. Jane Smith, AI Research Lead",
+      "totalSeats": 75,
+      "seatsAvailable": 75,
+      "bannerImage": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800",
+      "brochureUrl": "https://example.com/brochure.pdf",
+      "registrationLink": "",
+      "registrationOpen": true,
+      "certificateEligible": true,
+      "status": "Published",
+      "facultyCoordinator": "Prof. Test Coordinator",
+      "studentCoordinator": "Test Lead",
+      "certificateTitle": "",
+      "certificateParagraph": "",
+      "certificateStatus": "Published",
+      "certificateTemplateUrl": "",
+      "templateConfig": null,
+      "winnerCertificateTitle": "",
+      "winnerCertificateParagraph": "",
+      "winnerTemplateConfig": null,
+      "awardCategory": "",
+      "quotaConfig": null,
+      "createdAt": "2026-10-23T02:28:04.838225+00:00",
+      "updatedAt": "2026-10-23T02:28:03.512+00:00"
+    },
+    {
       "id": "evt-1792519111753",
       "title": "Quota Automated Test Hackathon 2026",
       "category": "Hackathon",
@@ -196,13 +444,51 @@
       "seatsAvailable": 39,
       "bannerImage": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80",
       "brochureUrl": "",
+      "registrationLink": "",
       "registrationOpen": false,
       "certificateEligible": false,
       "status": "Archived",
       "facultyCoordinator": "Anuroop",
       "studentCoordinator": "",
-      "createdBy": "usr-faculty-01",
-      "createdAt": "2026-10-20T17:58:31.753Z",
+      "certificateTitle": "CERTIFICATE OF PARTICIPATION",
+      "certificateParagraph": "",
+      "certificateStatus": "Archived",
+      "certificateTemplateUrl": "",
+      "templateConfig": {
+        "nameY": 305,
+        "nameFontSize": 34,
+        "nameColor": "#8B0000",
+        "paraX": 0,
+        "paraY": 252,
+        "paraFontSize": 12.5,
+        "paraLineSpacing": 18,
+        "paraMaxWidth": 580,
+        "paraColor": "#1F2937",
+        "paraAlign": "center",
+        "paraBold": false,
+        "showCertId": true,
+        "certIdY": 45
+      },
+      "winnerCertificateTitle": "WINNER CERTIFICATE",
+      "winnerCertificateParagraph": "In recognition of your outstanding achievement and winning performance in the Drone Workshop, organized by the IEDC Cell, Government Polytechnic College Perinthalmanna.",
+      "winnerTemplateConfig": {
+        "nameY": 305,
+        "nameFontSize": 34,
+        "nameColor": "#8B0000",
+        "paraX": 0,
+        "paraY": 252,
+        "paraFontSize": 12.5,
+        "paraLineSpacing": 18,
+        "paraMaxWidth": 580,
+        "paraColor": "#1F2937",
+        "paraAlign": "center",
+        "paraBold": false,
+        "showCertId": true,
+        "certIdY": 45,
+        "subtitleY": 398,
+        "introY": 363
+      },
+      "awardCategory": "First Prize Winner",
       "quotaConfig": {
         "participationType": "Statewide",
         "singleClass": {
@@ -306,7 +592,66 @@
         ],
         "isStatewide": true
       },
-      "updatedAt": "2026-10-21T06:34:31.617Z",
+      "createdAt": "2026-10-23T02:12:40.197299+00:00",
+      "updatedAt": "2026-10-21T06:34:31.617+00:00"
+    },
+    {
+      "id": "evt-1792722521785",
+      "title": "Automated E2E Test Event - AI Innovation Summit (UPDATED)",
+      "category": "Workshop",
+      "level": "State",
+      "date": "2026-11-15",
+      "time": "10:00 AM - 04:00 PM",
+      "venue": "Advanced IoT Lab & Auditorium",
+      "description": "End-to-end testing of event creation, Supabase persistence, and revalidation.",
+      "speaker": "Dr. Jane Smith, AI Research Lead",
+      "totalSeats": 120,
+      "seatsAvailable": 75,
+      "bannerImage": "https://images.unsplash.com/photo-1518770660439-4636190af475?w=800",
+      "brochureUrl": "https://example.com/brochure.pdf",
+      "registrationLink": "",
+      "registrationOpen": true,
+      "certificateEligible": true,
+      "status": "Published",
+      "facultyCoordinator": "Prof. Test Coordinator",
+      "studentCoordinator": "Test Lead",
+      "certificateTitle": "",
+      "certificateParagraph": "",
+      "certificateStatus": "Published",
+      "certificateTemplateUrl": "",
+      "templateConfig": null,
+      "winnerCertificateTitle": "",
+      "winnerCertificateParagraph": "",
+      "winnerTemplateConfig": null,
+      "awardCategory": "",
+      "quotaConfig": null,
+      "createdAt": "2026-10-23T02:28:42.893592+00:00",
+      "updatedAt": "2026-10-23T02:28:44.064+00:00"
+    },
+    {
+      "id": "evt-1792463201770",
+      "title": "DRONE WORKSHOP",
+      "category": "Workshop",
+      "level": "College",
+      "date": "2026-10-20",
+      "time": "09:00 AM - 05:00 PM",
+      "venue": "Main Auditorium & ICFC Lab",
+      "description": "DRONE ",
+      "speaker": "",
+      "totalSeats": 100,
+      "seatsAvailable": 93,
+      "bannerImage": "https://roboprenr.com/media/images/Drone-Workshop-Image.jpg",
+      "brochureUrl": "https://roboprenr.com/media/images/Drone-Workshop-Image.jpg",
+      "registrationLink": "",
+      "registrationOpen": true,
+      "certificateEligible": true,
+      "status": "Published",
+      "facultyCoordinator": "Prof. Muhammed Rashid",
+      "studentCoordinator": "Rahul V",
+      "certificateTitle": "CERTIFICATE OF PARTICIPATION",
+      "certificateParagraph": "In recognition of your outstanding participation and dedication in the State-Wide\nHands-on Workshop on drone, organized by the IEDC Cell, Government\nPolytechnic College Perinthalmanna, held on 21 July 2026.\n",
+      "certificateStatus": "Published",
+      "certificateTemplateUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/website-assets/certificate-templates/IEDC_CERTIFICATE_TEMPLATE_1792565763716.jpg",
       "templateConfig": {
         "nameY": 305,
         "nameFontSize": 34,
@@ -316,12 +661,14 @@
         "paraFontSize": 12.5,
         "paraLineSpacing": 18,
         "paraMaxWidth": 580,
-        "paraColor": "#1F2937",
+        "paraColor": "#1b222c",
         "paraAlign": "center",
         "paraBold": false,
         "showCertId": true,
         "certIdY": 45
       },
+      "winnerCertificateTitle": "WINNER CERTIFICATE",
+      "winnerCertificateParagraph": "",
       "winnerTemplateConfig": {
         "nameY": 305,
         "nameFontSize": 34,
@@ -339,12 +686,97 @@
         "subtitleY": 398,
         "introY": 363
       },
-      "certificateTitle": "CERTIFICATE OF PARTICIPATION",
-      "certificateParagraph": "",
-      "winnerCertificateTitle": "WINNER CERTIFICATE",
-      "winnerCertificateParagraph": "In recognition of your outstanding achievement and winning performance in the Drone Workshop, organized by the IEDC Cell, Government Polytechnic College Perinthalmanna.",
       "awardCategory": "First Prize Winner",
-      "certificateTemplateUrl": ""
+      "quotaConfig": {
+        "participationType": "Entire College",
+        "singleClass": {
+          "department": "Mechanical Engineering",
+          "academicYear": "Second Year",
+          "maxSeats": 25
+        },
+        "classes": {
+          "Electronics Engineering__First Year": {
+            "department": "Electronics Engineering",
+            "academicYear": "First Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Electronics Engineering__Second Year": {
+            "department": "Electronics Engineering",
+            "academicYear": "Second Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Electronics Engineering__Third Year": {
+            "department": "Electronics Engineering",
+            "academicYear": "Third Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Civil Engineering__First Year": {
+            "department": "Civil Engineering",
+            "academicYear": "First Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Civil Engineering__Second Year": {
+            "department": "Civil Engineering",
+            "academicYear": "Second Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Civil Engineering__Third Year": {
+            "department": "Civil Engineering",
+            "academicYear": "Third Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Mechanical Engineering__First Year": {
+            "department": "Mechanical Engineering",
+            "academicYear": "First Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Mechanical Engineering__Second Year": {
+            "department": "Mechanical Engineering",
+            "academicYear": "Second Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Mechanical Engineering__Third Year": {
+            "department": "Mechanical Engineering",
+            "academicYear": "Third Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Electrical and Electronics Engineering__First Year": {
+            "department": "Electrical and Electronics Engineering",
+            "academicYear": "First Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Electrical and Electronics Engineering__Second Year": {
+            "department": "Electrical and Electronics Engineering",
+            "academicYear": "Second Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Electrical and Electronics Engineering__Third Year": {
+            "department": "Electrical and Electronics Engineering",
+            "academicYear": "Third Year",
+            "enabled": true,
+            "maxSeats": 8
+          }
+        },
+        "externalQuota": {
+          "enabled": false,
+          "maxSeats": 0
+        },
+        "waitlistEnabled": true,
+        "reallocationLogs": []
+      },
+      "createdAt": "2026-10-20T02:26:42.389713+00:00",
+      "updatedAt": "2026-10-21T08:55:15.265+00:00"
     },
     {
       "id": "evt-1792507055299",
@@ -360,13 +792,16 @@
       "seatsAvailable": 49,
       "bannerImage": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/event-posters/events/Screenshot_2026-10-20_234101_1792519898663.png",
       "brochureUrl": "",
+      "registrationLink": "",
       "registrationOpen": true,
       "certificateEligible": true,
       "status": "Published",
       "facultyCoordinator": "Prof. Muhammed Rashid",
       "studentCoordinator": "Rahul V",
-      "createdBy": "usr-faculty-01",
-      "createdAt": "2026-10-20T14:37:35.299Z",
+      "certificateTitle": "",
+      "certificateParagraph": "In recognition of your outstanding participation and dedication in the State-Wide Design Thinking Workshop\n2026, organized by the IEDC Cell, Government Polytechnic College Perinthalmanna, held on 20 October\n2026.",
+      "certificateStatus": "Published",
+      "certificateTemplateUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/website-assets/certificate-templates/FUBU_1792507194173.jpg",
       "templateConfig": {
         "nameY": 305,
         "nameFontSize": 34,
@@ -378,10 +813,10 @@
         "showCertId": true,
         "certIdY": 45
       },
-      "certificateParagraph": "In recognition of your outstanding participation and dedication in the State-Wide Design Thinking Workshop\n2026, organized by the IEDC Cell, Government Polytechnic College Perinthalmanna, held on 20 October\n2026.",
-      "certificateTemplateUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/website-assets/certificate-templates/FUBU_1792507194173.jpg",
-      "updatedAt": "2026-10-20T19:33:54.458Z",
-      "certificateStatus": "Published",
+      "winnerCertificateTitle": "",
+      "winnerCertificateParagraph": "",
+      "winnerTemplateConfig": null,
+      "awardCategory": "",
       "quotaConfig": {
         "participationType": "Entire College",
         "singleClass": {
@@ -483,160 +918,70 @@
             "adminUser": "Muhammed Ashfak O"
           }
         ]
-      }
-    },
-    {
-      "id": "evt-1792463201770",
-      "title": "DRONE WORKSHOP",
-      "category": "Workshop",
-      "level": "College",
-      "date": "2026-10-20",
-      "time": "09:00 AM - 05:00 PM",
-      "venue": "Main Auditorium & ICFC Lab",
-      "description": "DRONE ",
-      "speaker": "",
-      "totalSeats": 100,
-      "seatsAvailable": 93,
-      "bannerImage": "https://roboprenr.com/media/images/Drone-Workshop-Image.jpg",
-      "brochureUrl": "https://roboprenr.com/media/images/Drone-Workshop-Image.jpg",
-      "registrationOpen": true,
-      "certificateEligible": true,
-      "status": "Published",
-      "facultyCoordinator": "Prof. Muhammed Rashid",
-      "studentCoordinator": "Rahul V",
-      "createdBy": "usr-faculty-01",
-      "createdAt": "2026-10-20T02:26:41.770Z",
-      "updatedAt": "2026-10-21T08:55:15.265Z",
-      "templateConfig": {
-        "nameY": 305,
-        "nameFontSize": 34,
-        "nameColor": "#8B0000",
-        "paraX": 0,
-        "paraY": 252,
-        "paraFontSize": 12.5,
-        "paraLineSpacing": 18,
-        "paraMaxWidth": 580,
-        "paraColor": "#1b222c",
-        "paraAlign": "center",
-        "paraBold": false,
-        "showCertId": true,
-        "certIdY": 45
       },
-      "certificateTemplateUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/website-assets/certificate-templates/IEDC_CERTIFICATE_TEMPLATE_1792565763716.jpg",
-      "certificateParagraph": "In recognition of your outstanding participation and dedication in the State-Wide\nHands-on Workshop on drone, organized by the IEDC Cell, Government\nPolytechnic College Perinthalmanna, held on 21 July 2026.\n",
-      "certificateStatus": "Published",
-      "quotaConfig": {
-        "participationType": "Entire College",
-        "singleClass": {
-          "department": "Mechanical Engineering",
-          "academicYear": "Second Year",
-          "maxSeats": 25
-        },
-        "classes": {
-          "Electronics Engineering__First Year": {
-            "department": "Electronics Engineering",
-            "academicYear": "First Year",
-            "enabled": true,
-            "maxSeats": 8
-          },
-          "Electronics Engineering__Second Year": {
-            "department": "Electronics Engineering",
-            "academicYear": "Second Year",
-            "enabled": true,
-            "maxSeats": 8
-          },
-          "Electronics Engineering__Third Year": {
-            "department": "Electronics Engineering",
-            "academicYear": "Third Year",
-            "enabled": true,
-            "maxSeats": 8
-          },
-          "Civil Engineering__First Year": {
-            "department": "Civil Engineering",
-            "academicYear": "First Year",
-            "enabled": true,
-            "maxSeats": 8
-          },
-          "Civil Engineering__Second Year": {
-            "department": "Civil Engineering",
-            "academicYear": "Second Year",
-            "enabled": true,
-            "maxSeats": 8
-          },
-          "Civil Engineering__Third Year": {
-            "department": "Civil Engineering",
-            "academicYear": "Third Year",
-            "enabled": true,
-            "maxSeats": 8
-          },
-          "Mechanical Engineering__First Year": {
-            "department": "Mechanical Engineering",
-            "academicYear": "First Year",
-            "enabled": true,
-            "maxSeats": 8
-          },
-          "Mechanical Engineering__Second Year": {
-            "department": "Mechanical Engineering",
-            "academicYear": "Second Year",
-            "enabled": true,
-            "maxSeats": 8
-          },
-          "Mechanical Engineering__Third Year": {
-            "department": "Mechanical Engineering",
-            "academicYear": "Third Year",
-            "enabled": true,
-            "maxSeats": 8
-          },
-          "Electrical and Electronics Engineering__First Year": {
-            "department": "Electrical and Electronics Engineering",
-            "academicYear": "First Year",
-            "enabled": true,
-            "maxSeats": 8
-          },
-          "Electrical and Electronics Engineering__Second Year": {
-            "department": "Electrical and Electronics Engineering",
-            "academicYear": "Second Year",
-            "enabled": true,
-            "maxSeats": 8
-          },
-          "Electrical and Electronics Engineering__Third Year": {
-            "department": "Electrical and Electronics Engineering",
-            "academicYear": "Third Year",
-            "enabled": true,
-            "maxSeats": 8
-          }
-        },
-        "externalQuota": {
-          "enabled": false,
-          "maxSeats": 0
-        },
-        "waitlistEnabled": true,
-        "reallocationLogs": []
-      },
-      "winnerTemplateConfig": {
-        "nameY": 305,
-        "nameFontSize": 34,
-        "nameColor": "#8B0000",
-        "paraX": 0,
-        "paraY": 252,
-        "paraFontSize": 12.5,
-        "paraLineSpacing": 18,
-        "paraMaxWidth": 580,
-        "paraColor": "#1F2937",
-        "paraAlign": "center",
-        "paraBold": false,
-        "showCertId": true,
-        "certIdY": 45,
-        "subtitleY": 398,
-        "introY": 363
-      },
-      "certificateTitle": "CERTIFICATE OF PARTICIPATION",
-      "winnerCertificateTitle": "WINNER CERTIFICATE",
-      "winnerCertificateParagraph": "",
-      "awardCategory": "First Prize Winner"
+      "createdAt": "2026-10-20T14:37:36.619533+00:00",
+      "updatedAt": "2026-10-20T19:33:54.458+00:00"
     }
   ],
   "registrations": [
+    {
+      "id": "reg-1792722756923-dxf0",
+      "registrationCode": "REG-2026-26921",
+      "passToken": "pass_da7c4b7e5ba67aa1f21be42c",
+      "qrPayload": "IEDCPASS:evt-1792722753652-idl8rx:REG-2026-26921:pass_da7c4b7e5ba67aa1f21be42c",
+      "eventId": "evt-1792722753652-idl8rx",
+      "eventTitle": "Automated E2E Test Event - AI Innovation Summit (UPDATED)",
+      "studentName": "Test Student E2E",
+      "registerNumber": "TEST9988",
+      "email": "teststudent9988@gptcpmna.ac.in",
+      "phone": "9876543210",
+      "department": "Electronics Engineering",
+      "academicYear": "Third Year",
+      "collegeName": "Govt Polytechnic College Perinthalmanna",
+      "participationCategory": "Internal",
+      "district": "",
+      "course": "",
+      "additionalNotes": "",
+      "status": "Confirmed",
+      "attendance": null,
+      "attendanceMethod": null,
+      "attendedAt": null,
+      "markedBy": null,
+      "markedById": null,
+      "waitlistPosition": null,
+      "consent": true,
+      "registeredAt": "2026-10-23T02:32:36.923Z",
+      "createdAt": "2026-10-23T02:32:36.923Z"
+    },
+    {
+      "id": "reg-1792722626077-r6tg",
+      "registrationCode": "REG-2026-84781",
+      "passToken": "pass_9603556d4f68249cf331386f",
+      "qrPayload": "IEDCPASS:evt-1792722619649:REG-2026-84781:pass_9603556d4f68249cf331386f",
+      "eventId": "evt-1792722619649",
+      "eventTitle": "Automated E2E Test Event - AI Innovation Summit (UPDATED)",
+      "studentName": "Test Student E2E",
+      "registerNumber": "TEST9988",
+      "email": "teststudent9988@gptcpmna.ac.in",
+      "phone": "9876543210",
+      "department": "Electronics Engineering",
+      "academicYear": "Third Year",
+      "collegeName": "Govt Polytechnic College Perinthalmanna",
+      "participationCategory": "Internal",
+      "district": "",
+      "course": "",
+      "additionalNotes": "",
+      "status": "Confirmed",
+      "attendance": null,
+      "attendanceMethod": null,
+      "attendedAt": null,
+      "markedBy": null,
+      "markedById": null,
+      "waitlistPosition": null,
+      "consent": true,
+      "registeredAt": "2026-10-23T02:30:26.077Z",
+      "createdAt": "2026-10-23T02:30:26.077Z"
+    },
     {
       "id": "reg-1792572900901-8qcm",
       "registrationCode": "REG-2026-49488",
@@ -1603,15 +1948,14 @@
       "email": "rahul.test@gptcpmna.edu.in",
       "certificateType": "Participant",
       "eventDate": "2026-10-20",
-      "issueDate": "2026-10-21",
+      "issueDate": "2026-10-22",
       "qrCodeUrl": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/IEDC-2026-21922",
-      "pdfStorageUrl": "/certificates/IEDC-2026-21922.pdf",
+      "pdfStorageUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/certificates/IEDC-2026-21922.pdf",
       "pngStorageUrl": "/certificates/IEDC-2026-21922.png",
       "status": "Published",
-      "downloadsCount": 5,
-      "issuedBy": "usr-admin-test",
-      "issuedAt": "2026-10-21T08:55:12.097Z",
-      "updatedAt": "2026-10-21T08:55:15.265Z"
+      "downloadsCount": 8,
+      "issuedBy": "admin",
+      "issuedAt": "2026-10-22T22:29:29.877Z"
     },
     {
       "id": "cert-1792507269700-xxk9",
@@ -1645,15 +1989,14 @@
       "email": "panshadh@gmail.com",
       "certificateType": "Participant",
       "eventDate": "2026-10-20",
-      "issueDate": "2026-10-21",
+      "issueDate": "2026-10-22",
       "qrCodeUrl": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/IEDC-2026-43968",
-      "pdfStorageUrl": "/certificates/IEDC-2026-43968.pdf",
+      "pdfStorageUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/certificates/IEDC-2026-43968.pdf",
       "pngStorageUrl": "/certificates/IEDC-2026-43968.png",
       "status": "Published",
       "downloadsCount": 7,
-      "issuedBy": "usr-admin-test",
-      "issuedAt": "2026-10-21T08:55:14.241Z",
-      "updatedAt": "2026-10-21T08:55:15.265Z"
+      "issuedBy": "admin",
+      "issuedAt": "2026-10-22T22:29:40.539Z"
     },
     {
       "id": "cert-1792500537399-zqxb",
@@ -1667,15 +2010,14 @@
       "email": "faheemafarhanath213@gmail.com",
       "certificateType": "Participant",
       "eventDate": "2026-10-20",
-      "issueDate": "2026-10-21",
+      "issueDate": "2026-10-22",
       "qrCodeUrl": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/IEDC-2026-43345",
-      "pdfStorageUrl": "/certificates/IEDC-2026-43345.pdf",
+      "pdfStorageUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/certificates/IEDC-2026-43345.pdf",
       "pngStorageUrl": "/certificates/IEDC-2026-43345.png",
       "status": "Published",
       "downloadsCount": 6,
-      "issuedBy": "usr-admin-test",
-      "issuedAt": "2026-10-21T08:55:13.154Z",
-      "updatedAt": "2026-10-21T08:55:15.265Z"
+      "issuedBy": "admin",
+      "issuedAt": "2026-10-22T22:29:35.066Z"
     },
     {
       "id": "cert-1792496374240-tksr",
@@ -1689,15 +2031,14 @@
       "email": "muhammedashfako64@gmail.com",
       "certificateType": "Participant",
       "eventDate": "2026-10-20",
-      "issueDate": "2026-10-21",
+      "issueDate": "2026-10-22",
       "qrCodeUrl": "https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=http://localhost:3000/verify/IEDC-2026-58845",
-      "pdfStorageUrl": "/certificates/IEDC-2026-58845.pdf",
+      "pdfStorageUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/certificates/IEDC-2026-58845.pdf",
       "pngStorageUrl": "/certificates/IEDC-2026-58845.png",
       "status": "Published",
       "downloadsCount": 7,
-      "issuedBy": "usr-admin-test",
-      "issuedAt": "2026-10-21T08:55:15.256Z",
-      "updatedAt": "2026-10-21T08:55:15.265Z"
+      "issuedBy": "admin",
+      "issuedAt": "2026-10-22T22:29:44.559Z"
     },
     {
       "id": "cert-1792483518096-7l97",
@@ -1894,6 +2235,18 @@
   ],
   "certificateTemplates": [
     {
+      "id": "tpl-master-vector",
+      "title": "Official IEDC Master Certificate (Vector Reference)",
+      "type": "Vector PDF Master",
+      "pdfUrl": "/templates/reference_certificate.pdf",
+      "cleanUrl": "/templates/clean_master_template.pdf",
+      "previewPdf": "/templates/test_generated_certificate.pdf",
+      "isActive": false,
+      "version": 1,
+      "createdAt": "2026-10-22T23:00:08.604Z",
+      "description": "Preserves exact borders, logos, Principal Abdul Kader KT & Coordinator Anuroop P signatures, and typography."
+    },
+    {
       "id": "tpl-1792572911034",
       "title": "Statewide AI & Robotics Custom Template 2026",
       "type": "Image Master",
@@ -1957,7 +2310,9 @@
       "borderColor": "#F98A5B",
       "isActive": false,
       "createdAt": "2026-06-01T10:00:00Z",
-      "updatedAt": "2026-10-21T08:55:11.040Z"
+      "updatedAt": "2026-10-21T08:55:11.040Z",
+      "cleanUrl": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80",
+      "pdfUrl": "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=1200&auto=format&fit=crop&q=80"
     },
     {
       "id": "tpl-002",
@@ -1967,7 +2322,9 @@
       "borderColor": "#EC3A74",
       "isActive": false,
       "createdAt": "2026-06-15T12:00:00Z",
-      "updatedAt": "2026-10-21T08:55:11.040Z"
+      "updatedAt": "2026-10-21T08:55:11.040Z",
+      "cleanUrl": "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=1200&auto=format&fit=crop&q=80",
+      "pdfUrl": "https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=1200&auto=format&fit=crop&q=80"
     }
   ],
   "brochures": [
@@ -2731,6 +3088,396 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "log-1792722831565-mbyh",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "CERTIFICATES_PROGRAM_GENERATE",
+      "details": "Generated 6 certificates for event \"Robotics Bootcamp 2026\" (0 failed)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:33:51.565Z"
+    },
+    {
+      "id": "log-1792722795668-5bbq",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: State-Level AI & Robotics Workshop 2026",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:33:15.668Z"
+    },
+    {
+      "id": "log-1792722794501-g1rz",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: State-Level AI & Robotics Workshop 2026",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:33:14.501Z"
+    },
+    {
+      "id": "log-1792722764556-x8m9",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_DELETE",
+      "details": "Deleted event: Rapid Event C - Drone Bootcamp",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:32:44.556Z"
+    },
+    {
+      "id": "log-1792722764273-pv1o",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_DELETE",
+      "details": "Deleted event: Rapid Event B - Cloud Workshop",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:32:44.273Z"
+    },
+    {
+      "id": "log-1792722763962-a01u",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_DELETE",
+      "details": "Deleted event: Rapid Event A - Hardware Hack",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:32:43.962Z"
+    },
+    {
+      "id": "log-1792722762878-u334",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_CREATE",
+      "details": "Created event: Rapid Event C - Drone Bootcamp",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:32:42.878Z"
+    },
+    {
+      "id": "log-1792722762815-9yxm",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_CREATE",
+      "details": "Created event: Rapid Event A - Hardware Hack",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:32:42.815Z"
+    },
+    {
+      "id": "log-1792722762794-hsb9",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_CREATE",
+      "details": "Created event: Rapid Event B - Cloud Workshop",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:32:42.794Z"
+    },
+    {
+      "id": "log-1792722762211-ate8",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_DELETE",
+      "details": "Deleted event: Draft Robotics Workshop",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:32:42.211Z"
+    },
+    {
+      "id": "log-1792722761625-3igr",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: Draft Robotics Workshop",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:32:41.625Z"
+    },
+    {
+      "id": "log-1792722761004-rt9y",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: Draft Robotics Workshop",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:32:41.004Z"
+    },
+    {
+      "id": "log-1792722760099-fl8u",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_CREATE",
+      "details": "Created event: Draft Robotics Workshop",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:32:40.099Z"
+    },
+    {
+      "id": "log-1792722758096-3dqc",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_DELETE",
+      "details": "Deleted event: Automated E2E Test Event - AI Innovation Summit (UPDATED)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:32:38.096Z"
+    },
+    {
+      "id": "log-1792722757809-30rn",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: Automated E2E Test Event - AI Innovation Summit (UPDATED)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:32:37.809Z"
+    },
+    {
+      "id": "log-1792722756627-lmrt",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: Automated E2E Test Event - AI Innovation Summit (UPDATED)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:32:36.627Z"
+    },
+    {
+      "id": "log-1792722754822-fcuc",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_CREATE",
+      "details": "Created event: Automated E2E Test Event - AI Innovation Summit",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:32:34.822Z"
+    },
+    {
+      "id": "log-1792722634497-5air",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_CREATE",
+      "details": "Created event: Rapid Event B - Cloud Workshop",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:30:34.497Z"
+    },
+    {
+      "id": "log-1792722634491-pepp",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_CREATE",
+      "details": "Created event: Rapid Event C - Drone Bootcamp",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:30:34.491Z"
+    },
+    {
+      "id": "log-1792722633434-yqq4",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_DELETE",
+      "details": "Deleted event: Draft Robotics Workshop",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:30:33.434Z"
+    },
+    {
+      "id": "log-1792722632443-vmit",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: Draft Robotics Workshop",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:30:32.443Z"
+    },
+    {
+      "id": "log-1792722631630-ux55",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: Draft Robotics Workshop",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:30:31.630Z"
+    },
+    {
+      "id": "log-1792722630502-o89g",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_CREATE",
+      "details": "Created event: Draft Robotics Workshop",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:30:30.502Z"
+    },
+    {
+      "id": "log-1792722628386-vogj",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_DELETE",
+      "details": "Deleted event: Automated E2E Test Event - AI Innovation Summit (UPDATED)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:30:28.386Z"
+    },
+    {
+      "id": "log-1792722626823-dzva",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: Automated E2E Test Event - AI Innovation Summit (UPDATED)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:30:26.823Z"
+    },
+    {
+      "id": "log-1792722625131-su5q",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: Automated E2E Test Event - AI Innovation Summit (UPDATED)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:30:25.131Z"
+    },
+    {
+      "id": "log-1792722622053-41cg",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_CREATE",
+      "details": "Created event: Automated E2E Test Event - AI Innovation Summit",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:30:22.053Z"
+    },
+    {
+      "id": "log-1792722524397-vskf",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: Automated E2E Test Event - AI Innovation Summit (UPDATED)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:28:44.397Z"
+    },
+    {
+      "id": "log-1792722522721-fyye",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_CREATE",
+      "details": "Created event: Automated E2E Test Event - AI Innovation Summit",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:28:42.721Z"
+    },
+    {
+      "id": "log-1792722484798-ep4r",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_CREATE",
+      "details": "Created event: Automated E2E Test Event - AI Innovation Summit",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-23T02:28:04.798Z"
+    },
+    {
+      "id": "log-1792710231627-mpss",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: State-Level AI & Robotics Workshop 2026",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-22T23:03:51.627Z"
+    },
+    {
+      "id": "log-1792710231472-sage",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: State-Level AI & Robotics Workshop 2026",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-22T23:03:51.472Z"
+    },
+    {
+      "id": "log-1792710200197-wc4r",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "CERTIFICATES_PROGRAM_GENERATE",
+      "details": "Generated 6 certificates for event \"Robotics Bootcamp 2026\" (0 failed)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-22T23:03:20.197Z"
+    },
+    {
+      "id": "log-1792710024493-mxke",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "CERTIFICATES_PROGRAM_GENERATE",
+      "details": "Generated 6 certificates for event \"Robotics Bootcamp 2026\" (0 failed)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-22T23:00:24.493Z"
+    },
+    {
+      "id": "log-1792709517330-ddaw",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: State-Level AI & Robotics Workshop 2026",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-22T22:51:57.330Z"
+    },
+    {
+      "id": "log-1792709514667-49mm",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: State-Level AI & Robotics Workshop 2026",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-22T22:51:54.667Z"
+    },
+    {
+      "id": "log-1792708184565-79do",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "CERTIFICATES_PROGRAM_GENERATE",
+      "details": "Generated 4 certificates for event \"DRONE WORKSHOP\" (0 failed)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-22T22:29:44.565Z"
+    },
+    {
+      "id": "log-1792592396193-vtt8",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: State-Level AI & Robotics Workshop 2026",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T14:19:56.193Z"
+    },
+    {
+      "id": "log-1792592389719-ziu5",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: State-Level AI & Robotics Workshop 2026",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-21T14:19:49.719Z"
+    },
     {
       "id": "log-1792572915267-h8li",
       "userId": "usr-admin-test",

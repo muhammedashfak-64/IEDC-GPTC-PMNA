@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getProgramQuotaDetails } from '@/lib/serverStore';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
