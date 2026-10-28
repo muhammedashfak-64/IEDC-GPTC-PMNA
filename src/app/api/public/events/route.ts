@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getEventsAsync, loadDb } from '@/lib/serverStore';
+import { getEventsAsync, getCertificatesAsync } from '@/lib/serverStore';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -10,8 +10,7 @@ export async function GET(req: NextRequest) {
     let publishedEvents = await getEventsAsync(true);
 
     if (hasCertsOnly) {
-      const db = loadDb();
-      const certs = db.certificates || [];
+      const certs = await getCertificatesAsync(true);
       const eventIdsWithPublishedCerts = new Set(
         certs.filter((c: any) => c.status === 'Published').map((c: any) => c.eventId)
       );

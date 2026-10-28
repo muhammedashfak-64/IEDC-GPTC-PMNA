@@ -13,7 +13,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const publish = body.publish !== false;
 
   try {
-    const result = publishProgramCertificates(id, publish, auth);
+    const result = await publishProgramCertificates(id, publish, auth);
     return NextResponse.json({ success: true, ...result });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

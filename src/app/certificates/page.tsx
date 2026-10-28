@@ -15,6 +15,7 @@ import {
   Sparkles,
   ExternalLink,
   Eye,
+  EyeOff,
   Image as ImageIcon
 } from 'lucide-react';
 
@@ -24,6 +25,7 @@ export default function CertificatesDownloadPage() {
   // Section 6: Initial state must be completely empty strings
   const [fullName, setFullName] = useState('');
   const [mobileNumber, setMobileNumber] = useState('');
+  const [showPhone, setShowPhone] = useState(false);
   const [loading, setLoading] = useState(false);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
@@ -153,7 +155,7 @@ export default function CertificatesDownloadPage() {
                 type="text"
                 required
                 autoComplete="off"
-                placeholder="Enter your full name as registered"
+                placeholder="Enter your full registered name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="w-full bg-[#18181D] border border-white/10 focus:border-white/30 rounded-xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none"
@@ -164,7 +166,7 @@ export default function CertificatesDownloadPage() {
             </span>
           </div>
 
-          {/* 3. Registered Mobile Number Input (type="tel", Initially Blank, No password dots) */}
+          {/* 3. Registered Mobile Number Input (Hidden by default with Eye toggle icon) */}
           <div>
             <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
               3. Registered Mobile Number
@@ -172,16 +174,24 @@ export default function CertificatesDownloadPage() {
             <div className="relative">
               <Phone className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
               <input
-                type="tel"
-                inputMode="tel"
+                type={showPhone ? 'text' : 'password'}
+                inputMode="numeric"
                 required
                 autoComplete="off"
                 maxLength={10}
-                placeholder="Enter your registered 10-digit mobile number"
+                placeholder="Enter your registered mobile number"
                 value={mobileNumber}
                 onChange={(e) => setMobileNumber(e.target.value.replace(/\D/g, ''))}
-                className="w-full bg-[#18181D] border border-white/10 focus:border-white/30 rounded-xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none font-mono"
+                className="w-full bg-[#18181D] border border-white/10 focus:border-white/30 rounded-xl pl-10 pr-11 py-3 text-xs text-white placeholder-slate-500 focus:outline-none font-mono"
               />
+              <button
+                type="button"
+                onClick={() => setShowPhone(!showPhone)}
+                className="absolute right-3.5 top-3 text-slate-400 hover:text-white transition-colors cursor-pointer"
+                title={showPhone ? 'Hide mobile number' : 'Show mobile number'}
+              >
+                {showPhone ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
             </div>
             <span className="text-[10px] text-slate-400 mt-1 block">
               Enter the 10-digit mobile number provided during event registration.

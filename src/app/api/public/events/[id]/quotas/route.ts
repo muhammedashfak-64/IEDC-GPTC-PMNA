@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getProgramQuotaDetails } from '@/lib/serverStore';
+import { getProgramQuotaDetailsAsync } from '@/lib/serverStore';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -11,7 +11,7 @@ export async function GET(
   const { id } = await params;
 
   try {
-    const { quotaConfig, summary } = getProgramQuotaDetails(id);
+    const { quotaConfig, summary } = await getProgramQuotaDetailsAsync(id);
 
     // Format safe public availability map (no private participant data)
     const publicClasses: Record<string, any> = {};
@@ -20,7 +20,10 @@ export async function GET(
         department: stat.department,
         academicYear: stat.academicYear,
         enabled: stat.enabled,
+        capacity: stat.maxSeats,
+        registered: stat.confirmedCount,
         remainingSeats: stat.remainingSeats,
+        waitlistCount: stat.waitlistCount,
         status: stat.status
       };
     }
@@ -31,6 +34,9 @@ export async function GET(
       participationType: summary.participationType,
       isStatewide: summary.isStatewide,
       waitlistEnabled: summary.waitlistEnabled,
+      totalCapacity: summary.totalCapacity,
+      totalConfirmed: summary.internalConfirmed + summary.externalConfirmed,
+      totalRemaining: Math.max(0, summary.internalRemaining + summary.externalRemaining),
       singleClass:
         summary.participationType === 'Single Class'
           ? quotaConfig.singleClass
@@ -38,7 +44,10 @@ export async function GET(
       classes: publicClasses,
       externalQuota: {
         enabled: summary.externalQuota.enabled,
+        capacity: summary.externalQuota.maxSeats,
+        registered: summary.externalQuota.confirmedCount,
         remainingSeats: summary.externalQuota.remainingSeats,
+        waitlistCount: summary.externalQuota.waitlistCount,
         status: summary.externalQuota.status
       },
       registrationStartDate: quotaConfig.registrationStartDate || null,

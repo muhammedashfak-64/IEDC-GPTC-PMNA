@@ -565,12 +565,12 @@ export default function ProgramQuotaManager({
               {
                 id: 'Entire College',
                 title: '3. Entire College',
-                desc: 'All 4 departments and 3 academic years with independent quotas.'
+                desc: 'All 5 departments and 3 academic years with independent quotas.'
               },
               {
                 id: 'Statewide',
                 title: '4. Statewide',
-                desc: 'GPTC PMNA 12 classes + shared external college pool.'
+                desc: 'GPTC PMNA classes + shared external college pool.'
               },
               {
                 id: 'Custom Allocation',

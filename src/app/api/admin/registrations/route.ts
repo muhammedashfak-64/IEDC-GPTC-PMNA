@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/adminAuthHelper';
-import { getRegistrations, registerStudentForEvent, updateRegistrationStatus, deleteRegistration } from '@/lib/serverStore';
+import { getRegistrationsAsync, registerStudentForEvent, updateRegistrationStatus, deleteRegistration } from '@/lib/serverStore';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const eventId = searchParams.get('eventId') || undefined;
-  const list = getRegistrations(eventId);
+  const list = await getRegistrationsAsync(eventId);
 
   return NextResponse.json({ success: true, count: list.length, data: list });
 }
@@ -37,7 +37,7 @@ export async function PUT(req: NextRequest) {
     const { id, status } = await req.json();
     if (!id || !status) return NextResponse.json({ success: false, error: 'Registration ID and status required' }, { status: 400 });
 
-    const updated = updateRegistrationStatus(id, status, user!);
+    const updated = await updateRegistrationStatus(id, status, user!);
     return NextResponse.json({ success: true, data: updated });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 400 });
@@ -53,7 +53,7 @@ export async function DELETE(req: NextRequest) {
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ success: false, error: 'Registration ID required' }, { status: 400 });
 
-    const ok = deleteRegistration(id, user!);
+    const ok = await deleteRegistration(id, user!);
     if (!ok) return NextResponse.json({ success: false, error: 'Registration not found' }, { status: 404 });
 
     return NextResponse.json({ success: true, message: 'Registration deleted successfully' });

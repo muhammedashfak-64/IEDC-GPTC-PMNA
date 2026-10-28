@@ -27,7 +27,9 @@ import {
   syncSettingsToSupabase,
   syncAuditLogToSupabase,
   syncRegistrationToSupabase,
-  deleteRegistrationFromSupabase
+  deleteRegistrationFromSupabase,
+  unpackRegistrationFromSupabase,
+  unpackCertificateFromSupabase
 } from './supabaseSync';
 import {
   ProgramQuotaConfig,
@@ -42,7 +44,9 @@ import {
   normalizeDepartment,
   normalizeAcademicYear,
   getClassKey,
-  parseClassKey
+  parseClassKey,
+  isInternalParticipant,
+  isExternalParticipant
 } from './quotaUtils';
 
 const DB_FILE = path.join(process.cwd(), 'src', 'data', 'db.json');
@@ -545,6 +549,93 @@ export function getRegistrations(eventId?: string) {
   return enriched;
 }
 
+export async function fetchRegistrationsFromDatabase(eventId?: string): Promise<any[]> {
+  try {
+    let query = supabaseAdmin.from('registrations').select('*').order('created_at', { ascending: false });
+    if (eventId && eventId !== 'All') {
+      query = query.eq('event_id', eventId);
+    }
+    const { data: rows, error } = await query;
+    if (error) {
+      console.warn('[serverStore] fetchRegistrationsFromDatabase query warning:', error.message);
+      return getRegistrations(eventId);
+    }
+
+    if (Array.isArray(rows)) {
+      const unpacked = rows.map((r: any) => unpackRegistrationFromSupabase(r)).filter(Boolean);
+      const db = loadDb();
+      if (!db.registrations) db.registrations = [];
+
+      // Supabase is authoritative. When eventId is scoped, drop stale local rows for that event.
+      const remoteIds = new Set(unpacked.map((u: any) => u.id));
+      const preservedLocal = db.registrations.filter((r: any) =>
+        eventId && eventId !== 'All' ? r.eventId !== eventId : !remoteIds.has(r.id)
+      );
+
+      db.registrations = [...unpacked, ...preservedLocal];
+      saveDb(db);
+
+      if (eventId && eventId !== 'All') {
+        return unpacked.filter((r: any) => r.eventId === eventId);
+      }
+      return unpacked;
+    }
+  } catch (err: any) {
+    console.error('[serverStore] fetchRegistrationsFromDatabase error:', err);
+  }
+
+  return getRegistrations(eventId);
+}
+
+export async function getRegistrationsAsync(eventId?: string): Promise<any[]> {
+  return fetchRegistrationsFromDatabase(eventId);
+}
+
+export async function fetchCertificatesFromDatabase(eventId?: string): Promise<any[]> {
+  try {
+    let query = supabaseAdmin.from('certificates').select('*').order('issued_date', { ascending: false });
+    if (eventId && eventId !== 'All') {
+      query = query.eq('event_id', eventId);
+    }
+    const { data: rows, error } = await query;
+    if (error) {
+      console.warn('[serverStore] fetchCertificatesFromDatabase query warning:', error.message);
+      return getCertificates(false);
+    }
+
+    if (Array.isArray(rows)) {
+      const unpacked = rows.map((r: any) => unpackCertificateFromSupabase(r)).filter(Boolean);
+      const db = loadDb();
+      if (!db.certificates) db.certificates = [];
+
+      const remoteIds = new Set(unpacked.map((u: any) => u.id));
+      const preservedLocal = db.certificates.filter((c: any) =>
+        eventId && eventId !== 'All' ? c.eventId !== eventId : !remoteIds.has(c.id)
+      );
+
+      db.certificates = [...unpacked, ...preservedLocal];
+      saveDb(db);
+
+      if (eventId && eventId !== 'All') {
+        return unpacked.filter((c: any) => c.eventId === eventId);
+      }
+      return unpacked;
+    }
+  } catch (err: any) {
+    console.error('[serverStore] fetchCertificatesFromDatabase error:', err);
+  }
+
+  return getCertificates(false);
+}
+
+export async function getCertificatesAsync(publishedOnly = false, eventId?: string): Promise<any[]> {
+  const list = await fetchCertificatesFromDatabase(eventId);
+  if (publishedOnly) {
+    return list.filter((c: any) => c.status === 'Published');
+  }
+  return list;
+}
+
 // Concurrency lock map for serialized atomic event registrations
 const eventRegistrationLocks = new Map<string, Promise<any>>();
 
@@ -572,13 +663,13 @@ export async function registerStudentForEvent(data: {
 
   await currentLock;
   try {
-    return doRegisterStudentForEvent(data);
+    return await doRegisterStudentForEventAsync(data);
   } finally {
     releaseLock();
   }
 }
 
-function doRegisterStudentForEvent(data: {
+async function doRegisterStudentForEventAsync(data: {
   eventId: string;
   studentName: string;
   registerNumber: string;
@@ -593,18 +684,27 @@ function doRegisterStudentForEvent(data: {
   additionalNotes?: string;
   consent?: boolean;
 }) {
-  const db = loadDb();
-  if (!db.registrations) db.registrations = [];
-  if (!db.events) db.events = [];
-
   // 1. Basic Field Validation
   if (!data.eventId) throw new Error('Event ID is required.');
   if (!data.studentName?.trim()) throw new Error('Student name is required.');
   if (!data.email?.trim()) throw new Error('Email address is required.');
   if (!data.phone?.trim()) throw new Error('Mobile number is required.');
 
-  // 2. Check Event Exists & Status
-  const event = db.events.find((e: any) => e.id === data.eventId);
+  // 2. Fetch authoritative live registrations and event from Supabase
+  const registrations = await fetchRegistrationsFromDatabase(data.eventId);
+  const db = loadDb();
+  if (!db.events) db.events = [];
+
+  let event = db.events.find((e: any) => e.id === data.eventId);
+  if (!event) {
+    const { data: remoteRow } = await supabaseAdmin.from('events').select('*').eq('id', data.eventId).single();
+    if (remoteRow) {
+      event = unpackEventFromSupabase(remoteRow);
+      db.events.unshift(event);
+      saveDb(db);
+    }
+  }
+
   if (!event) throw new Error('Selected event was not found.');
   if (event.status !== 'Published' || event.registrationOpen === false) {
     throw new Error('Registration is not currently open for this event.');
@@ -629,16 +729,16 @@ function doRegisterStudentForEvent(data: {
   const isPerinthalmanna =
     !data.collegeName ||
     data.collegeName.toLowerCase().includes('perinthalmanna') ||
-    data.collegeName.toLowerCase().includes('gptc pmna');
+    data.collegeName.toLowerCase().includes('pmna');
   const participationCategory: 'Internal' | 'External' =
     data.participationCategory || (isPerinthalmanna ? 'Internal' : 'External');
 
-  // 4. Duplicate Check
+  // 4. Duplicate Check against authoritative database records
   const cleanRegNo = (data.registerNumber && data.registerNumber.trim()) ? data.registerNumber.trim().toUpperCase() : '';
   const cleanEmail = data.email.trim().toLowerCase();
   const cleanPhone = data.phone.replace(/\D/g, '').slice(-10);
 
-  const existing = db.registrations.find(
+  const existing = registrations.find(
     (r: any) =>
       r.eventId === data.eventId &&
       r.status !== 'Cancelled' &&
@@ -654,7 +754,7 @@ function doRegisterStudentForEvent(data: {
     );
   }
 
-  // 5. Evaluate Quota & Capacity
+  // 5. Evaluate Quota & Capacity against authoritative registrations
   let status: 'Confirmed' | 'Waitlisted' = 'Confirmed';
   let waitlistPosition: number | null = null;
   const quotaConfig: ProgramQuotaConfig =
@@ -682,11 +782,9 @@ function doRegisterStudentForEvent(data: {
 
     if (quotaConfig.participationType === 'Single Class') {
       const single = quotaConfig.singleClass;
-      if (
-        !single ||
-        single.department !== dept ||
-        normalizeAcademicYear(single.academicYear) !== yr
-      ) {
+      const sDept = normalizeDepartment(single?.department);
+      const sYr = normalizeAcademicYear(single?.academicYear);
+      if (!single || sDept !== dept || sYr !== yr) {
         throw new Error(
           `This program is open exclusively to ${single?.department || 'Selected Class'} (${single?.academicYear || ''}). Students from ${dept} (${yr}) are not eligible to register.`
         );
@@ -694,22 +792,28 @@ function doRegisterStudentForEvent(data: {
       isClassEnabled = true;
       maxSeats = Number(single.maxSeats) || 0;
     } else {
-      const classConf = quotaConfig.classes?.[classKey];
+      let classConf = quotaConfig.classes?.[classKey];
+      if (!classConf && (quotaConfig.participationType === 'Entire College' || quotaConfig.participationType === 'Statewide' || !quotaConfig.participationType)) {
+        const perClassDefault = Math.max(1, Math.floor((Number(event.totalSeats) || 60) / 15));
+        classConf = {
+          department: dept,
+          academicYear: yr,
+          enabled: true,
+          maxSeats: perClassDefault
+        };
+      }
       if (!classConf || !classConf.enabled || Number(classConf.maxSeats) <= 0) {
-        throw new Error(`Registration for ${dept} (${yr}) is disabled for this program.`);
+        throw new Error(`Registration for ${dept} (${yr}) is currently disabled for this program.`);
       }
       isClassEnabled = true;
       maxSeats = Number(classConf.maxSeats) || 0;
     }
 
-    // Count confirmed students in this class
-    const confirmedInClass = db.registrations.filter((r: any) => {
+    // Count confirmed students in this class from authoritative registrations
+    const confirmedInClass = registrations.filter((r: any) => {
       if (r.eventId !== data.eventId) return false;
       if (r.status !== 'Confirmed' && r.status !== 'Attended') return false;
-      const isExt =
-        r.participationCategory === 'External' ||
-        (r.collegeName && !r.collegeName.toLowerCase().includes('perinthalmanna'));
-      if (isExt) return false;
+      if (!isInternalParticipant(r)) return false;
       return (
         normalizeDepartment(r.department) === dept &&
         normalizeAcademicYear(r.academicYear) === yr
@@ -720,12 +824,9 @@ function doRegisterStudentForEvent(data: {
       status = 'Confirmed';
     } else if (quotaConfig.waitlistEnabled !== false) {
       status = 'Waitlisted';
-      const currentWaitlist = db.registrations.filter((r: any) => {
+      const currentWaitlist = registrations.filter((r: any) => {
         if (r.eventId !== data.eventId || r.status !== 'Waitlisted') return false;
-        const isExt =
-          r.participationCategory === 'External' ||
-          (r.collegeName && !r.collegeName.toLowerCase().includes('perinthalmanna'));
-        if (isExt) return false;
+        if (!isInternalParticipant(r)) return false;
         return (
           normalizeDepartment(r.department) === dept &&
           normalizeAcademicYear(r.academicYear) === yr
@@ -739,13 +840,15 @@ function doRegisterStudentForEvent(data: {
     }
   } else {
     // External student: must check statewide external shared quota
-    if (quotaConfig.participationType !== 'Statewide') {
+    const isStatewide = quotaConfig.participationType === 'Statewide';
+    const extConfig = quotaConfig.externalQuota || { enabled: isStatewide, maxSeats: 30 };
+    if (!isStatewide && !extConfig.enabled) {
       throw new Error(
         'This program is open exclusively to students of Govt Polytechnic College Perinthalmanna. External college registration is not permitted.'
       );
     }
 
-    if (!quotaConfig.externalQuota?.enabled || Number(quotaConfig.externalQuota?.maxSeats) <= 0) {
+    if (!extConfig.enabled || Number(extConfig.maxSeats) <= 0) {
       throw new Error('External college registration is currently disabled for this program.');
     }
 
@@ -756,26 +859,20 @@ function doRegisterStudentForEvent(data: {
       }
     }
 
-    const maxSeats = Number(quotaConfig.externalQuota.maxSeats) || 0;
-    const confirmedExternal = db.registrations.filter((r: any) => {
+    const maxSeats = Number(extConfig.maxSeats) || 0;
+    const confirmedExternal = registrations.filter((r: any) => {
       if (r.eventId !== data.eventId) return false;
       if (r.status !== 'Confirmed' && r.status !== 'Attended') return false;
-      return (
-        r.participationCategory === 'External' ||
-        (r.collegeName && !r.collegeName.toLowerCase().includes('perinthalmanna'))
-      );
+      return isExternalParticipant(r);
     }).length;
 
     if (confirmedExternal < maxSeats) {
       status = 'Confirmed';
     } else if (quotaConfig.waitlistEnabled !== false) {
       status = 'Waitlisted';
-      const currentExtWaitlist = db.registrations.filter((r: any) => {
+      const currentExtWaitlist = registrations.filter((r: any) => {
         if (r.eventId !== data.eventId || r.status !== 'Waitlisted') return false;
-        return (
-          r.participationCategory === 'External' ||
-          (r.collegeName && !r.collegeName.toLowerCase().includes('perinthalmanna'))
-        );
+        return isExternalParticipant(r);
       }).length;
       waitlistPosition = currentExtWaitlist + 1;
     } else {
@@ -821,20 +918,86 @@ function doRegisterStudentForEvent(data: {
     createdAt: new Date().toISOString()
   };
 
+  // Add to local database
+  if (!db.registrations) db.registrations = [];
   db.registrations.unshift(newRegistration);
 
-  // Update overall event seatsAvailable if confirmed
-  if (status === 'Confirmed' && typeof event.seatsAvailable === 'number') {
-    event.seatsAvailable = Math.max(0, event.seatsAvailable - 1);
-  }
+  // Recalculate event seatsAvailable and totalSeats using the updated registrations
+  const allCurrentRegs = [newRegistration, ...registrations.filter((r: any) => r.id !== newRegistration.id)];
+  const updatedSummary = calculateQuotaSummary(event, allCurrentRegs);
+  event.totalSeats = updatedSummary.totalCapacity;
+  event.seatsAvailable = Math.max(0, updatedSummary.internalRemaining + updatedSummary.externalRemaining);
+  event.updatedAt = new Date().toISOString();
 
   saveDb(db);
 
-  // Async sync to Supabase
-  syncRegistrationToSupabase(newRegistration, false).catch(console.error);
-  syncEventToSupabase(event, true).catch(console.error);
+  // 7. Authoritatively save registration and updated event to Supabase
+  try {
+    await syncRegistrationToSupabase(newRegistration, false);
+    await syncEventToSupabase(event, true);
+  } catch (syncErr: any) {
+    // Roll back local record so memory/local state does not diverge from Supabase
+    db.registrations = (db.registrations || []).filter((r: any) => r.id !== newRegistration.id);
+    saveDb(db);
+    console.error('[serverStore] doRegisterStudentForEventAsync Supabase sync error:', syncErr);
+    throw syncErr;
+  }
+
+  // 8. Revalidate routes
+  try {
+    revalidatePath('/register');
+    revalidatePath('/events');
+    revalidatePath(`/api/public/events/${data.eventId}/quotas`);
+    revalidatePath(`/admin/events/${data.eventId}`);
+    revalidatePath('/');
+  } catch {}
 
   return newRegistration;
+}
+
+export async function getProgramQuotaDetailsAsync(eventId: string) {
+  // 1. Fetch live registrations from Supabase
+  const registrations = await fetchRegistrationsFromDatabase(eventId);
+
+  // 2. Fetch event
+  const db = loadDb();
+  let event = (db.events || []).find((e: any) => e.id === eventId);
+  if (!event) {
+    const { data: remoteRow } = await supabaseAdmin.from('events').select('*').eq('id', eventId).single();
+    if (remoteRow) {
+      event = unpackEventFromSupabase(remoteRow);
+      if (!db.events) db.events = [];
+      db.events.unshift(event);
+      saveDb(db);
+    }
+  }
+
+  if (!event) throw new Error(`Event with ID "${eventId}" not found.`);
+
+  if (!event.quotaConfig) {
+    event.quotaConfig = createDefaultQuotaConfig(event.totalSeats, event.level);
+    saveDb(db);
+    await syncEventToSupabase(event, true).catch(() => {});
+  }
+
+  // 3. Calculate summary using authoritative registrations
+  const summary = calculateQuotaSummary(event, registrations);
+
+  // 4. Ensure seatsAvailable is accurately synchronized
+  const expectedAvailable = Math.max(0, summary.internalRemaining + summary.externalRemaining);
+  if (event.seatsAvailable !== expectedAvailable || event.totalSeats !== summary.totalCapacity) {
+    event.totalSeats = summary.totalCapacity;
+    event.seatsAvailable = expectedAvailable;
+    event.updatedAt = new Date().toISOString();
+    saveDb(db);
+    syncEventToSupabase(event, true).catch(() => {});
+  }
+
+  return {
+    quotaConfig: event.quotaConfig,
+    summary,
+    registrations
+  };
 }
 
 export function getProgramQuotaDetails(eventId: string) {
@@ -855,39 +1018,45 @@ export function getProgramQuotaDetails(eventId: string) {
     registrations: (db.registrations || []).filter((r: any) => r.eventId === eventId)
   };
 }
-
-export function updateProgramQuotaConfig(
+export async function updateProgramQuotaConfigAsync(
   eventId: string,
   configUpdates: Partial<ProgramQuotaConfig>,
   user: AuthUser,
   force = false
 ) {
+  const registrations = await fetchRegistrationsFromDatabase(eventId);
   const db = loadDb();
-  const event = (db.events || []).find((e: any) => e.id === eventId);
+  let event = (db.events || []).find((e: any) => e.id === eventId);
+  if (!event) {
+    const { data: remoteRow } = await supabaseAdmin.from('events').select('*').eq('id', eventId).single();
+    if (remoteRow) {
+      event = unpackEventFromSupabase(remoteRow);
+    }
+  }
   if (!event) throw new Error('Event not found.');
 
   const currentConfig: ProgramQuotaConfig =
     event.quotaConfig || createDefaultQuotaConfig(event.totalSeats, event.level);
 
-  // Validation: Check if any class quota is being reduced below confirmed count
-  const registrations = (db.registrations || []).filter(
-    (r: any) => r.eventId === eventId && r.status !== 'Cancelled' && r.status !== 'Rejected'
+  // Active confirmed registrations that consume capacity
+  const activeRegs = registrations.filter(
+    (r: any) => r.status === 'Confirmed' || r.status === 'Attended'
   );
 
+  // Validation: Check if any class quota is being reduced below confirmed count
   if (!force && configUpdates.classes) {
     for (const [key, item] of Object.entries(configUpdates.classes)) {
       const { department, academicYear } = parseClassKey(key);
-      const confirmed = registrations.filter(
+      const confirmed = activeRegs.filter(
         (r: any) =>
-          r.participationCategory !== 'External' &&
+          isInternalParticipant(r) &&
           normalizeDepartment(r.department) === department &&
-          normalizeAcademicYear(r.academicYear) === academicYear &&
-          (r.status === 'Confirmed' || r.status === 'Attended')
+          normalizeAcademicYear(r.academicYear) === academicYear
       ).length;
 
       if (item.enabled && Number(item.maxSeats) < confirmed) {
         throw new Error(
-          `Validation Error: Quota for ${department} (${academicYear}) cannot be set to ${item.maxSeats} because ${confirmed} confirmed registrations already occupy those seats.`
+          `Validation Warning: Quota for ${department} (${academicYear}) cannot be set to ${item.maxSeats} because ${confirmed} confirmed registrations already occupy those seats.`
         );
       }
     }
@@ -895,16 +1064,11 @@ export function updateProgramQuotaConfig(
 
   // Validate external quota
   if (!force && configUpdates.externalQuota && configUpdates.externalQuota.enabled) {
-    const extConfirmed = registrations.filter(
-      (r: any) =>
-        (r.status === 'Confirmed' || r.status === 'Attended') &&
-        (r.participationCategory === 'External' ||
-          (r.collegeName && !r.collegeName.toLowerCase().includes('perinthalmanna')))
-    ).length;
+    const extConfirmed = activeRegs.filter((r: any) => isExternalParticipant(r)).length;
 
     if (Number(configUpdates.externalQuota.maxSeats) < extConfirmed) {
       throw new Error(
-        `Validation Error: External college quota cannot be reduced to ${configUpdates.externalQuota.maxSeats} because ${extConfirmed} external registrations are already confirmed.`
+        `Validation Warning: External college quota cannot be reduced to ${configUpdates.externalQuota.maxSeats} because ${extConfirmed} external registrations are already confirmed.`
       );
     }
   }
@@ -925,18 +1089,118 @@ export function updateProgramQuotaConfig(
   };
 
   // Recalculate event totalSeats and seatsAvailable
-  const summary = calculateQuotaSummary(event, db.registrations || []);
+  const summary = calculateQuotaSummary(event, registrations);
   event.totalSeats = summary.totalCapacity;
-  event.seatsAvailable = summary.internalRemaining + summary.externalRemaining;
+  event.seatsAvailable = Math.max(0, summary.internalRemaining + summary.externalRemaining);
   event.updatedAt = new Date().toISOString();
 
   saveDb(db);
-  syncEventToSupabase(event, true).catch(console.error);
+  await syncEventToSupabase(event, true);
+
   addAuditLog(
     'QUOTA_CONFIG_UPDATE',
     user,
     `Updated registration quota configuration for "${event.title}" (${eventId})`
   );
+
+  try {
+    revalidatePath('/register');
+    revalidatePath('/events');
+    revalidatePath(`/api/public/events/${eventId}/quotas`);
+    revalidatePath(`/admin/events/${eventId}`);
+  } catch {}
+
+  return {
+    success: true,
+    quotaConfig: event.quotaConfig,
+    summary
+  };
+}
+
+export function updateProgramQuotaConfig(
+  eventId: string,
+  configUpdates: Partial<ProgramQuotaConfig>,
+  user: AuthUser,
+  force = false
+) {
+  const db = loadDb();
+  const event = (db.events || []).find((e: any) => e.id === eventId);
+  if (!event) throw new Error('Event not found.');
+
+  const currentConfig: ProgramQuotaConfig =
+    event.quotaConfig || createDefaultQuotaConfig(event.totalSeats, event.level);
+
+  const registrations = (db.registrations || []).filter(
+    (r: any) => r.eventId === eventId && r.status !== 'Cancelled' && r.status !== 'Rejected'
+  );
+
+  if (!force && configUpdates.classes) {
+    for (const [key, item] of Object.entries(configUpdates.classes)) {
+      const { department, academicYear } = parseClassKey(key);
+      const confirmed = registrations.filter(
+        (r: any) =>
+          isInternalParticipant(r) &&
+          normalizeDepartment(r.department) === department &&
+          normalizeAcademicYear(r.academicYear) === academicYear &&
+          (r.status === 'Confirmed' || r.status === 'Attended')
+      ).length;
+
+      if (item.enabled && Number(item.maxSeats) < confirmed) {
+        throw new Error(
+          `Validation Warning: Quota for ${department} (${academicYear}) cannot be set to ${item.maxSeats} because ${confirmed} confirmed registrations already occupy those seats.`
+        );
+      }
+    }
+  }
+
+  if (!force && configUpdates.externalQuota && configUpdates.externalQuota.enabled) {
+    const extConfirmed = registrations.filter(
+      (r: any) =>
+        (r.status === 'Confirmed' || r.status === 'Attended') &&
+        isExternalParticipant(r)
+    ).length;
+
+    if (Number(configUpdates.externalQuota.maxSeats) < extConfirmed) {
+      throw new Error(
+        `Validation Warning: External college quota cannot be reduced to ${configUpdates.externalQuota.maxSeats} because ${extConfirmed} external registrations are already confirmed.`
+      );
+    }
+  }
+
+  event.quotaConfig = {
+    ...currentConfig,
+    ...configUpdates,
+    classes: {
+      ...currentConfig.classes,
+      ...(configUpdates.classes || {})
+    },
+    externalQuota: {
+      ...currentConfig.externalQuota,
+      ...(configUpdates.externalQuota || {})
+    },
+    reallocationLogs: currentConfig.reallocationLogs || []
+  };
+
+  const summary = calculateQuotaSummary(event, db.registrations || []);
+  event.totalSeats = summary.totalCapacity;
+  event.seatsAvailable = Math.max(0, summary.internalRemaining + summary.externalRemaining);
+  event.updatedAt = new Date().toISOString();
+
+  saveDb(db);
+  syncEventToSupabase(event, true).catch(console.error);
+
+  addAuditLog(
+    'QUOTA_CONFIG_UPDATE',
+    user,
+    `Updated registration quota configuration for "${event.title}" (${eventId})`
+  );
+
+  try {
+    revalidatePath('/register');
+    revalidatePath('/events');
+    revalidatePath(`/api/public/events/${eventId}/quotas`);
+    revalidatePath(`/admin/events/${eventId}`);
+  } catch {}
 
   return {
     success: true,
@@ -1114,60 +1378,105 @@ export function promoteWaitlistedStudent(registrationId: string, user: AuthUser)
   };
 }
 
-export function updateRegistrationStatus(id: string, status: string, user: AuthUser) {
+export async function updateRegistrationStatus(id: string, status: string, user: AuthUser) {
   const db = loadDb();
   if (!db.registrations) db.registrations = [];
 
-  const index = db.registrations.findIndex((r: any) => r.id === id);
-  if (index === -1) throw new Error('Registration not found.');
+  let reg = db.registrations.find((r: any) => r.id === id);
+  if (!reg) {
+    const { data: remoteRow } = await supabaseAdmin.from('registrations').select('*').eq('id', id).single();
+    if (remoteRow) {
+      reg = unpackRegistrationFromSupabase(remoteRow);
+      db.registrations.push(reg);
+    }
+  }
+  if (!reg) throw new Error('Registration not found.');
 
   const validStatuses = ['Confirmed', 'Pending', 'Attended', 'Cancelled', 'Waitlisted', 'Rejected'];
   if (!validStatuses.includes(status)) {
     throw new Error(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
   }
 
-  const prevStatus = db.registrations[index].status;
-  db.registrations[index].status = status;
-  db.registrations[index].updatedAt = new Date().toISOString();
+  const prevStatus = reg.status;
+  reg.status = status;
+  reg.updatedAt = new Date().toISOString();
 
-  // If status changed to Cancelled from Confirmed/Attended, restore available seat
-  const event = (db.events || []).find((e: any) => e.id === db.registrations[index].eventId);
-  if (event && (prevStatus === 'Confirmed' || prevStatus === 'Attended') && status === 'Cancelled') {
-    if (typeof event.seatsAvailable === 'number') {
-      event.seatsAvailable = Math.min(event.totalSeats || 60, event.seatsAvailable + 1);
-      syncEventToSupabase(event, true).catch(console.error);
+  // Recalculate event seats using authoritative summary
+  const eventId = reg.eventId;
+  let event = (db.events || []).find((e: any) => e.id === eventId);
+  if (!event) {
+    const { data: remoteRow } = await supabaseAdmin.from('events').select('*').eq('id', eventId).single();
+    if (remoteRow) {
+      event = unpackEventFromSupabase(remoteRow);
+      if (!db.events) db.events = [];
+      db.events.push(event);
     }
   }
 
+  if (event) {
+    const eventRegs = db.registrations.filter((r: any) => r.eventId === eventId);
+    const summary = calculateQuotaSummary(event, eventRegs);
+    event.totalSeats = summary.totalCapacity;
+    event.seatsAvailable = Math.max(0, summary.internalRemaining + summary.externalRemaining);
+    event.updatedAt = new Date().toISOString();
+    await syncEventToSupabase(event, true).catch(console.error);
+  }
+
   saveDb(db);
+  await syncRegistrationToSupabase(reg, true).catch(console.error);
+  addAuditLog('REGISTRATION_STATUS_UPDATE', user, `Changed status of ${reg.studentName} (${id}) from ${prevStatus} to ${status}`);
 
-  syncRegistrationToSupabase(db.registrations[index], true).catch(console.error);
-  addAuditLog('REGISTRATION_STATUS_UPDATE', user, `Changed status of ${db.registrations[index].studentName} (${id}) from ${prevStatus} to ${status}`);
+  try {
+    revalidatePath('/register');
+    revalidatePath('/events');
+    revalidatePath(`/api/public/events/${eventId}/quotas`);
+    revalidatePath(`/admin/events/${eventId}`);
+  } catch {}
 
-  return db.registrations[index];
+  return reg;
 }
 
-export function deleteRegistration(id: string, user: AuthUser) {
+export async function deleteRegistration(id: string, user: AuthUser) {
   const db = loadDb();
-  if (!db.registrations) return false;
+  if (!db.registrations) db.registrations = [];
 
-  const target = db.registrations.find((r: any) => r.id === id);
-  if (!target) return false;
+  const targetIndex = db.registrations.findIndex((r: any) => r.id === id);
+  let target = targetIndex !== -1 ? db.registrations[targetIndex] : null;
 
-  db.registrations = db.registrations.filter((r: any) => r.id !== id);
-
-  // Restore seat if applicable
-  const event = (db.events || []).find((e: any) => e.id === target.eventId);
-  if (event && (target.status === 'Confirmed' || target.status === 'Attended')) {
-    if (typeof event.seatsAvailable === 'number') {
-      event.seatsAvailable = Math.min(event.totalSeats || 60, event.seatsAvailable + 1);
-      syncEventToSupabase(event, true).catch(console.error);
+  if (!target) {
+    const { data: remoteRow } = await supabaseAdmin.from('registrations').select('*').eq('id', id).single();
+    if (remoteRow) {
+      target = unpackRegistrationFromSupabase(remoteRow);
     }
   }
 
+  if (!target) return false;
+
+  const eventId = target.eventId;
+  if (targetIndex !== -1) {
+    db.registrations.splice(targetIndex, 1);
+  }
+
+  const event = (db.events || []).find((e: any) => e.id === eventId);
+  if (event) {
+    const eventRegs = db.registrations.filter((r: any) => r.eventId === eventId);
+    const summary = calculateQuotaSummary(event, eventRegs);
+    event.totalSeats = summary.totalCapacity;
+    event.seatsAvailable = Math.max(0, summary.internalRemaining + summary.externalRemaining);
+    event.updatedAt = new Date().toISOString();
+    await syncEventToSupabase(event, true).catch(console.error);
+  }
+
   saveDb(db);
-  deleteRegistrationFromSupabase(id).catch(console.error);
+  await deleteRegistrationFromSupabase(id).catch(console.error);
   addAuditLog('REGISTRATION_DELETE', user, `Deleted registration for ${target.studentName} (${id})`);
+
+  try {
+    revalidatePath('/register');
+    revalidatePath('/events');
+    revalidatePath(`/api/public/events/${eventId}/quotas`);
+    revalidatePath(`/admin/events/${eventId}`);
+  } catch {}
 
   return true;
 }
@@ -1409,15 +1718,20 @@ export function getPublicCertificateForVerification(certId: string) {
 // -------------------------------------------------------------
 // ATTENDANCE & PARTICIPANT OPERATIONS
 // -------------------------------------------------------------
-export function markAttendance(
+export async function markAttendance(
   registrationId: string,
   attendance: 'Present' | 'Absent',
   user: AuthUser
 ) {
-  const db = loadDb();
+  let db = loadDb();
   if (!db.registrations) db.registrations = [];
 
-  const index = db.registrations.findIndex((r: any) => r.id === registrationId);
+  let index = db.registrations.findIndex((r: any) => r.id === registrationId);
+  if (index === -1) {
+    await fetchRegistrationsFromDatabase();
+    db = loadDb();
+    index = db.registrations.findIndex((r: any) => r.id === registrationId);
+  }
   if (index === -1) throw new Error('Registration not found.');
 
   const isPresent = attendance === 'Present';
@@ -1430,7 +1744,7 @@ export function markAttendance(
   db.registrations[index].updatedAt = new Date().toISOString();
 
   saveDb(db);
-  syncRegistrationToSupabase(db.registrations[index], true).catch(console.error);
+  await syncRegistrationToSupabase(db.registrations[index], true);
   addAuditLog(
     'ATTENDANCE_MARK',
     user,
@@ -1440,12 +1754,13 @@ export function markAttendance(
   return db.registrations[index];
 }
 
-export function markBulkAttendance(
+export async function markBulkAttendance(
   eventId: string,
   registrationIds: string[],
   attendance: 'Present' | 'Absent',
   user: AuthUser
 ) {
+  await fetchRegistrationsFromDatabase(eventId);
   const db = loadDb();
   if (!db.registrations) db.registrations = [];
 
@@ -1464,7 +1779,7 @@ export function markBulkAttendance(
   });
 
   saveDb(db);
-  updatedList.forEach((r) => syncRegistrationToSupabase(r, true).catch(console.error));
+  await Promise.all(updatedList.map((r) => syncRegistrationToSupabase(r, true)));
   addAuditLog(
     'ATTENDANCE_BULK_MARK',
     user,
@@ -1478,11 +1793,12 @@ export function markBulkAttendance(
  * Validates a scanned QR pass token and atomically marks attendance.
  * Enforces event binding, prevents duplicates, and logs scan metadata.
  */
-export function scanPassAttendance(
+export async function scanPassAttendance(
   targetEventId: string,
   scannedCodeOrToken: string,
   user: AuthUser
 ) {
+  await fetchRegistrationsFromDatabase(targetEventId);
   const db = loadDb();
   if (!db.registrations) db.registrations = [];
   if (!db.events) db.events = [];
@@ -1590,7 +1906,7 @@ export function scanPassAttendance(
   db.registrations[regIndex].updatedAt = nowIso;
 
   saveDb(db);
-  syncRegistrationToSupabase(db.registrations[regIndex], true).catch(console.error);
+  await syncRegistrationToSupabase(db.registrations[regIndex], true);
 
   addAuditLog(
     'ATTENDANCE_QR_SCAN',
@@ -1690,6 +2006,10 @@ export async function generateProgramCertificates(
   } = {},
   user: AuthUser
 ) {
+  // Authoritatively load latest live registrations and certificates from Supabase
+  await fetchRegistrationsFromDatabase(eventId);
+  await fetchCertificatesFromDatabase(eventId);
+
   const db = loadDb();
   const event = (db.events || []).find((e: any) => e.id === eventId);
   if (!event) throw new Error('Event / Program not found.');
@@ -1852,7 +2172,7 @@ export async function generateProgramCertificates(
         }
       }
 
-      syncCertificateToSupabase(certRecord, !!existingCert).catch(console.error);
+      await syncCertificateToSupabase(certRecord, !!existingCert);
       results.push(certRecord);
     } catch (err: any) {
       console.error(`Failed generating cert for ${recipient.name}:`, err);
@@ -1912,19 +2232,21 @@ export async function generateProgramCertificates(
   };
 }
 
-export function publishProgramCertificates(eventId: string, publish: boolean, user: AuthUser) {
+export async function publishProgramCertificates(eventId: string, publish: boolean, user: AuthUser) {
+  await fetchCertificatesFromDatabase(eventId);
   const db = loadDb();
   if (!db.certificates) db.certificates = [];
 
   const newStatus = publish ? 'Published' : 'Draft';
   let count = 0;
+  const toSync: any[] = [];
 
   db.certificates.forEach((c: any) => {
     if (c.eventId === eventId) {
       c.status = newStatus;
       c.updatedAt = new Date().toISOString();
       count++;
-      syncCertificateToSupabase(c, true).catch(() => {});
+      toSync.push(c);
     }
   });
 
@@ -1932,10 +2254,12 @@ export function publishProgramCertificates(eventId: string, publish: boolean, us
   if (evtIdx !== -1) {
     db.events[evtIdx].certificateStatus = newStatus;
     db.events[evtIdx].updatedAt = new Date().toISOString();
-    syncEventToSupabase(db.events[evtIdx], true).catch(() => {});
+    await syncEventToSupabase(db.events[evtIdx], true);
   }
 
   saveDb(db);
+  await Promise.all(toSync.map((c) => syncCertificateToSupabase(c, true)));
+
   addAuditLog(
     'CERTIFICATES_PUBLISH_TOGGLE',
     user,
@@ -1990,17 +2314,20 @@ export async function generateProgramCertificatesZip(
 }
 
 export async function retrieveStudentCertificate(eventId: string, fullName: string, mobileNumber: string) {
-  const db = loadDb();
   if (!fullName?.trim() || !mobileNumber?.trim()) {
     return { success: false, error: 'Full name and registered mobile number are required.' };
   }
 
-  const cleanInputName = fullName.toLowerCase().replace(/[^a-z0-9]/g, '');
   const cleanInputPhone = mobileNumber.replace(/\D/g, '').slice(-10);
-
   if (cleanInputPhone.length < 10) {
     return { success: false, error: 'Please enter a valid 10-digit mobile number.' };
   }
+
+  // Load authoritative published certificates from Supabase
+  await fetchCertificatesFromDatabase(eventId);
+  const db = loadDb();
+
+  const cleanInputName = fullName.toLowerCase().replace(/[^a-z0-9]/g, '');
 
   const match = (db.certificates || []).find((c: any) => {
     if (eventId && eventId !== 'All' && c.eventId !== eventId && c.eventName !== eventId) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminUserFromRequest } from '@/lib/adminAuthHelper';
-import { getRegistrations, markAttendance, markBulkAttendance } from '@/lib/serverStore';
+import { fetchRegistrationsFromDatabase, markAttendance, markBulkAttendance } from '@/lib/serverStore';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   }
 
   const { id } = await params;
-  const registrations = getRegistrations(id);
+  const registrations = await fetchRegistrationsFromDatabase(id);
   const total = registrations.length;
   const present = registrations.filter((r: any) => r.attendance === 'Present' || r.status === 'Attended').length;
   const absent = total - present;
@@ -39,23 +39,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const body = await req.json();
 
   try {
-    if (body.bulk) {
-      const updated = markBulkAttendance(
-        id,
-        body.registrationIds || [],
-        body.attendance === 'Present' ? 'Present' : 'Absent',
-        auth
-      );
+    const isBulk = body.bulk || Array.isArray(body.registrationIds);
+    const targetStatus = (body.attendance || body.status) === 'Present' ? 'Present' : 'Absent';
+
+    if (isBulk) {
+      const ids = Array.isArray(body.registrationIds) ? body.registrationIds : [];
+      const updated = await markBulkAttendance(id, ids, targetStatus, auth);
       return NextResponse.json({ success: true, count: updated.length, data: updated });
     } else {
-      if (!body.registrationId) {
+      const regId = body.registrationId || body.id;
+      if (!regId) {
         return NextResponse.json({ success: false, error: 'registrationId is required.' }, { status: 400 });
       }
-      const updated = markAttendance(
-        body.registrationId,
-        body.attendance === 'Present' ? 'Present' : 'Absent',
-        auth
-      );
+      const updated = await markAttendance(regId, targetStatus, auth);
       return NextResponse.json({ success: true, data: updated });
     }
   } catch (err: any) {

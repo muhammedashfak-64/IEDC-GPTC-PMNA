@@ -24,9 +24,29 @@ import {
   Building,
   GraduationCap,
   Lock,
-  Search
+  Search,
+  RefreshCw,
+  Users
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
+
+function getCanonicalDept(dept: string): string {
+  const d = (dept || '').trim().toLowerCase();
+  if (d.includes('computer') || d.includes('cs') || d.includes('software')) return 'Computer Engineering';
+  if (d.includes('electrical') || d.includes('eee')) return 'Electrical & Electronics Engineering';
+  if (d.includes('electronics') || d.includes('ec')) return 'Electronics Engineering';
+  if (d.includes('civil') || d.includes('ce')) return 'Civil Engineering';
+  if (d.includes('mechanical') || d.includes('mech') || d.includes('me')) return 'Mechanical Engineering';
+  return dept;
+}
+
+function getCanonicalYear(year: string): string {
+  const y = (year || '').trim().toLowerCase();
+  if (y.includes('1') || y.includes('first') || y.includes('sem 1') || y.includes('sem 2')) return 'First Year';
+  if (y.includes('2') || y.includes('second') || y.includes('sem 3') || y.includes('sem 4')) return 'Second Year';
+  if (y.includes('3') || y.includes('third') || y.includes('sem 5') || y.includes('sem 6')) return 'Third Year';
+  return year;
+}
 
 function RegisterFormContent() {
   const searchParams = useSearchParams();

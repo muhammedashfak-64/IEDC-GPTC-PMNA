@@ -151,15 +151,25 @@ const NAMED_COLORS: Record<string, [number, number, number]> = {
 };
 
 /**
+ * Safely create a pdf-lib RGB color where each component is strictly guaranteed to be a JavaScript number.
+ * Permanently prevents errors like "'red' must be of type 'number', but was actually of type 'string'".
+ */
+export function safeRgb(r: any, g: any, b: any) {
+  const numR = Math.min(1, Math.max(0, typeof r === 'number' && !isNaN(r) ? r : parseFloat(String(r || 0))));
+  const numG = Math.min(1, Math.max(0, typeof g === 'number' && !isNaN(g) ? g : parseFloat(String(g || 0))));
+  const numB = Math.min(1, Math.max(0, typeof b === 'number' && !isNaN(b) ? b : parseFloat(String(b || 0))));
+  return rgb(isNaN(numR) ? 0 : numR, isNaN(numG) ? 0 : numG, isNaN(numB) ? 0 : numB);
+}
+
+/**
  * Safely parse any color representation (hex string #RRGGBB, #RGB, named color, rgb(...) string, object, or array of numbers)
  * into a valid pdf-lib RGB tuple: [r, g, b] where each channel is a float between 0.0 and 1.0.
- * Prevents errors like "'red' must be of type 'number', but was actually of type 'string'".
  */
 export function normalizeColorToRgb(
   color: any,
   fallback: [number, number, number] = [139 / 255, 0, 0]
 ): [number, number, number] {
-  if (!color) return fallback;
+  if (!color) return [Number(fallback[0]), Number(fallback[1]), Number(fallback[2])];
 
   // Case 1: Object with red/green/blue or r/g/b keys
   if (typeof color === 'object' && !Array.isArray(color)) {
@@ -175,24 +185,21 @@ export function normalizeColorToRgb(
         const r = numR > 1.0 ? Math.min(1, Math.max(0, numR / 255)) : Math.min(1, Math.max(0, numR));
         const g = numG > 1.0 ? Math.min(1, Math.max(0, numG / 255)) : Math.min(1, Math.max(0, numG));
         const b = numB > 1.0 ? Math.min(1, Math.max(0, numB / 255)) : Math.min(1, Math.max(0, numB));
-        return [r, g, b];
+        return [Number(r), Number(g), Number(b)];
       }
     }
   }
 
-  // Case 2: Array of numbers
+  // Case 2: Array of numbers or numeric strings
   if (Array.isArray(color) && color.length >= 3) {
-    const isAlready01 = color.slice(0, 3).every(
-      (c) => typeof c === 'number' && !isNaN(c) && c >= 0 && c <= 1.0
-    );
-    if (isAlready01) {
-      return [Number(color[0]), Number(color[1]), Number(color[2])];
-    }
-    const r = Math.min(1, Math.max(0, Number(color[0]) / 255));
-    const g = Math.min(1, Math.max(0, Number(color[1]) / 255));
-    const b = Math.min(1, Math.max(0, Number(color[2]) / 255));
-    if (!isNaN(r) && !isNaN(g) && !isNaN(b)) {
-      return [r, g, b];
+    const num0 = parseFloat(String(color[0]));
+    const num1 = parseFloat(String(color[1]));
+    const num2 = parseFloat(String(color[2]));
+    if (!isNaN(num0) && !isNaN(num1) && !isNaN(num2)) {
+      const r = num0 > 1.0 ? Math.min(1, Math.max(0, num0 / 255)) : Math.min(1, Math.max(0, num0));
+      const g = num1 > 1.0 ? Math.min(1, Math.max(0, num1 / 255)) : Math.min(1, Math.max(0, num1));
+      const b = num2 > 1.0 ? Math.min(1, Math.max(0, num2 / 255)) : Math.min(1, Math.max(0, num2));
+      return [Number(r), Number(g), Number(b)];
     }
   }
 
@@ -202,7 +209,7 @@ export function normalizeColorToRgb(
 
     // Named color lookup
     if (NAMED_COLORS[str]) {
-      return NAMED_COLORS[str];
+      return [Number(NAMED_COLORS[str][0]), Number(NAMED_COLORS[str][1]), Number(NAMED_COLORS[str][2])];
     }
 
     // Hex string
@@ -211,12 +218,12 @@ export function normalizeColorToRgb(
       const r = parseInt(hex.slice(0, 2), 16) / 255;
       const g = parseInt(hex.slice(2, 4), 16) / 255;
       const b = parseInt(hex.slice(4, 6), 16) / 255;
-      if (!isNaN(r) && !isNaN(g) && !isNaN(b)) return [r, g, b];
+      if (!isNaN(r) && !isNaN(g) && !isNaN(b)) return [Number(r), Number(g), Number(b)];
     } else if (hex.length === 3) {
       const r = parseInt(hex[0] + hex[0], 16) / 255;
       const g = parseInt(hex[1] + hex[1], 16) / 255;
       const b = parseInt(hex[2] + hex[2], 16) / 255;
-      if (!isNaN(r) && !isNaN(g) && !isNaN(b)) return [r, g, b];
+      if (!isNaN(r) && !isNaN(g) && !isNaN(b)) return [Number(r), Number(g), Number(b)];
     }
 
     // rgb(r, g, b) string
@@ -225,11 +232,11 @@ export function normalizeColorToRgb(
       const r = Math.min(1, Math.max(0, parseInt(rgbMatch[1], 10) / 255));
       const g = Math.min(1, Math.max(0, parseInt(rgbMatch[2], 10) / 255));
       const b = Math.min(1, Math.max(0, parseInt(rgbMatch[3], 10) / 255));
-      if (!isNaN(r) && !isNaN(g) && !isNaN(b)) return [r, g, b];
+      if (!isNaN(r) && !isNaN(g) && !isNaN(b)) return [Number(r), Number(g), Number(b)];
     }
   }
 
-  return fallback;
+  return [Number(fallback[0]), Number(fallback[1]), Number(fallback[2])];
 }
 
 /**
@@ -343,11 +350,15 @@ export async function generateSingleCertificatePdf(
   let height: number;
 
   let resolvedCustomPath = await resolveTemplateFile(params.customTemplatePath);
+  const cleanPathLower = (resolvedCustomPath || '').toLowerCase().split('?')[0];
 
   const isCustomImage =
     resolvedCustomPath &&
     fs.existsSync(resolvedCustomPath) &&
-    (resolvedCustomPath.endsWith('.png') || resolvedCustomPath.endsWith('.jpg') || resolvedCustomPath.endsWith('.jpeg'));
+    (cleanPathLower.endsWith('.png') ||
+      cleanPathLower.endsWith('.jpg') ||
+      cleanPathLower.endsWith('.jpeg') ||
+      cleanPathLower.endsWith('.webp'));
 
   if (isCustomImage && resolvedCustomPath) {
     // Image-based template: Create new landscape PDF (A4 842.25 x 595.5 pt) and embed template image
@@ -357,16 +368,22 @@ export async function generateSingleCertificatePdf(
     page = pdfDoc.addPage([width, height]);
 
     const imgBytes = fs.readFileSync(resolvedCustomPath);
-    const bgImage = resolvedCustomPath.endsWith('.png')
-      ? await pdfDoc.embedPng(imgBytes)
-      : await pdfDoc.embedJpg(imgBytes);
+    let bgImage: any;
+    if (cleanPathLower.endsWith('.png')) {
+      bgImage = await pdfDoc.embedPng(imgBytes);
+    } else if (cleanPathLower.endsWith('.jpg') || cleanPathLower.endsWith('.jpeg')) {
+      bgImage = await pdfDoc.embedJpg(imgBytes);
+    } else {
+      const convertedPng = await sharp(imgBytes).toFormat('png').toBuffer();
+      bgImage = await pdfDoc.embedPng(convertedPng);
+    }
 
     page.drawImage(bgImage, { x: 0, y: 0, width, height });
     // Exact template preservation: No destructive whiteout rectangle. Background, borders, textures, and signatures remain 100% intact.
   } else {
     // Vector PDF Master: clean_master_template.pdf or reference_certificate.pdf
     let templateBytes: Buffer;
-    if (resolvedCustomPath && fs.existsSync(resolvedCustomPath) && resolvedCustomPath.endsWith('.pdf')) {
+    if (resolvedCustomPath && fs.existsSync(resolvedCustomPath) && cleanPathLower.endsWith('.pdf')) {
       templateBytes = fs.readFileSync(resolvedCustomPath);
     } else if (fs.existsSync(masterCleanPath)) {
       templateBytes = fs.readFileSync(masterCleanPath);
@@ -391,13 +408,13 @@ export async function generateSingleCertificatePdf(
   // 2. Type B Header Replacement (if Certificate of Achievement / Winner)
   if (isTypeB) {
     // Only cleanly cover the default line if using the vector PDF master where "— OF PARTICIPATION —" is pre-printed
-    if (!isCustomImage && !resolvedCustomPath?.endsWith('.pdf')) {
+    if (!isCustomImage && !cleanPathLower.endsWith('.pdf')) {
       page.drawRectangle({
         x: 180,
         y: 350,
         width: width - 360,
         height: 75,
-        color: rgb(1, 1, 1)
+        color: safeRgb(1, 1, 1)
       });
     }
 
@@ -408,7 +425,7 @@ export async function generateSingleCertificatePdf(
       y: cfg.subtitleY || 398,
       size: 13,
       font: fontBold,
-      color: rgb(26 / 255, 36 / 255, 86 / 255) // Official IEDC Navy Blue
+      color: safeRgb(26 / 255, 36 / 255, 86 / 255) // Official IEDC Navy Blue
     });
 
     const intro = params.recipientIntro || 'THIS CERTIFICATE IS AWARDED TO';
@@ -418,7 +435,7 @@ export async function generateSingleCertificatePdf(
       y: cfg.introY || 363,
       size: 11,
       font: fontRegular,
-      color: rgb(31 / 255, 41 / 255, 55 / 255)
+      color: safeRgb(31 / 255, 41 / 255, 55 / 255)
     });
   }
 
@@ -440,7 +457,7 @@ export async function generateSingleCertificatePdf(
     y: cfg.nameY,
     size: nameSize,
     font: fontBold,
-    color: rgb(cfg.nameColor[0], cfg.nameColor[1], cfg.nameColor[2])
+    color: safeRgb(cfg.nameColor[0], cfg.nameColor[1], cfg.nameColor[2])
   });
 
   // 4. Construct Dynamic Paragraph Text
@@ -483,7 +500,7 @@ export async function generateSingleCertificatePdf(
       y: currentY,
       size: cfg.paraFontSize,
       font: fontForPara,
-      color: rgb(cfg.paraColor[0], cfg.paraColor[1], cfg.paraColor[2])
+      color: safeRgb(cfg.paraColor[0], cfg.paraColor[1], cfg.paraColor[2])
     });
     currentY -= cfg.paraLineSpacing;
   }
@@ -524,7 +541,7 @@ export async function generateSingleCertificatePdf(
             y: py - 2,
             width: pWidth + 4,
             height: pHeight + 4,
-            color: rgb(0.9, 0.9, 0.9)
+            color: safeRgb(0.9, 0.9, 0.9)
           });
 
           page.drawImage(photoImg, {
@@ -549,7 +566,7 @@ export async function generateSingleCertificatePdf(
       y: cfg.certIdY,
       size: 8.5,
       font: fontRegular,
-      color: rgb(156 / 255, 163 / 255, 175 / 255)
+      color: safeRgb(156 / 255, 163 / 255, 175 / 255)
     });
   }
 

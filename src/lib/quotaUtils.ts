@@ -38,19 +38,47 @@ export function normalizeAcademicYear(yr?: string): CollegeAcademicYear {
 export function normalizeDepartment(dept?: string): string {
   if (!dept) return 'Electronics Engineering';
   const clean = dept.toLowerCase().trim();
+
+  // Computer Engineering / Science
+  if (clean.includes('comp') || clean.includes('cs') || clean === 'cse' || clean === 'ct') {
+    return 'Computer Engineering';
+  }
+  // Electronics
   if (clean.includes('electron') || clean === 'ec' || clean === 'ece') {
     return 'Electronics Engineering';
   }
+  // Electrical / EEE
+  if (clean.includes('electr') || clean === 'eee' || clean === 'ee') {
+    return 'Electrical and Electronics Engineering';
+  }
+  // Civil
   if (clean.includes('civil') || clean === 'ce') {
     return 'Civil Engineering';
   }
+  // Mechanical
   if (clean.includes('mech') || clean === 'me') {
     return 'Mechanical Engineering';
   }
-  if (clean.includes('electr') || clean === 'eee') {
-    return 'Electrical and Electronics Engineering';
-  }
-  return dept;
+
+  return dept.trim();
+}
+
+export function isInternalParticipant(reg: {
+  participationCategory?: string;
+  collegeName?: string;
+}): boolean {
+  if (reg.participationCategory === 'External') return false;
+  if (reg.participationCategory === 'Internal') return true;
+  const col = (reg.collegeName || '').toLowerCase().trim();
+  if (!col) return true;
+  return col.includes('perinthalmanna') || col.includes('pmna');
+}
+
+export function isExternalParticipant(reg: {
+  participationCategory?: string;
+  collegeName?: string;
+}): boolean {
+  return !isInternalParticipant(reg);
 }
 
 export function createDefaultQuotaConfig(
@@ -110,8 +138,17 @@ export function calculateQuotaSummary(
   let internalConfirmed = 0;
   let totalWaitlist = 0;
 
-  // Process all 12 classes
-  for (const dept of COLLEGE_DEPARTMENTS) {
+  // Process all configured departments
+  const allDepts = Array.from(
+    new Set([
+      ...COLLEGE_DEPARTMENTS,
+      ...Object.keys(rawConfig.classes || {})
+        .map((k) => parseClassKey(k).department)
+        .filter(Boolean)
+    ])
+  );
+
+  for (const dept of allDepts) {
     for (const yr of COLLEGE_ACADEMIC_YEARS) {
       const key = `${dept}__${yr}`;
       const conf = rawConfig.classes?.[key] || {
@@ -124,7 +161,8 @@ export function calculateQuotaSummary(
       // In Single Class mode, only the selected class is enabled
       const isActuallyEnabled =
         rawConfig.participationType === 'Single Class'
-          ? rawConfig.singleClass?.department === dept && rawConfig.singleClass?.academicYear === yr
+          ? normalizeDepartment(rawConfig.singleClass?.department) === dept &&
+            normalizeAcademicYear(rawConfig.singleClass?.academicYear) === yr
           : conf.enabled;
 
       const maxSeats =
@@ -136,15 +174,7 @@ export function calculateQuotaSummary(
 
       // Filter registrations for this class (Internal participants only)
       const classRegs = eventRegs.filter((r: any) => {
-        const isExternal =
-          r.participationCategory === 'External' ||
-          (r.collegeName &&
-            r.collegeName.trim().toLowerCase() !==
-              'govt polytechnic college perinthalmanna' &&
-            r.collegeName.trim().toLowerCase() !== 'gptc perinthalmanna' &&
-            r.collegeName.trim().toLowerCase() !== 'gptc pmna');
-
-        if (isExternal) return false;
+        if (!isInternalParticipant(r)) return false;
 
         const rDept = normalizeDepartment(r.department);
         const rYr = normalizeAcademicYear(r.academicYear);
@@ -191,22 +221,13 @@ export function calculateQuotaSummary(
     }
   }
 
-  // Process External Quota (Statewide)
+  // Process External Quota (Statewide or when enabled)
   const isStatewide = rawConfig.participationType === 'Statewide';
   const extConfig = rawConfig.externalQuota || { enabled: isStatewide, maxSeats: 30 };
   const extEnabled = isStatewide && extConfig.enabled;
   const extMaxSeats = extEnabled ? Number(extConfig.maxSeats) || 0 : 0;
 
-  const externalRegs = eventRegs.filter((r: any) => {
-    return (
-      r.participationCategory === 'External' ||
-      (r.collegeName &&
-        r.collegeName.trim().toLowerCase() !==
-          'govt polytechnic college perinthalmanna' &&
-        r.collegeName.trim().toLowerCase() !== 'gptc perinthalmanna' &&
-        r.collegeName.trim().toLowerCase() !== 'gptc pmna')
-    );
-  });
+  const externalRegs = eventRegs.filter((r: any) => isExternalParticipant(r));
 
   const extConfirmedList = externalRegs.filter(
     (r: any) => r.status === 'Confirmed' || r.status === 'Attended'

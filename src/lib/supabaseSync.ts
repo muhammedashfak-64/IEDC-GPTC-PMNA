@@ -16,6 +16,17 @@ async function safeDbOp(operationName: string, op: () => Promise<any>) {
   }
 }
 
+// Strict helper for critical mutations that throws on error
+async function strictDbOp(operationName: string, op: () => Promise<any>) {
+  if (!isSupabaseConfigured()) return null;
+  const result = await op();
+  if (result?.error) {
+    console.error(`[SupabaseSync] ${operationName} error:`, result.error.message || result.error);
+    throw new Error(`[SupabaseSync] ${operationName} failed: ${result.error.message || JSON.stringify(result.error)}`);
+  }
+  return result?.data || null;
+}
+
 // -------------------------------------------------------------
 // EVENTS
 // -------------------------------------------------------------
@@ -102,7 +113,7 @@ export function unpackEventFromSupabase(row: any) {
 }
 
 export async function syncEventToSupabase(event: any, isUpdate = false) {
-  return safeDbOp('syncEventToSupabase', async () => {
+  return strictDbOp('syncEventToSupabase', async () => {
     const row = packEventForSupabase(event);
     if (isUpdate) {
       return supabaseAdmin.from('events').upsert(row, { onConflict: 'id' });
@@ -112,7 +123,7 @@ export async function syncEventToSupabase(event: any, isUpdate = false) {
 }
 
 export async function deleteEventFromSupabase(id: string) {
-  return safeDbOp('deleteEventFromSupabase', async () => {
+  return strictDbOp('deleteEventFromSupabase', async () => {
     return supabaseAdmin.from('events').delete().eq('id', id);
   });
 }
@@ -189,12 +200,12 @@ export async function deleteTeamMemberFromSupabase(id: string) {
 // CERTIFICATES
 // -------------------------------------------------------------
 export async function syncCertificateToSupabase(cert: any, isUpdate = false) {
-  return safeDbOp('syncCertificateToSupabase', async () => {
+  return strictDbOp('syncCertificateToSupabase', async () => {
     const row = {
       id: cert.id,
       certificate_id: cert.certificateId || cert.certificate_id,
       participant_name: cert.participantName || cert.participant_name,
-      register_number: cert.registerNumber || cert.register_number,
+      register_number: cert.registerNumber || cert.register_number || '',
       email: cert.email || '',
       phone: cert.phone || '',
       event_id: cert.eventId || cert.event_id || '',
@@ -214,6 +225,31 @@ export async function syncCertificateToSupabase(cert: any, isUpdate = false) {
     }
     return supabaseAdmin.from('certificates').insert(row);
   });
+}
+
+export function unpackCertificateFromSupabase(row: any): any {
+  if (!row) return null;
+  return {
+    id: row.id,
+    certificateId: row.certificate_id || row.id,
+    participantName: row.participant_name,
+    registerNumber: row.register_number || '',
+    email: row.email || '',
+    phone: row.phone || '',
+    eventId: row.event_id || '',
+    eventName: row.event_name || 'IEDC Technical Event',
+    eventDate: row.event_date || '',
+    certificateType: row.certificate_type || 'Participation',
+    qrCodeUrl: row.qr_code_url || '',
+    pdfStorageUrl: row.pdf_storage_url || '',
+    pngStorageUrl: `/certificates/${row.certificate_id || row.id}.png`,
+    status: row.status || 'Published',
+    downloadsCount: Number(row.downloads_count) || 0,
+    issueDate: row.issued_date || '',
+    issuedAt: row.created_at || row.updated_at || new Date().toISOString(),
+    createdAt: row.created_at,
+    updatedAt: row.updated_at
+  };
 }
 
 export async function deleteCertificateFromSupabase(id: string) {
@@ -438,7 +474,7 @@ export async function syncAuditLogToSupabase(log: any) {
 // REGISTRATIONS
 // -------------------------------------------------------------
 export async function syncRegistrationToSupabase(reg: any, isUpdate = false) {
-  return safeDbOp('syncRegistrationToSupabase', async () => {
+  return strictDbOp('syncRegistrationToSupabase', async () => {
     let additionalNotes = reg.additionalNotes || reg.additional_notes || '';
     const extraMeta: any = {};
     if (reg.passToken) extraMeta.passToken = reg.passToken;
@@ -449,25 +485,49 @@ export async function syncRegistrationToSupabase(reg: any, isUpdate = false) {
     if (reg.attendance) extraMeta.attendance = reg.attendance;
     if (reg.attendedAt) extraMeta.attendedAt = reg.attendedAt;
     if (reg.participationCategory) extraMeta.participationCategory = reg.participationCategory;
+    if (reg.markedBy) extraMeta.markedBy = reg.markedBy;
+    if (reg.markedById) extraMeta.markedById = reg.markedById;
+    if (reg.attendanceMethod) extraMeta.attendanceMethod = reg.attendanceMethod;
+    if (reg.status) extraMeta.status = reg.status;
 
-    if (Object.keys(extraMeta).length > 0 && !additionalNotes.includes('<!--IEDC_REG_META:')) {
-      additionalNotes = `${additionalNotes}<!--IEDC_REG_META:${JSON.stringify(extraMeta)}-->`;
+    // Preserve exact original student registration number
+    const rawRegNum = typeof reg.registerNumber === 'string' ? reg.registerNumber.trim() : (reg.register_number ? String(reg.register_number).trim() : '');
+    extraMeta.originalRegisterNumber = rawRegNum;
+
+    // Strip previous IEDC_REG_META if already present to avoid appending duplicates
+    if (additionalNotes.includes('<!--IEDC_REG_META:')) {
+      additionalNotes = additionalNotes.split('<!--IEDC_REG_META:')[0].trim();
+    }
+    additionalNotes = `${additionalNotes}<!--IEDC_REG_META:${JSON.stringify(extraMeta)}-->`;
+
+    const registrationCode = reg.registrationCode || reg.registration_code || `REG-2026-${reg.id.replace('reg-', '').padStart(5, '0')}`;
+
+    // Critical fix: Ensure register_number is never an empty string in Postgres unique index idx_reg_event_regnum
+    // If student didn't enter an admission number, use their unique registrationCode as unique identifier in DB
+    const dbRegisterNumber = rawRegNum || registrationCode;
+
+    // Database check constraint allows only 'Confirmed', 'Pending', 'Attended', 'Cancelled'
+    let dbStatus = reg.status;
+    if (dbStatus === 'Waitlisted' || dbStatus === 'Rejected') {
+      dbStatus = 'Pending';
+    } else if (!['Confirmed', 'Pending', 'Attended', 'Cancelled'].includes(dbStatus)) {
+      dbStatus = 'Confirmed';
     }
 
     const row = {
       id: reg.id,
-      registration_code: reg.registrationCode || reg.registration_code || `REG-2026-${reg.id.replace('reg-', '').padStart(5, '0')}`,
+      registration_code: registrationCode,
       event_id: reg.eventId || reg.event_id,
       event_title: reg.eventTitle || reg.event_title || 'Campus Event',
       student_name: reg.studentName || reg.student_name,
-      register_number: reg.registerNumber || reg.register_number || '',
+      register_number: dbRegisterNumber,
       email: reg.email,
       phone: reg.phone,
       department: reg.department || 'General',
       academic_year: reg.academicYear || reg.academic_year || '2nd Year',
       college_name: reg.collegeName || reg.college_name || 'Govt Polytechnic College Perinthalmanna',
       additional_notes: additionalNotes,
-      status: ['Confirmed', 'Pending', 'Attended', 'Cancelled', 'Waitlisted', 'Rejected'].includes(reg.status) ? reg.status : 'Confirmed',
+      status: dbStatus,
       consent: reg.consent !== false,
       created_at: reg.registeredAt || reg.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -484,4 +544,75 @@ export async function deleteRegistrationFromSupabase(id: string) {
   return safeDbOp('deleteRegistrationFromSupabase', async () => {
     return supabaseAdmin.from('registrations').delete().eq('id', id);
   });
+}
+
+export function unpackRegistrationFromSupabase(row: any): any {
+  if (!row) return null;
+
+  let additionalNotes = row.additional_notes || '';
+  let meta: any = {};
+
+  if (typeof additionalNotes === 'string' && additionalNotes.includes('<!--IEDC_REG_META:')) {
+    const parts = additionalNotes.split('<!--IEDC_REG_META:');
+    additionalNotes = parts[0].trim();
+    const metaStr = parts[1]?.split('-->')[0];
+    try {
+      meta = JSON.parse(metaStr);
+    } catch {}
+  }
+
+  const passToken =
+    meta.passToken ||
+    `pass_${Buffer.from(row.id || row.registration_code || 'reg').toString('hex').slice(0, 24)}`;
+  const qrPayload =
+    meta.qrPayload ||
+    `IEDCPASS:${row.event_id}:${row.registration_code || row.id}:${passToken}`;
+
+  const isExternal =
+    meta.participationCategory === 'External' ||
+    (row.college_name &&
+      !row.college_name.toLowerCase().includes('perinthalmanna') &&
+      !row.college_name.toLowerCase().includes('pmna'));
+
+  // Restore original register number (blank if not provided by student)
+  let studentRegisterNumber = row.register_number || '';
+  if (meta.originalRegisterNumber !== undefined) {
+    studentRegisterNumber = meta.originalRegisterNumber;
+  } else if (row.register_number === row.registration_code) {
+    studentRegisterNumber = '';
+  }
+
+  // Restore true status (including 'Waitlisted' or 'Rejected')
+  const trueStatus = meta.status || row.status || 'Confirmed';
+
+  return {
+    id: row.id,
+    registrationCode: row.registration_code || row.id,
+    eventId: row.event_id,
+    eventTitle: row.event_title || 'Campus Event',
+    studentName: row.student_name,
+    registerNumber: studentRegisterNumber,
+    email: row.email,
+    phone: row.phone,
+    department: row.department || 'General',
+    academicYear: row.academic_year || 'First Year',
+    collegeName: row.college_name || 'Govt Polytechnic College Perinthalmanna',
+    participationCategory: meta.participationCategory || (isExternal ? 'External' : 'Internal'),
+    district: meta.district || '',
+    course: meta.course || '',
+    additionalNotes,
+    status: trueStatus,
+    attendance: meta.attendance || (row.status === 'Attended' ? 'Present' : (row.status === 'Cancelled' ? 'Absent' : null)),
+    attendanceMethod: meta.attendanceMethod || null,
+    attendedAt: meta.attendedAt || (row.status === 'Attended' ? row.updated_at : null),
+    markedBy: meta.markedBy || null,
+    markedById: meta.markedById || null,
+    waitlistPosition: meta.waitlistPosition ?? null,
+    passToken,
+    qrPayload,
+    consent: row.consent !== false,
+    registeredAt: row.created_at || new Date().toISOString(),
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || row.created_at || new Date().toISOString()
+  };
 }

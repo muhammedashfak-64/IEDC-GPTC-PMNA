@@ -1,4 +1,5 @@
 export const COLLEGE_DEPARTMENTS = [
+  'Computer Engineering',
   'Electronics Engineering',
   'Civil Engineering',
   'Mechanical Engineering',

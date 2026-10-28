@@ -30,8 +30,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const event_id = body.event_id || body.eventId;
-    const full_name = body.full_name || body.fullName || body.name;
-    const mobile_number = body.mobile_number || body.mobileNumber || body.phone;
+    const full_name = body.full_name || body.fullName || body.name || body.studentName;
+    const mobile_number = body.mobile_number || body.mobileNumber || body.phone || body.mobile;
 
     if (!full_name || !mobile_number) {
       return NextResponse.json(

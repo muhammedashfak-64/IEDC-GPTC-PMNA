@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAdminUserFromRequest } from '@/lib/adminAuthHelper';
-import { getProgramQuotaDetails, updateProgramQuotaConfig } from '@/lib/serverStore';
+import { getProgramQuotaDetailsAsync, updateProgramQuotaConfigAsync } from '@/lib/serverStore';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -16,7 +16,7 @@ export async function GET(
 
   const { id } = await params;
   try {
-    const details = getProgramQuotaDetails(id);
+    const details = await getProgramQuotaDetailsAsync(id);
     return NextResponse.json({
       success: true,
       ...details
@@ -41,7 +41,7 @@ export async function PUT(
     const force = Boolean(body.force);
     const updates = body.quotaConfig || body;
 
-    const result = updateProgramQuotaConfig(id, updates, auth, force);
+    const result = await updateProgramQuotaConfigAsync(id, updates, auth, force);
     return NextResponse.json(result);
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 400 });

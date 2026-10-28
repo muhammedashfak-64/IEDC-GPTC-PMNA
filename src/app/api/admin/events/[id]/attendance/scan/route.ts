@@ -27,7 +27,7 @@ export async function POST(
       );
     }
 
-    const result = scanPassAttendance(id, qrData, auth);
+    const result = await scanPassAttendance(id, qrData, auth);
     return NextResponse.json(result, { status: 200 });
   } catch (err: any) {
     const statusCode = err.code === 'WRONG_EVENT' ? 400 : err.code === 'INVALID_PASS' ? 404 : 400;

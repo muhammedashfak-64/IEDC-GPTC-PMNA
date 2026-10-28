@@ -108,6 +108,7 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
   const [previewTarget, setPreviewTarget] = useState<'participation' | 'winner'>('participation');
   const [sampleGenerating, setSampleGenerating] = useState(false);
   const [certTemplateTab, setCertTemplateTab] = useState<'participation' | 'winner'>('participation');
+  const [availableTemplates, setAvailableTemplates] = useState<any[]>([]);
 
   // Participation Template Config State
   const [templateConfig, setTemplateConfig] = useState({
@@ -149,12 +150,17 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
   const loadProgramData = async () => {
     setLoading(true);
     try {
-      const [evtRes, regRes, ldrRes, certRes] = await Promise.all([
+      const [evtRes, regRes, ldrRes, certRes, tplRes] = await Promise.all([
         fetch('/api/admin/events').then((r) => r.json()),
         fetch(`/api/admin/events/${id}/attendance`).then((r) => r.json()),
         fetch(`/api/admin/events/${id}/leaders`).then((r) => r.json()),
-        fetch('/api/admin/certificates').then((r) => r.json())
+        fetch('/api/admin/certificates').then((r) => r.json()),
+        fetch('/api/admin/certificate-templates').then((r) => r.json()).catch(() => ({ success: false, data: [] }))
       ]);
+
+      if (tplRes?.success && Array.isArray(tplRes.data)) {
+        setAvailableTemplates(tplRes.data);
+      }
 
       if (evtRes.success) {
         const found = (evtRes.data || []).find((e: any) => e.id === id);
@@ -1480,17 +1486,49 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                 )}
               </div>
 
+              {/* Template Selection from Library */}
+              {availableTemplates.length > 0 && (
+                <div>
+                  <label className="text-xs font-bold text-slate-300 uppercase block mb-1">
+                    Select from Template Library
+                  </label>
+                  <select
+                    value={program?.certificateTemplateUrl || ''}
+                    onChange={(e) => {
+                      const selectedVal = e.target.value;
+                      setProgram((p: any) => ({ ...p, certificateTemplateUrl: selectedVal }));
+                      if (selectedVal) {
+                        const tpl = availableTemplates.find(
+                          (t) => (t.cleanUrl || t.url || t.pdfUrl) === selectedVal
+                        );
+                        if (tpl?.templateConfig) {
+                          setTemplateConfig((prev) => ({ ...prev, ...tpl.templateConfig }));
+                        }
+                      }
+                    }}
+                    className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                  >
+                    <option value="">Default Master Vector Template</option>
+                    {availableTemplates.map((t) => (
+                      <option key={t.id} value={t.cleanUrl || t.url || t.pdfUrl}>
+                        {t.title} ({t.type || 'Master'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {/* Custom Master Template Upload */}
               <div>
                 <label className="text-xs font-bold text-slate-300 uppercase block mb-1">
-                  Upload Custom Master File (Optional)
+                  Or Upload New Master File (PNG, JPG, PDF)
                 </label>
                 <FileUpload
                   label="Certificate Master File"
                   value={program?.certificateTemplateUrl || ''}
                   onChange={(url) => setProgram((p: any) => ({ ...p, certificateTemplateUrl: url }))}
                   folder="certificate-templates"
-                  accept="application/pdf,image/png,image/jpeg"
+                  accept="application/pdf,image/png,image/jpeg,image/webp"
                 />
               </div>
 
@@ -1574,8 +1612,9 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                         <label className="text-[11px] text-slate-400 block mb-1">Name Y Position (pt)</label>
                         <input
                           type="number"
+                          step="any"
                           value={templateConfig.nameY}
-                          onChange={(e) => setTemplateConfig({ ...templateConfig, nameY: Number(e.target.value) || 0 })}
+                          onChange={(e) => setTemplateConfig({ ...templateConfig, nameY: parseFloat(e.target.value) || 0 })}
                           className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
                         />
                       </div>
@@ -1583,8 +1622,9 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                         <label className="text-[11px] text-slate-400 block mb-1">Name Font Size (pt)</label>
                         <input
                           type="number"
+                          step="any"
                           value={templateConfig.nameFontSize}
-                          onChange={(e) => setTemplateConfig({ ...templateConfig, nameFontSize: Number(e.target.value) || 0 })}
+                          onChange={(e) => setTemplateConfig({ ...templateConfig, nameFontSize: parseFloat(e.target.value) || 0 })}
                           className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
                         />
                       </div>
@@ -1595,8 +1635,9 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                         <label className="text-[11px] text-slate-400 block mb-1">Paragraph Y Position (pt)</label>
                         <input
                           type="number"
+                          step="any"
                           value={templateConfig.paraY}
-                          onChange={(e) => setTemplateConfig({ ...templateConfig, paraY: Number(e.target.value) || 0 })}
+                          onChange={(e) => setTemplateConfig({ ...templateConfig, paraY: parseFloat(e.target.value) || 0 })}
                           className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
                         />
                       </div>
@@ -1604,8 +1645,9 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                         <label className="text-[11px] text-slate-400 block mb-1">Paragraph Font Size (pt)</label>
                         <input
                           type="number"
+                          step="any"
                           value={templateConfig.paraFontSize}
-                          onChange={(e) => setTemplateConfig({ ...templateConfig, paraFontSize: Number(e.target.value) || 0 })}
+                          onChange={(e) => setTemplateConfig({ ...templateConfig, paraFontSize: parseFloat(e.target.value) || 0 })}
                           className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
                         />
                       </div>
@@ -1616,8 +1658,9 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                         <label className="text-[11px] text-slate-400 block mb-1">Line Spacing (pt)</label>
                         <input
                           type="number"
+                          step="any"
                           value={templateConfig.paraLineSpacing}
-                          onChange={(e) => setTemplateConfig({ ...templateConfig, paraLineSpacing: Number(e.target.value) || 0 })}
+                          onChange={(e) => setTemplateConfig({ ...templateConfig, paraLineSpacing: parseFloat(e.target.value) || 0 })}
                           className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
                         />
                       </div>
@@ -1625,8 +1668,9 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                         <label className="text-[11px] text-slate-400 block mb-1">Max Paragraph Width (pt)</label>
                         <input
                           type="number"
+                          step="any"
                           value={templateConfig.paraMaxWidth}
-                          onChange={(e) => setTemplateConfig({ ...templateConfig, paraMaxWidth: Number(e.target.value) || 0 })}
+                          onChange={(e) => setTemplateConfig({ ...templateConfig, paraMaxWidth: parseFloat(e.target.value) || 0 })}
                           className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
                         />
                       </div>
@@ -1762,8 +1806,9 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                         <label className="text-[11px] text-slate-400 block mb-1">Name Y Position (pt)</label>
                         <input
                           type="number"
+                          step="any"
                           value={winnerTemplateConfig.nameY}
-                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, nameY: Number(e.target.value) || 0 })}
+                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, nameY: parseFloat(e.target.value) || 0 })}
                           className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
                         />
                       </div>
@@ -1771,8 +1816,9 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                         <label className="text-[11px] text-slate-400 block mb-1">Name Font Size (pt)</label>
                         <input
                           type="number"
+                          step="any"
                           value={winnerTemplateConfig.nameFontSize}
-                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, nameFontSize: Number(e.target.value) || 0 })}
+                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, nameFontSize: parseFloat(e.target.value) || 0 })}
                           className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
                         />
                       </div>
@@ -1783,8 +1829,9 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                         <label className="text-[11px] text-slate-400 block mb-1">Description Y Position (pt)</label>
                         <input
                           type="number"
+                          step="any"
                           value={winnerTemplateConfig.paraY}
-                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, paraY: Number(e.target.value) || 0 })}
+                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, paraY: parseFloat(e.target.value) || 0 })}
                           className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
                         />
                       </div>
@@ -1792,8 +1839,9 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                         <label className="text-[11px] text-slate-400 block mb-1">Description Font Size (pt)</label>
                         <input
                           type="number"
+                          step="any"
                           value={winnerTemplateConfig.paraFontSize}
-                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, paraFontSize: Number(e.target.value) || 0 })}
+                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, paraFontSize: parseFloat(e.target.value) || 0 })}
                           className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
                         />
                       </div>
@@ -1804,8 +1852,9 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                         <label className="text-[11px] text-slate-400 block mb-1">Description X Position (pt, 0=auto)</label>
                         <input
                           type="number"
+                          step="any"
                           value={winnerTemplateConfig.paraX || 0}
-                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, paraX: Number(e.target.value) || 0 })}
+                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, paraX: parseFloat(e.target.value) || 0 })}
                           className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
                         />
                       </div>
@@ -1813,8 +1862,9 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                         <label className="text-[11px] text-slate-400 block mb-1">Line Spacing (pt)</label>
                         <input
                           type="number"
+                          step="any"
                           value={winnerTemplateConfig.paraLineSpacing}
-                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, paraLineSpacing: Number(e.target.value) || 0 })}
+                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, paraLineSpacing: parseFloat(e.target.value) || 0 })}
                           className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
                         />
                       </div>
@@ -1825,8 +1875,9 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                         <label className="text-[11px] text-slate-400 block mb-1">Max Description Width (pt)</label>
                         <input
                           type="number"
+                          step="any"
                           value={winnerTemplateConfig.paraMaxWidth}
-                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, paraMaxWidth: Number(e.target.value) || 0 })}
+                          onChange={(e) => setWinnerTemplateConfig({ ...winnerTemplateConfig, paraMaxWidth: parseFloat(e.target.value) || 0 })}
                           className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white"
                         />
                       </div>
