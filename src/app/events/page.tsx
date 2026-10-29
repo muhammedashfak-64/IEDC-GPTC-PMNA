@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { Calendar, MapPin, Clock, Award, Sparkles, QrCode, FileText, ArrowRight, Download, RefreshCw } from 'lucide-react';
+import { getEventRegistrationStatus } from '@/lib/quotaUtils';
 
 export default function EventsPage() {
   const [events, setEvents] = useState<any[]>([]);
@@ -77,13 +78,22 @@ export default function EventsPage() {
             </div>
 
             <div className="pt-2">
-              <Link
-                href={`/register?event=${events[0].id}`}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#F98A5B] hover:bg-[#fa753e] text-black font-extrabold text-xs transition-colors shadow-lg"
-              >
-                <span>Register for This Event</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Link>
+              {(() => {
+                const regStatus = getEventRegistrationStatus(events[0]);
+                return regStatus.isOpen ? (
+                  <Link
+                    href={`/register?event=${events[0].id}`}
+                    className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#F98A5B] hover:bg-[#fa753e] text-black font-extrabold text-xs transition-colors shadow-lg"
+                  >
+                    <span>Register for This Event</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                ) : (
+                  <div className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-neutral-800 text-neutral-400 font-bold text-xs border border-white/10 cursor-not-allowed">
+                    <span>{regStatus.statusText}</span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
@@ -179,13 +189,29 @@ export default function EventsPage() {
                       </a>
                     )}
 
-                    <Link
-                      href={`/register?event=${e.id}`}
-                      className="w-full py-2.5 rounded-xl bg-[#F98A5B] hover:bg-[#fa753e] text-neutral-950 font-bold text-xs shadow-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <span>Register for Event</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </Link>
+                    {(() => {
+                      const regStatus = getEventRegistrationStatus(e);
+                      return regStatus.isOpen ? (
+                        <div className="space-y-1">
+                          <Link
+                            href={`/register?event=${e.id}`}
+                            className="w-full py-2.5 rounded-xl bg-[#F98A5B] hover:bg-[#fa753e] text-neutral-950 font-bold text-xs shadow-lg transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                          >
+                            <span>Register for Event</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </Link>
+                          {regStatus.deadlineFormatted && (
+                            <span className="text-[10px] text-neutral-400 block text-center">
+                              Closes: {regStatus.deadlineFormatted}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="w-full py-2.5 rounded-xl bg-neutral-800 text-neutral-400 font-bold text-xs text-center border border-white/10 cursor-not-allowed">
+                          <span>{regStatus.statusText}</span>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

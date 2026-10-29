@@ -10,7 +10,7 @@ export default function InnovationPortalPage() {
   const [title, setTitle] = useState('');
   const [studentName, setStudentName] = useState(user?.name || '');
   const [registerNumber, setRegisterNumber] = useState(user?.registerNumber || '');
-  const [department, setDepartment] = useState(user?.department || 'Computer Engineering');
+  const [department, setDepartment] = useState(user?.department || 'Electronics Engineering');
   const [problemStatement, setProblemStatement] = useState('');
   const [proposedSolution, setProposedSolution] = useState('');
   const [techStackInput, setTechStackInput] = useState('');
@@ -99,11 +99,10 @@ export default function InnovationPortalPage() {
                 onChange={(e) => setDepartment(e.target.value)}
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-2 text-sm text-white focus:outline-none"
               >
-                <option value="Computer Engineering">Computer Engineering</option>
-                <option value="Electronics Engineering">Electronics Engineering</option>
-                <option value="Electrical Engineering">Electrical Engineering</option>
-                <option value="Mechanical Engineering">Mechanical Engineering</option>
                 <option value="Civil Engineering">Civil Engineering</option>
+                <option value="Mechanical Engineering">Mechanical Engineering</option>
+                <option value="Electrical and Electronics Engineering">Electrical &amp; Electronics Engineering (EEE)</option>
+                <option value="Electronics Engineering">Electronics Engineering</option>
               </select>
             </div>
 

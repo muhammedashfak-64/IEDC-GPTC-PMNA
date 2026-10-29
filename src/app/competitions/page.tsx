@@ -5,7 +5,7 @@ import { useApp } from '@/context/AppContext';
 import { Award, Trophy, Zap, CheckCircle2, Medal, ExternalLink } from 'lucide-react';
 
 const leaderboards = [
-  { rank: 1, name: 'Rahul V', dept: 'Computer Engg', points: 1450, badge: 'Innovator Champion' },
+  { rank: 1, name: 'Rahul V', dept: 'Electronics Engg', points: 1450, badge: 'Innovator Champion' },
   { rank: 2, name: 'Fathima Riya', dept: 'Electronics Engg', points: 1320, badge: 'IoT Pioneer' },
   { rank: 3, name: 'Arjun K', dept: 'Electrical Engg', points: 1180, badge: 'Hackathon Lead' },
   { rank: 4, name: 'Ananya P', dept: 'Mechanical Engg', points: 950, badge: 'Robotics Enthusiast' },

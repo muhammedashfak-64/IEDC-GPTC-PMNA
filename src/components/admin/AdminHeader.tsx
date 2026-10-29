@@ -74,10 +74,10 @@ export const AdminHeader: React.FC = () => {
 
       {/* Right Tools: Status, Quick Create, Notifications, Profile */}
       <div className="flex items-center gap-2.5">
-        {/* System Database Status Pill */}
+        {/* System Cloud Sync Status Pill */}
         <div className="hidden xl:flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-[11px] font-mono font-medium">
           <Database className="w-3 h-3 text-emerald-400" />
-          <span>Supabase Sync Active</span>
+          <span>Cloud Sync Active</span>
         </div>
 
         {/* Quick Action Dropdown */}
@@ -152,7 +152,7 @@ export const AdminHeader: React.FC = () => {
                   <div className="text-slate-400 text-[11px]">Separate public frontend and private backend active.</div>
                 </div>
                 <div className="p-2.5 rounded-xl bg-white/5 border border-white/5 space-y-0.5">
-                  <div className="font-bold text-white">Supabase Auth Integrated</div>
+                  <div className="font-bold text-white">Cloud Authentication Active</div>
                   <div className="text-slate-400 text-[11px]">Role-based access enforced server-side.</div>
                 </div>
               </div>

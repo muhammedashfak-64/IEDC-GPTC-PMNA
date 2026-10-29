@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -203,11 +204,10 @@ export default function AdminProjectsPage() {
 
                 <button
                   onClick={() => handleTogglePublish(proj)}
-                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border cursor-pointer ${
-                    proj.publicationStatus === 'Published'
+                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border cursor-pointer ${proj.publicationStatus === 'Published'
                       ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                       : 'bg-slate-500/15 text-slate-300 border-slate-500/30'
-                  }`}
+                    }`}
                 >
                   {proj.publicationStatus === 'Published' ? 'Published' : 'Draft'}
                 </button>
@@ -295,11 +295,10 @@ export default function AdminProjectsPage() {
                     onChange={(e) => setFormData({ ...formData, department: e.target.value })}
                     className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
                   >
-                    <option value="Electronics Engineering">Electronics Engineering</option>
-                    <option value="Computer Engineering">Computer Engineering</option>
-                    <option value="Electrical Engineering">Electrical Engineering</option>
-                    <option value="Mechanical Engineering">Mechanical Engineering</option>
                     <option value="Civil Engineering">Civil Engineering</option>
+                    <option value="Mechanical Engineering">Mechanical Engineering</option>
+                    <option value="Electrical and Electronics Engineering">Electrical and Electronics Engineering (EEE)</option>
+                    <option value="Electronics Engineering">Electronics Engineering</option>
                   </select>
                 </div>
 

@@ -29,12 +29,13 @@ import {
   Users
 } from 'lucide-react';
 import QRCode from 'react-qr-code';
+import { getEventRegistrationStatus } from '@/lib/quotaUtils';
+import { downloadPass } from '@/lib/downloadHelper';
 
 function getCanonicalDept(dept: string): string {
   const d = (dept || '').trim().toLowerCase();
-  if (d.includes('computer') || d.includes('cs') || d.includes('software')) return 'Computer Engineering';
-  if (d.includes('electrical') || d.includes('eee')) return 'Electrical & Electronics Engineering';
-  if (d.includes('electronics') || d.includes('ec')) return 'Electronics Engineering';
+  if (d.includes('electrical') || d.includes('eee') || d === 'ee') return 'Electrical and Electronics Engineering';
+  if (d.includes('electronics') || d.includes('ec') || d === 'ece') return 'Electronics Engineering';
   if (d.includes('civil') || d.includes('ce')) return 'Civil Engineering';
   if (d.includes('mechanical') || d.includes('mech') || d.includes('me')) return 'Mechanical Engineering';
   return dept;
@@ -92,8 +93,9 @@ function RegisterFormContent() {
   const handleLookupPass = async (e: React.FormEvent) => {
     e.preventDefault();
     setLookupError(null);
-    if (!selectedEventId && !lookupCode.trim()) {
-      setLookupError('Please select an event or enter your Registration Code.');
+    const cleanPhone = lookupPhone.replace(/\D/g, '').slice(-10);
+    if (!cleanPhone || cleanPhone.length !== 10) {
+      setLookupError('Please enter your 10-digit registered mobile number.');
       return;
     }
     setLookupLoading(true);
@@ -102,19 +104,19 @@ function RegisterFormContent() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          eventId: selectedEventId,
-          phone: lookupPhone,
-          registrationCode: lookupCode
+          eventId: selectedEventId || undefined,
+          phone: cleanPhone,
+          registrationCode: lookupCode.trim() || undefined
         })
       });
       const json = await res.json();
       if (!res.ok || !json.success) {
-        throw new Error(json.error || 'No matching pass found.');
+        throw new Error(json.error || 'No matching confirmed pass found for this mobile number.');
       }
       setRegisteredData(json.data);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
-      setLookupError(err.message || 'Failed to retrieve pass.');
+      setLookupError(err.message || 'No matching confirmed pass found for this mobile number.');
     } finally {
       setLookupLoading(false);
     }
@@ -388,6 +390,14 @@ function RegisterFormContent() {
             <Download className="w-4 h-4 text-[#F98A5B]" />
             <span>Download Pass (PNG)</span>
           </a>
+          <a
+            href={`/api/public/registrations/${registeredData.id}/pass/jpg`}
+            download={`IEDC_Pass_${(registeredData.studentName || 'Student').replace(/\s+/g, '_')}.jpg`}
+            className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer"
+          >
+            <Download className="w-4 h-4 text-purple-400" />
+            <span>Download Pass (JPG)</span>
+          </a>
           <button
             onClick={handlePrint}
             className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer"
@@ -511,14 +521,14 @@ function RegisterFormContent() {
           <div className="space-y-4">
             <div>
               <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
-                Select Program / Event
+                Program / Event <span className="text-slate-500 font-normal">(Optional — auto-detects by phone)</span>
               </label>
               <select
                 value={selectedEventId}
                 onChange={(e) => setSelectedEventId(e.target.value)}
                 className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-4 py-3 text-sm text-white focus:outline-none"
               >
-                <option value="">-- Select Event --</option>
+                <option value="">-- All Programs / Auto-Detect by Mobile Number --</option>
                 {events.map((e) => (
                   <option key={e.id} value={e.id}>
                     {e.title} — {e.date}
@@ -530,20 +540,22 @@ function RegisterFormContent() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
-                  Registered Mobile Number
+                  Registered Mobile Number <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="tel"
+                  maxLength={10}
+                  required
                   value={lookupPhone}
-                  onChange={(e) => setLookupPhone(e.target.value)}
+                  onChange={(e) => setLookupPhone(e.target.value.replace(/\D/g, ''))}
                   placeholder="e.g. 9876543210"
-                  className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-4 py-3 text-sm text-white focus:outline-none"
+                  className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-4 py-3 text-sm text-white focus:outline-none font-mono"
                 />
               </div>
 
               <div>
                 <label className="text-xs font-bold text-slate-300 uppercase tracking-wider block mb-1.5">
-                  OR Pass ID / Registration Code
+                  Pass ID / Reg Code <span className="text-slate-500 font-normal">(Optional)</span>
                 </label>
                 <input
                   type="text"
@@ -752,10 +764,11 @@ function RegisterFormContent() {
               <input
                 type="text"
                 required
-                placeholder="e.g. Muhammed Ashfak"
+                placeholder="e.g. MUHAMMED ASHFAK"
                 value={formData.studentName}
-                onChange={(e) => setFormData({ ...formData, studentName: e.target.value })}
-                className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none"
+                onChange={(e) => setFormData({ ...formData, studentName: e.target.value.toUpperCase() })}
+                onBlur={(e) => setFormData({ ...formData, studentName: e.target.value.trim().toUpperCase() })}
+                className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none uppercase"
               />
             </div>
 
@@ -851,7 +864,7 @@ function RegisterFormContent() {
                   <label className="text-xs font-bold text-slate-300">Course / Branch</label>
                   <input
                     type="text"
-                    placeholder="e.g. Diploma in Robotics / B.Tech Computer Science"
+                    placeholder="e.g. Diploma in Robotics / Mechanical Engineering"
                     value={formData.course}
                     onChange={(e) =>
                       setFormData({ ...formData, course: e.target.value, department: e.target.value })
@@ -950,6 +963,14 @@ function RegisterFormContent() {
           </label>
         </div>
 
+        {/* Event Registration Closure Notice */}
+        {selectedEvent && !getEventRegistrationStatus(selectedEvent).isOpen && (
+          <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>Registration Closed: {getEventRegistrationStatus(selectedEvent).reason}</span>
+          </div>
+        )}
+
         {/* Error Alert */}
         {errorMessage && (
           <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs flex items-center gap-2">
@@ -961,11 +982,13 @@ function RegisterFormContent() {
         {/* Submit Button */}
         <button
           type="submit"
-          disabled={submitting}
-          className="w-full py-3.5 rounded-2xl bg-[#F98A5B] hover:bg-[#F98A5B]/90 text-black font-black text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg disabled:opacity-50"
+          disabled={submitting || (Boolean(selectedEvent) && !getEventRegistrationStatus(selectedEvent).isOpen)}
+          className="w-full py-3.5 rounded-2xl bg-[#F98A5B] hover:bg-[#F98A5B]/90 text-black font-black text-sm flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {submitting ? (
             <span>Confirming Registration...</span>
+          ) : selectedEvent && !getEventRegistrationStatus(selectedEvent).isOpen ? (
+            <span>{getEventRegistrationStatus(selectedEvent).statusText}</span>
           ) : (
             <>
               <Ticket className="w-4 h-4" />

@@ -61,11 +61,10 @@ const COMMON_ROLES = [
 ];
 
 const COMMON_DEPTS = [
-  'Electronics Engineering',
-  'Electrical Engineering',
-  'Mechanical Engineering',
   'Civil Engineering',
-  'Computer Engineering'
+  'Mechanical Engineering',
+  'Electrical and Electronics Engineering',
+  'Electronics Engineering'
 ];
 
 const COMMON_CATEGORIES = [

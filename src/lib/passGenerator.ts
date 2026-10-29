@@ -112,7 +112,12 @@ export async function generatePassPdf(
 
   if (fs.existsSync(collegeLogoPath)) {
     try {
-      const collegeImg = await pdfDoc.embedPng(fs.readFileSync(collegeLogoPath));
+      // Resize high-resolution logo to lightweight 150x150 thumbnail to keep PDF size under 100 KB
+      const resizedLogo = await sharp(collegeLogoPath)
+        .resize(150, 150, { fit: 'inside' })
+        .png({ quality: 80, compressionLevel: 8 })
+        .toBuffer();
+      const collegeImg = await pdfDoc.embedPng(resizedLogo);
       page.drawImage(collegeImg, {
         x: 20,
         y: height - 90,
@@ -126,7 +131,11 @@ export async function generatePassPdf(
 
   if (fs.existsSync(iedcLogoPath)) {
     try {
-      const iedcImg = await pdfDoc.embedPng(fs.readFileSync(iedcLogoPath));
+      const resizedIedc = await sharp(iedcLogoPath)
+        .resize(150, 150, { fit: 'inside' })
+        .png({ quality: 80, compressionLevel: 8 })
+        .toBuffer();
+      const iedcImg = await pdfDoc.embedPng(resizedIedc);
       page.drawImage(iedcImg, {
         x: width - 72,
         y: height - 90,
@@ -576,4 +585,15 @@ export async function ensurePassFiles(
     pdfUrl: `/api/public/registrations/${reg.id}/pass/pdf`,
     pngUrl: `/api/public/registrations/${reg.id}/pass/png`
   };
+}
+
+/**
+ * Generates companion JPG entry pass image.
+ */
+export async function generatePassJpg(
+  reg: PassRegistrationData,
+  event: PassEventData
+): Promise<Buffer> {
+  const pngBuffer = await generatePassPng(reg, event);
+  return sharp(pngBuffer).jpeg({ quality: 92 }).toBuffer();
 }

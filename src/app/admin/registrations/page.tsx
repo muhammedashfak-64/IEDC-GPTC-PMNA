@@ -461,7 +461,7 @@ export default function AdminRegistrationsPage() {
           </span>
           <h1 className="text-2xl sm:text-3xl font-black text-white">Event Registrations</h1>
           <p className="text-slate-400 text-xs mt-1">
-            Real-time participant database, attendance tracking, and Excel &amp; PDF report generation.
+            Real-time participant registry, attendance tracking, and Excel &amp; PDF report generation.
           </p>
         </div>
 
@@ -518,7 +518,7 @@ export default function AdminRegistrationsPage() {
             onClick={loadData}
             disabled={loading}
             className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-colors cursor-pointer"
-            title="Refresh from Supabase"
+            title="Refresh Registry"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-[#F98A5B]' : ''}`} />
           </button>
@@ -597,11 +597,10 @@ export default function AdminRegistrationsPage() {
               className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none"
             >
               <option value="All">All Departments</option>
-              <option value="Computer Engineering">Computer Engg</option>
-              <option value="Electronics Engineering">Electronics Engg</option>
-              <option value="Electrical & Electronics Engineering">EEE</option>
-              <option value="Mechanical Engineering">Mechanical Engg</option>
               <option value="Civil Engineering">Civil Engg</option>
+              <option value="Mechanical Engineering">Mechanical Engg</option>
+              <option value="Electrical and Electronics Engineering">EEE</option>
+              <option value="Electronics Engineering">Electronics Engg</option>
               <option value="General">General</option>
             </select>
           </div>

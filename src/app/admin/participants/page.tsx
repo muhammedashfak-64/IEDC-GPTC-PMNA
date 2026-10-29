@@ -26,7 +26,7 @@ export default function ParticipantsDirectoryPage() {
           if (!map.has(key)) {
             map.set(key, {
               registerNumber: key,
-              name: r.studentName,
+              name: (r.studentName || '').toUpperCase(),
               email: r.email,
               phone: r.phone,
               department: r.department,
@@ -45,7 +45,7 @@ export default function ParticipantsDirectoryPage() {
           } else {
             map.set(key, {
               registerNumber: key,
-              name: c.participantName,
+              name: (c.participantName || '').toUpperCase(),
               email: c.email,
               phone: c.phone,
               department: 'General',

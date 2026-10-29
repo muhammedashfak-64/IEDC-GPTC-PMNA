@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/adminAuthHelper';
 import {
   getCertificateTemplates,
+  getCertificateTemplatesAsync,
   saveCertificateTemplate,
   updateCertificateTemplate,
   setActiveCertificateTemplate,
@@ -15,7 +16,7 @@ export async function GET(req: NextRequest) {
   const { errorResponse } = requireAdminAuth(req);
   if (errorResponse) return errorResponse;
 
-  const templates = getCertificateTemplates();
+  const templates = await getCertificateTemplatesAsync();
   return NextResponse.json({ success: true, data: templates });
 }
 

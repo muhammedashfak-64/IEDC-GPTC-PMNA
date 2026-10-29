@@ -23,6 +23,7 @@ import {
   syncResourceToSupabase,
   syncBlogToSupabase,
   syncAnnouncementToSupabase,
+  deleteAnnouncementFromSupabase,
   syncStartupToSupabase,
   syncSettingsToSupabase,
   syncAuditLogToSupabase,
@@ -46,7 +47,10 @@ import {
   getClassKey,
   parseClassKey,
   isInternalParticipant,
-  isExternalParticipant
+  isExternalParticipant,
+  normalizePersonalName,
+  getEventRegistrationDeadline,
+  getEventRegistrationStatus
 } from './quotaUtils';
 
 const DB_FILE = path.join(process.cwd(), 'src', 'data', 'db.json');
@@ -207,9 +211,27 @@ export function authenticateAdmin(identifier: string, password: string): { user:
     return null;
   }
 
-  // Verify password (plain hash check in store / Supabase password compatibility / default demo credentials)
-  const allowedPasses = ['Faculty@123', 'Student@123', 'Admin@123', 'Designer@123'];
-  const isMatch = user.passwordHash === password || allowedPasses.includes(password);
+  // Verify password:
+  // Strictly enforce user.passwordHash so updated passwords cannot be bypassed.
+  let isMatch = false;
+  if (user.passwordHash) {
+    isMatch = user.passwordHash === password;
+  } else {
+    // Legacy fallback before first password set
+    const defaultPass =
+      user.role === 'admin' || user.role === 'main_admin'
+        ? 'Admin@123'
+        : user.role === 'faculty' || user.role === 'faculty_coordinator'
+        ? 'Faculty@123'
+        : user.role === 'designer' || user.role === 'media_lead'
+        ? 'Designer@123'
+        : 'Student@123';
+    isMatch = password === defaultPass;
+    if (isMatch) {
+      user.passwordHash = password;
+      saveDb(db);
+    }
+  }
   if (!isMatch) {
     return null;
   }
@@ -367,7 +389,7 @@ export async function createEvent(eventData: any, user?: Partial<AuthUser> | nul
     level: eventData.level || 'College',
     date: eventData.date || new Date().toISOString().split('T')[0],
     time: eventData.time || '10:00 AM - 04:00 PM',
-    venue: eventData.venue || 'Main Auditorium',
+    venue: eventData.venue || 'Auditorium',
     description: eventData.description || '',
     speaker: eventData.speaker || '',
     totalSeats: Number(eventData.totalSeats) || 60,
@@ -436,10 +458,28 @@ export async function updateEvent(id: string, updates: any, user?: Partial<AuthU
     throw new Error(`Event with ID "${id}" not found.`);
   }
 
+  // Preserve totalSeats unless explicitly provided as a positive number
+  let newTotalSeats = existing.totalSeats;
+  if (typeof updates.totalSeats === 'number' && updates.totalSeats > 0) {
+    newTotalSeats = updates.totalSeats;
+  } else if (typeof updates.totalSeats === 'string' && Number(updates.totalSeats) > 0) {
+    newTotalSeats = Number(updates.totalSeats);
+  }
+
+  // Count confirmed registrations authoritatively
+  const eventRegs = (db.registrations || []).filter((r: any) => r.eventId === id);
+  const confirmedCount = eventRegs.filter((r: any) =>
+    ['confirmed', 'attended', 'registered'].includes((r.status || '').toLowerCase())
+  ).length;
+
+  const newSeatsAvailable = Math.max(0, newTotalSeats - confirmedCount);
+
   const updatedEvt = {
     ...existing,
     ...updates,
     id: existing.id, // Immutable stable database ID
+    totalSeats: newTotalSeats,
+    seatsAvailable: newSeatsAvailable,
     updatedAt: new Date().toISOString()
   };
 
@@ -706,23 +746,12 @@ async function doRegisterStudentForEventAsync(data: {
   }
 
   if (!event) throw new Error('Selected event was not found.');
-  if (event.status !== 'Published' || event.registrationOpen === false) {
-    throw new Error('Registration is not currently open for this event.');
-  }
 
-  // Check Registration Start and Closing Dates if configured
+  // Check Registration status, start date, and 11:00 AM IST cutoff on event date (or explicit deadline)
   const now = new Date();
-  if (event.registrationStartDate) {
-    const startDate = new Date(event.registrationStartDate);
-    if (!isNaN(startDate.getTime()) && now < startDate) {
-      throw new Error(`Registration has not started yet. Opens on ${startDate.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}.`);
-    }
-  }
-  if (event.registrationClosingDate) {
-    const closeDate = new Date(event.registrationClosingDate);
-    if (!isNaN(closeDate.getTime()) && now > closeDate) {
-      throw new Error(`Registration closed on ${closeDate.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}.`);
-    }
+  const regStatus = getEventRegistrationStatus(event, now);
+  if (!regStatus.isOpen) {
+    throw new Error(regStatus.reason || 'Registration is currently closed for this event.');
   }
 
   // 3. Determine Participation Category
@@ -895,7 +924,7 @@ async function doRegisterStudentForEventAsync(data: {
     qrPayload,
     eventId: data.eventId,
     eventTitle: event.title,
-    studentName: data.studentName.trim(),
+    studentName: normalizePersonalName(data.studentName),
     registerNumber: cleanRegNo,
     email: cleanEmail,
     phone: data.phone.trim(),
@@ -922,11 +951,14 @@ async function doRegisterStudentForEventAsync(data: {
   if (!db.registrations) db.registrations = [];
   db.registrations.unshift(newRegistration);
 
-  // Recalculate event seatsAvailable and totalSeats using the updated registrations
+  // Recalculate event seatsAvailable using the updated registrations while preserving admin totalSeats
   const allCurrentRegs = [newRegistration, ...registrations.filter((r: any) => r.id !== newRegistration.id)];
-  const updatedSummary = calculateQuotaSummary(event, allCurrentRegs);
-  event.totalSeats = updatedSummary.totalCapacity;
-  event.seatsAvailable = Math.max(0, updatedSummary.internalRemaining + updatedSummary.externalRemaining);
+  const confirmedCount = allCurrentRegs.filter((r: any) =>
+    ['confirmed', 'attended', 'registered'].includes((r.status || '').toLowerCase())
+  ).length;
+  const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0 ? event.totalSeats : 60;
+  event.totalSeats = currentTotalSeats;
+  event.seatsAvailable = Math.max(0, currentTotalSeats - confirmedCount);
   event.updatedAt = new Date().toISOString();
 
   saveDb(db);
@@ -983,10 +1015,14 @@ export async function getProgramQuotaDetailsAsync(eventId: string) {
   // 3. Calculate summary using authoritative registrations
   const summary = calculateQuotaSummary(event, registrations);
 
-  // 4. Ensure seatsAvailable is accurately synchronized
-  const expectedAvailable = Math.max(0, summary.internalRemaining + summary.externalRemaining);
-  if (event.seatsAvailable !== expectedAvailable || event.totalSeats !== summary.totalCapacity) {
-    event.totalSeats = summary.totalCapacity;
+  // 4. Ensure seatsAvailable is accurately synchronized from authoritative registrations
+  const confirmedCount = registrations.filter((r: any) =>
+    ['confirmed', 'attended', 'registered'].includes((r.status || '').toLowerCase())
+  ).length;
+  const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0 ? event.totalSeats : 60;
+  const expectedAvailable = Math.max(0, currentTotalSeats - confirmedCount);
+  if (event.seatsAvailable !== expectedAvailable || event.totalSeats !== currentTotalSeats) {
+    event.totalSeats = currentTotalSeats;
     event.seatsAvailable = expectedAvailable;
     event.updatedAt = new Date().toISOString();
     saveDb(db);
@@ -1088,10 +1124,14 @@ export async function updateProgramQuotaConfigAsync(
     reallocationLogs: currentConfig.reallocationLogs || []
   };
 
-  // Recalculate event totalSeats and seatsAvailable
+  // Recalculate event seatsAvailable while preserving configured totalSeats
   const summary = calculateQuotaSummary(event, registrations);
-  event.totalSeats = summary.totalCapacity;
-  event.seatsAvailable = Math.max(0, summary.internalRemaining + summary.externalRemaining);
+  const confirmedCount = registrations.filter((r: any) =>
+    ['confirmed', 'attended', 'registered'].includes((r.status || '').toLowerCase())
+  ).length;
+  const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0 ? event.totalSeats : summary.totalCapacity;
+  event.totalSeats = currentTotalSeats;
+  event.seatsAvailable = Math.max(0, currentTotalSeats - confirmedCount);
   event.updatedAt = new Date().toISOString();
 
   saveDb(db);
@@ -1182,8 +1222,12 @@ export function updateProgramQuotaConfig(
   };
 
   const summary = calculateQuotaSummary(event, db.registrations || []);
-  event.totalSeats = summary.totalCapacity;
-  event.seatsAvailable = Math.max(0, summary.internalRemaining + summary.externalRemaining);
+  const confirmedCount = (db.registrations || []).filter((r: any) =>
+    r.eventId === eventId && ['confirmed', 'attended', 'registered'].includes((r.status || '').toLowerCase())
+  ).length;
+  const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0 ? event.totalSeats : summary.totalCapacity;
+  event.totalSeats = currentTotalSeats;
+  event.seatsAvailable = Math.max(0, currentTotalSeats - confirmedCount);
   event.updatedAt = new Date().toISOString();
 
   saveDb(db);
@@ -1415,9 +1459,12 @@ export async function updateRegistrationStatus(id: string, status: string, user:
 
   if (event) {
     const eventRegs = db.registrations.filter((r: any) => r.eventId === eventId);
-    const summary = calculateQuotaSummary(event, eventRegs);
-    event.totalSeats = summary.totalCapacity;
-    event.seatsAvailable = Math.max(0, summary.internalRemaining + summary.externalRemaining);
+    const confirmedCount = eventRegs.filter((r: any) =>
+      ['confirmed', 'attended', 'registered'].includes((r.status || '').toLowerCase())
+    ).length;
+    const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0 ? event.totalSeats : 60;
+    event.totalSeats = currentTotalSeats;
+    event.seatsAvailable = Math.max(0, currentTotalSeats - confirmedCount);
     event.updatedAt = new Date().toISOString();
     await syncEventToSupabase(event, true).catch(console.error);
   }
@@ -1460,9 +1507,12 @@ export async function deleteRegistration(id: string, user: AuthUser) {
   const event = (db.events || []).find((e: any) => e.id === eventId);
   if (event) {
     const eventRegs = db.registrations.filter((r: any) => r.eventId === eventId);
-    const summary = calculateQuotaSummary(event, eventRegs);
-    event.totalSeats = summary.totalCapacity;
-    event.seatsAvailable = Math.max(0, summary.internalRemaining + summary.externalRemaining);
+    const confirmedCount = eventRegs.filter((r: any) =>
+      ['confirmed', 'attended', 'registered'].includes((r.status || '').toLowerCase())
+    ).length;
+    const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0 ? event.totalSeats : 60;
+    event.totalSeats = currentTotalSeats;
+    event.seatsAvailable = Math.max(0, currentTotalSeats - confirmedCount);
     event.updatedAt = new Date().toISOString();
     await syncEventToSupabase(event, true).catch(console.error);
   }
@@ -1495,7 +1545,7 @@ export function getCertificates(publishedOnly = false) {
 
 
 
-export async function ensureCertificatePdfExists(cert: any): Promise<string> {
+export async function ensureCertificatePdfExists(cert: any, force = false): Promise<string> {
   try {
     const certId = cert.certificateId;
     if (!certId) return '';
@@ -1505,8 +1555,9 @@ export async function ensureCertificatePdfExists(cert: any): Promise<string> {
 
     const tmpFilePath = path.join(os.tmpdir(), 'certificates', pdfFileName);
     if (
-      (fs.existsSync(localFilePath) && fs.statSync(localFilePath).size > 1000) ||
-      (fs.existsSync(tmpFilePath) && fs.statSync(tmpFilePath).size > 1000)
+      !force &&
+      ((fs.existsSync(localFilePath) && fs.statSync(localFilePath).size > 1000) ||
+      (fs.existsSync(tmpFilePath) && fs.statSync(tmpFilePath).size > 1000))
     ) {
       return `/api/public/certificates/${certId}/pdf`;
     }
@@ -1574,7 +1625,7 @@ export function createCertificate(certData: any, user: AuthUser) {
     certificateId: certIdStr,
     eventId: certData.eventId || 'evt-general',
     eventName: certData.eventName || 'IEDC Technical Workshop',
-    participantName: certData.participantName,
+    participantName: normalizePersonalName(certData.participantName),
     registerNumber: String(certData.registerNumber).trim(),
     phone: String(certData.phone || '').trim().replace(/\D/g, ''),
     email: certData.email || `${certData.registerNumber}@gptcpmna.edu.in`,
@@ -1608,7 +1659,7 @@ export function bulkCreateCertificates(records: any[], user: AuthUser) {
       certificateId: certIdStr,
       eventId: row.eventId || 'evt-bulk',
       eventName: row.eventName || 'IEDC Technical Event',
-      participantName: row.participantName || row.name,
+      participantName: normalizePersonalName(row.participantName || row.name),
       registerNumber: String(row.registerNumber || row.regNo || '').trim(),
       phone: String(row.phone || row.mobile || '').trim().replace(/\D/g, ''),
       email: row.email || `${row.registerNumber}@gptcpmna.edu.in`,
@@ -1639,7 +1690,11 @@ export function updateCertificate(id: string, updates: any, user: AuthUser) {
   const db = loadDb();
   const idx = (db.certificates || []).findIndex((c: any) => c.id === id || c.certificateId === id);
   if (idx === -1) return null;
-  db.certificates[idx] = { ...db.certificates[idx], ...updates };
+  const safeUpdates = { ...updates };
+  if (safeUpdates.participantName) {
+    safeUpdates.participantName = normalizePersonalName(safeUpdates.participantName);
+  }
+  db.certificates[idx] = { ...db.certificates[idx], ...safeUpdates };
   saveDb(db);
   syncCertificateToSupabase(db.certificates[idx], true).catch(() => {});
   addAuditLog('CERTIFICATE_UPDATE', user, `Updated certificate ${db.certificates[idx].certificateId}`);
@@ -2373,8 +2428,8 @@ export async function retrieveStudentCertificate(eventId: string, fullName: stri
   saveDb(db);
   syncCertificateToSupabase(match, true).catch(() => {});
 
-  // Ensure PDF file physically exists on disk before returning response
-  await ensureCertificatePdfExists(match);
+  // Ensure PDF file physically exists on disk and is fresh before returning response
+  await ensureCertificatePdfExists(match, true);
 
   return {
     success: true,
@@ -2385,9 +2440,9 @@ export async function retrieveStudentCertificate(eventId: string, fullName: stri
       eventDate: match.eventDate,
       certificateType: match.certificateType,
       issueDate: match.issueDate,
-      downloadUrl: `/certificates/${match.certificateId}.pdf`,
-      pdfDownloadUrl: `/certificates/${match.certificateId}.pdf`,
-      pngDownloadUrl: `/certificates/${match.certificateId}.png`,
+      downloadUrl: `/api/public/certificates/${match.certificateId}/pdf`,
+      pdfDownloadUrl: `/api/public/certificates/${match.certificateId}/pdf`,
+      pngDownloadUrl: `/api/public/certificates/${match.certificateId}/png`,
       status: match.status
     }
   };
@@ -3302,6 +3357,21 @@ export function createBrochure(data: any, user: AuthUser) {
   return newBro;
 }
 
+export async function syncTemplatesToSupabase(templates: any[]) {
+  try {
+    const { data: current } = await supabaseAdmin.from('website_settings').select('*').eq('id', 'current_settings').single();
+    const socialLinks = current?.social_links || {};
+    socialLinks.certificateTemplates = templates;
+    await supabaseAdmin.from('website_settings').upsert({
+      id: 'current_settings',
+      social_links: socialLinks,
+      updated_at: new Date().toISOString()
+    });
+  } catch (err: any) {
+    console.error('[serverStore] syncTemplatesToSupabase error:', err.message);
+  }
+}
+
 export function getCertificateTemplates() {
   const db = loadDb();
   if (!db.certificateTemplates || db.certificateTemplates.length === 0) {
@@ -3337,6 +3407,26 @@ export function getCertificateTemplates() {
   });
 
   return db.certificateTemplates;
+}
+
+export async function getCertificateTemplatesAsync() {
+  const db = loadDb();
+  try {
+    const { data } = await supabaseAdmin.from('website_settings').select('social_links').eq('id', 'current_settings').single();
+    if (data?.social_links?.certificateTemplates && Array.isArray(data.social_links.certificateTemplates)) {
+      const remoteTpls = data.social_links.certificateTemplates;
+      const localIds = new Set((db.certificateTemplates || []).map((t: any) => t.id));
+      let changed = false;
+      for (const rt of remoteTpls) {
+        if (!localIds.has(rt.id)) {
+          db.certificateTemplates.push(rt);
+          changed = true;
+        }
+      }
+      if (changed) saveDb(db);
+    }
+  } catch {}
+  return getCertificateTemplates();
 }
 
 export function saveCertificateTemplate(templateData: any, user: AuthUser) {
@@ -3375,6 +3465,7 @@ export function saveCertificateTemplate(templateData: any, user: AuthUser) {
   }
 
   saveDb(db);
+  syncTemplatesToSupabase(db.certificateTemplates).catch(() => {});
   addAuditLog('CERTIFICATE_TEMPLATE_SAVE', user, `Saved certificate template "${newTpl.title}" (active: ${newTpl.isActive})`);
   return newTpl;
 }
@@ -3396,6 +3487,7 @@ export function updateCertificateTemplate(templateId: string, updates: any, user
   };
 
   saveDb(db);
+  syncTemplatesToSupabase(db.certificateTemplates).catch(() => {});
   addAuditLog('CERTIFICATE_TEMPLATE_UPDATE', user, `Updated certificate template "${db.certificateTemplates[idx].title}"`);
   return db.certificateTemplates[idx];
 }
@@ -3413,6 +3505,7 @@ export function setActiveCertificateTemplate(templateId: string, user: AuthUser)
   });
 
   saveDb(db);
+  syncTemplatesToSupabase(db.certificateTemplates).catch(() => {});
   addAuditLog('CERTIFICATE_TEMPLATE_SET_ACTIVE', user, `Set active certificate template to "${found.title}"`);
   return found;
 }
@@ -3431,6 +3524,7 @@ export function deleteCertificateTemplate(templateId: string, user: AuthUser) {
     db.certificateTemplates[0].isActive = true;
   }
   saveDb(db);
+  syncTemplatesToSupabase(db.certificateTemplates).catch(() => {});
   addAuditLog('CERTIFICATE_TEMPLATE_DELETE', user, `Deleted certificate template "${removed.title}"`);
   return true;
 }
@@ -3565,23 +3659,76 @@ export function getAnnouncements() {
   return db.announcements || [];
 }
 
+export function getAnnouncementById(id: string) {
+  const db = loadDb();
+  return (db.announcements || []).find((a: any) => a.id === id) || null;
+}
+
 export function createAnnouncement(data: any, user: AuthUser) {
   const db = loadDb();
   if (!db.announcements) db.announcements = [];
   const newAnn = {
     id: `ann-${Date.now()}`,
-    title: data.title,
-    message: data.message,
+    title: String(data.title || '').trim(),
+    message: String(data.message || '').trim(),
     priority: data.priority || 'Medium',
     targetAudience: data.targetAudience || 'All',
-    isActive: true,
-    createdAt: new Date().toISOString()
+    isActive: data.isActive !== false,
+    actionLink: data.actionLink || data.action_link || '',
+    attachmentUrl: data.attachmentUrl || data.attachment_url || '',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
   };
   db.announcements.unshift(newAnn);
   saveDb(db);
   syncAnnouncementToSupabase(newAnn, false).catch(() => {});
   addAuditLog('ANNOUNCEMENT_CREATE', user, `Broadcast announcement: ${newAnn.title}`);
   return newAnn;
+}
+
+export function updateAnnouncement(id: string, updates: any, user: AuthUser) {
+  const db = loadDb();
+  if (!db.announcements) db.announcements = [];
+  const idx = db.announcements.findIndex((a: any) => a.id === id);
+  if (idx === -1) {
+    throw new Error(`Announcement with ID "${id}" was not found.`);
+  }
+
+  const existing = db.announcements[idx];
+  const updatedAnn = {
+    ...existing,
+    ...updates,
+    id: existing.id, // Immutable ID
+    title: updates.title !== undefined ? String(updates.title).trim() : existing.title,
+    message: updates.message !== undefined ? String(updates.message).trim() : existing.message,
+    priority: updates.priority || existing.priority || 'Medium',
+    targetAudience: updates.targetAudience || existing.targetAudience || 'All',
+    isActive: updates.isActive !== undefined ? Boolean(updates.isActive) : existing.isActive,
+    actionLink: updates.actionLink !== undefined ? updates.actionLink : (existing.actionLink || ''),
+    attachmentUrl: updates.attachmentUrl !== undefined ? updates.attachmentUrl : (existing.attachmentUrl || ''),
+    updatedAt: new Date().toISOString()
+  };
+
+  db.announcements[idx] = updatedAnn;
+  saveDb(db);
+  syncAnnouncementToSupabase(updatedAnn, true).catch(() => {});
+  addAuditLog('ANNOUNCEMENT_UPDATE', user, `Updated announcement: ${updatedAnn.title}`);
+  return updatedAnn;
+}
+
+export function deleteAnnouncement(id: string, user: AuthUser) {
+  const db = loadDb();
+  if (!db.announcements) return false;
+  const idx = db.announcements.findIndex((a: any) => a.id === id);
+  if (idx === -1) {
+    throw new Error(`Announcement with ID "${id}" was not found.`);
+  }
+
+  const removed = db.announcements.splice(idx, 1)[0];
+  saveDb(db);
+  deleteAnnouncementFromSupabase(id).catch(() => {});
+  addAuditLog('ANNOUNCEMENT_DELETE', user, `Deleted announcement: ${removed.title}`);
+  return true;
 }
 
 export function getPartners() {

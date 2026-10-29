@@ -24,7 +24,7 @@ const faqDatabase: { keywords: string[]; answer: string; link?: { label: string;
   },
   {
     keywords: ['nodal', 'coordinator', 'faculty', 'rashid'],
-    answer: 'Prof. Muhammed Rashid (Department of Electronics Engineering) is the Nodal Officer of IEDC GPTC PMNA. Prof. Anupama K (Computer Engineering) serves as Assistant Nodal Officer.',
+    answer: 'Prof. Muhammed Rashid (Department of Electronics Engineering) is the Nodal Officer of IEDC GPTC PMNA. Prof. Anupama K serves as Assistant Nodal Officer.',
     link: { label: 'View Executive Roster', url: '/#about' }
   },
   {

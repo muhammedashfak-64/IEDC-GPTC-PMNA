@@ -323,7 +323,7 @@ export default function MyProfilePage() {
                   onChange={(url) => setAvatar(url)}
                   folder="avatars"
                   accept="image/jpeg,image/png,image/webp,image/jpg"
-                  helperText="Upload your official administrator photo (JPG, PNG, WebP). Saved to Supabase Storage and shown across top navigation, sidebar, and account cards."
+                  helperText="Upload your official administrator photo (JPG, PNG, WebP). Saved to Cloud Storage and shown across top navigation, sidebar, and account cards."
                 />
 
                 {avatar && (

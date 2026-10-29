@@ -26,7 +26,7 @@ export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeModalProject, setActiveModalProject] = useState<Project | null>(null);
 
-  const departments = ['All', 'Computer Engineering', 'Electronics Engineering', 'Electrical Engineering', 'Mechanical Engineering', 'Civil Engineering'];
+  const departments = ['All', 'Civil Engineering', 'Mechanical Engineering', 'Electrical and Electronics Engineering', 'Electronics Engineering'];
   const technologies = ['All', 'ESP32', 'IoT', 'Python', 'Arduino', 'OpenCV', 'TensorFlow', 'React'];
   const statuses = ['All', 'Incubated', 'Prototype', 'In Progress', 'Completed'];
 

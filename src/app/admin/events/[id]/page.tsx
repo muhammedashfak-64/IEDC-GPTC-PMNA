@@ -81,8 +81,8 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
     registerNumber: '',
     email: '',
     phone: '',
-    department: 'Computer Engineering',
-    academicYear: '2nd Year',
+    department: 'Electronics Engineering',
+    academicYear: 'Second Year',
     collegeName: 'Govt Polytechnic College Perinthalmanna'
   });
 
@@ -91,7 +91,7 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
   const [leaderForm, setLeaderForm] = useState({
     name: '',
     role: 'Student Lead',
-    department: 'Computer Engineering',
+    department: 'Electronics Engineering',
     email: '',
     phone: '',
     certificateEligible: true
@@ -1158,11 +1158,10 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                     className="bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
                   >
                     <option value="All">All Departments</option>
-                    <option value="Computer Engineering">Computer Engineering</option>
-                    <option value="Electronics Engineering">Electronics Engineering</option>
-                    <option value="Mechanical Engineering">Mechanical Engineering</option>
                     <option value="Civil Engineering">Civil Engineering</option>
-                    <option value="Electrical Engineering">Electrical Engineering</option>
+                    <option value="Mechanical Engineering">Mechanical Engineering</option>
+                    <option value="Electrical and Electronics Engineering">Electrical &amp; Electronics Engineering (EEE)</option>
+                    <option value="Electronics Engineering">Electronics Engineering</option>
                   </select>
                 </div>
 
@@ -1174,8 +1173,8 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                       registerNumber: '',
                       email: '',
                       phone: '',
-                      department: 'Computer Engineering',
-                      academicYear: '2nd Year',
+                      department: 'Electronics Engineering',
+                      academicYear: 'Second Year',
                       collegeName: 'Govt Polytechnic College Perinthalmanna'
                     });
                     setShowAddParticipantModal(true);
@@ -2735,11 +2734,10 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                   onChange={(e) => setParticipantForm({ ...participantForm, department: e.target.value })}
                   className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
                 >
-                  <option value="Computer Engineering">Computer Engineering</option>
-                  <option value="Electronics Engineering">Electronics Engineering</option>
-                  <option value="Mechanical Engineering">Mechanical Engineering</option>
                   <option value="Civil Engineering">Civil Engineering</option>
-                  <option value="Electrical Engineering">Electrical Engineering</option>
+                  <option value="Mechanical Engineering">Mechanical Engineering</option>
+                  <option value="Electrical and Electronics Engineering">Electrical &amp; Electronics Engineering (EEE)</option>
+                  <option value="Electronics Engineering">Electronics Engineering</option>
                 </select>
               </div>
 
@@ -2814,7 +2812,7 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                 <label className="text-xs text-slate-400 block mb-1">Department</label>
                 <input
                   type="text"
-                  placeholder="e.g. Computer Engineering"
+                  placeholder="e.g. Electronics Engineering"
                   value={leaderForm.department}
                   onChange={(e) => setLeaderForm({ ...leaderForm, department: e.target.value })}
                   className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"

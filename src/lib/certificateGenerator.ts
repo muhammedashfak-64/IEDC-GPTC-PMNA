@@ -350,11 +350,17 @@ export async function generateSingleCertificatePdf(
   let height: number;
 
   let resolvedCustomPath = await resolveTemplateFile(params.customTemplatePath);
+  if (params.customTemplatePath && !resolvedCustomPath) {
+    throw new Error(
+      `The configured certificate template "${params.customTemplatePath}" could not be loaded. Please ensure the template file is accessible in Supabase Storage or re-upload it.`
+    );
+  }
+
   const cleanPathLower = (resolvedCustomPath || '').toLowerCase().split('?')[0];
 
   const isCustomImage =
     resolvedCustomPath &&
-    fs.existsSync(resolvedCustomPath) &&
+    fs.existsSync(/*turbopackIgnore: true*/ resolvedCustomPath) &&
     (cleanPathLower.endsWith('.png') ||
       cleanPathLower.endsWith('.jpg') ||
       cleanPathLower.endsWith('.jpeg') ||
@@ -367,7 +373,7 @@ export async function generateSingleCertificatePdf(
     height = 595.5;
     page = pdfDoc.addPage([width, height]);
 
-    const imgBytes = fs.readFileSync(resolvedCustomPath);
+    const imgBytes = fs.readFileSync(/*turbopackIgnore: true*/ resolvedCustomPath);
     let bgImage: any;
     if (cleanPathLower.endsWith('.png')) {
       bgImage = await pdfDoc.embedPng(imgBytes);
@@ -383,14 +389,18 @@ export async function generateSingleCertificatePdf(
   } else {
     // Vector PDF Master: clean_master_template.pdf or reference_certificate.pdf
     let templateBytes: Buffer;
-    if (resolvedCustomPath && fs.existsSync(resolvedCustomPath) && cleanPathLower.endsWith('.pdf')) {
-      templateBytes = fs.readFileSync(resolvedCustomPath);
-    } else if (fs.existsSync(masterCleanPath)) {
-      templateBytes = fs.readFileSync(masterCleanPath);
-    } else if (fs.existsSync(referencePath)) {
-      templateBytes = fs.readFileSync(referencePath);
+    if (resolvedCustomPath && fs.existsSync(/*turbopackIgnore: true*/ resolvedCustomPath) && cleanPathLower.endsWith('.pdf')) {
+      templateBytes = fs.readFileSync(/*turbopackIgnore: true*/ resolvedCustomPath);
+    } else if (!params.customTemplatePath && fs.existsSync(/*turbopackIgnore: true*/ masterCleanPath)) {
+      templateBytes = fs.readFileSync(/*turbopackIgnore: true*/ masterCleanPath);
+    } else if (!params.customTemplatePath && fs.existsSync(/*turbopackIgnore: true*/ referencePath)) {
+      templateBytes = fs.readFileSync(/*turbopackIgnore: true*/ referencePath);
     } else {
-      throw new Error('Official Certificate Master Template not found on server.');
+      throw new Error(
+        params.customTemplatePath
+          ? `Could not load configured certificate template "${params.customTemplatePath}".`
+          : 'Official Certificate Master Template not found on server.'
+      );
     }
 
     pdfDoc = await PDFDocument.load(templateBytes);
@@ -651,26 +661,13 @@ export async function generateSingleCertificatePng(
   config: Partial<CertificateConfig> = {}
 ): Promise<{ pngBytes: Buffer; fileName: string; storagePath: string; publicUrl?: string }> {
   let resolvedTemplatePath = await resolveTemplateFile(params.customTemplatePath);
-
-  const masterPngPath = path.join(
-    process.cwd(),
-    'public',
-    'uploads',
-    'certificate-templates',
-    'IEDC_PARTICIPATE_CERTICICATE_1792467393382.png'
-  );
-
-  if (
-    !resolvedTemplatePath ||
-    (!resolvedTemplatePath.endsWith('.png') &&
-      !resolvedTemplatePath.endsWith('.jpg') &&
-      !resolvedTemplatePath.endsWith('.jpeg'))
-  ) {
-    resolvedTemplatePath = masterPngPath;
+  if (params.customTemplatePath && !resolvedTemplatePath) {
+    throw new Error(
+      `The configured certificate template "${params.customTemplatePath}" could not be loaded for PNG export.`
+    );
   }
 
-  if (!fs.existsSync(resolvedTemplatePath)) {
-    // Fallback to any available certificate image in uploads/certificate-templates
+  if (!resolvedTemplatePath) {
     const tplDir = path.join(process.cwd(), 'public', 'uploads', 'certificate-templates');
     if (fs.existsSync(tplDir)) {
       const files = fs.readdirSync(tplDir);
@@ -681,8 +678,23 @@ export async function generateSingleCertificatePng(
     }
   }
 
-  if (!resolvedTemplatePath || !fs.existsSync(resolvedTemplatePath)) {
-    throw new Error('Certificate image template not found on server.');
+  if (!resolvedTemplatePath || !fs.existsSync(/*turbopackIgnore: true*/ resolvedTemplatePath)) {
+    throw new Error('Certificate template not found on server for PNG rendering.');
+  }
+
+  // If the template path points to a PDF, automatically substitute the companion high-res raster master image
+  if (resolvedTemplatePath.toLowerCase().endsWith('.pdf')) {
+    const companionJpg = path.join(path.dirname(resolvedTemplatePath), 'extracted_clean_master.jpg');
+    const companionUploads = path.join(process.cwd(), 'public', 'uploads', 'certificate-templates', 'IEDC_PARTICIPATE_CERTICICATE_1792467393382.png');
+    const companionDefault = path.join(process.cwd(), 'public', 'uploads', 'certificate-templates', 'IEDC_CERTIFICATE_TEMPLATE_1792565763716.jpg');
+
+    if (fs.existsSync(companionJpg)) {
+      resolvedTemplatePath = companionJpg;
+    } else if (fs.existsSync(companionUploads)) {
+      resolvedTemplatePath = companionUploads;
+    } else if (fs.existsSync(companionDefault)) {
+      resolvedTemplatePath = companionDefault;
+    }
   }
 
   const meta = await sharp(resolvedTemplatePath).metadata();
@@ -826,6 +838,24 @@ export async function generateSingleCertificatePng(
     fileName,
     storagePath,
     publicUrl
+  };
+}
+
+/**
+ * Generate a high-resolution JPG certificate matching the exact template and typography.
+ */
+export async function generateSingleCertificateJpg(
+  params: CertificateGenerateParams,
+  config: Partial<CertificateConfig> = {}
+): Promise<{ jpgBytes: Buffer; fileName: string; storagePath: string; publicUrl?: string }> {
+  const { pngBytes, fileName } = await generateSingleCertificatePng(params, config);
+  const jpgBytes = await sharp(pngBytes).jpeg({ quality: 92 }).toBuffer();
+  const jpgFileName = fileName.replace(/\.png$/i, '.jpg');
+  return {
+    jpgBytes,
+    fileName: jpgFileName,
+    storagePath: path.join(path.dirname(fileName), jpgFileName),
+    publicUrl: `/api/public/certificates/${params.certificateId}/jpg`
   };
 }
 

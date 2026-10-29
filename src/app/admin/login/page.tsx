@@ -82,7 +82,7 @@ export default function AdminLoginPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setForgotMessage(data.message || 'Recovery email dispatched via Supabase Auth.');
+        setForgotMessage(data.message || 'Password reset instructions dispatched.');
       } else {
         setForgotError(data.error || 'Failed to initiate password recovery.');
       }
@@ -261,7 +261,7 @@ export default function AdminLoginPage() {
                 disabled={submitting}
                 className="w-full py-3.5 px-4 rounded-xl bg-white hover:bg-slate-200 text-black font-extrabold text-xs shadow-lg flex items-center justify-center gap-2 cursor-pointer transition-all hover:scale-[1.01]"
               >
-                <span>{submitting ? 'Verifying Supabase Credentials...' : 'Sign In to Admin Console'}</span>
+                <span>{submitting ? 'Verifying Credentials...' : 'Sign In to Admin Console'}</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
@@ -271,7 +271,7 @@ export default function AdminLoginPage() {
           <div className="pt-2 border-t border-white/10 text-center">
             <span className="text-[11px] font-mono text-slate-400 flex items-center justify-center gap-1.5">
               <Lock className="w-3 h-3 text-slate-400" />
-              Protected by Supabase Server-Side Auth &amp; RLS
+              Protected by Enterprise Multi-Layer Security
             </span>
           </div>
 

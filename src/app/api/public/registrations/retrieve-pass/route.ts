@@ -9,9 +9,16 @@ export async function POST(req: NextRequest) {
     const searchCode = String(body.registrationCode || '').trim().toUpperCase();
     const phoneInput = String(body.phone || '').replace(/\D/g, '').slice(-10);
 
-    if (!eventId && !searchCode) {
+    if (!phoneInput && !searchCode) {
       return NextResponse.json(
-        { success: false, error: 'Please select an event or enter your Registration Code.' },
+        { success: false, error: 'Please enter your registered 10-digit mobile number.' },
+        { status: 400 }
+      );
+    }
+
+    if (phoneInput && phoneInput.length !== 10 && !searchCode) {
+      return NextResponse.json(
+        { success: false, error: 'Please enter a valid 10-digit mobile number.' },
         { status: 400 }
       );
     }
@@ -23,9 +30,9 @@ export async function POST(req: NextRequest) {
       if (searchCode && (r.registrationCode?.toUpperCase() === searchCode || r.id === searchCode)) {
         return true;
       }
-      if (eventId && r.eventId === eventId) {
-        const cleanRegPhone = String(r.phone || '').replace(/\D/g, '').slice(-10);
-        if (phoneInput && phoneInput.length === 10 && cleanRegPhone === phoneInput) {
+      const cleanRegPhone = String(r.phone || '').replace(/\D/g, '').slice(-10);
+      if (phoneInput && phoneInput.length === 10 && cleanRegPhone === phoneInput) {
+        if (!eventId || r.eventId === eventId) {
           return true;
         }
       }
@@ -34,7 +41,7 @@ export async function POST(req: NextRequest) {
 
     if (!found) {
       return NextResponse.json(
-        { success: false, error: 'No matching event registration found. Please check your details and try again.' },
+        { success: false, error: 'No matching event registration found. Please check your mobile number and try again.' },
         { status: 404 }
       );
     }
@@ -60,7 +67,7 @@ export async function POST(req: NextRequest) {
       data: {
         id: found.id,
         registrationCode: found.registrationCode,
-        studentName: found.studentName,
+        studentName: (found.studentName || '').toUpperCase(),
         department: found.department,
         academicYear: found.academicYear,
         collegeName: found.collegeName,
@@ -71,6 +78,7 @@ export async function POST(req: NextRequest) {
         registeredAt: found.registeredAt,
         pdfUrl: `/api/public/registrations/${found.id}/pass/pdf`,
         pngUrl: `/api/public/registrations/${found.id}/pass/png`,
+        jpgUrl: `/api/public/registrations/${found.id}/pass/jpg`,
         filePdfUrl: pdfUrl,
         filePngUrl: pngUrl
       }

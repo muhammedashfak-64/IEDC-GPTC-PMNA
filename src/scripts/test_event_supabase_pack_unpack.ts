@@ -101,7 +101,7 @@ async function runTest() {
     status: 'Published',
     quotaConfig: {
       participationType: 'Single Class',
-      singleClass: { department: 'Computer Engineering', academicYear: '3rd Year', maxSeats: 60 }
+      singleClass: { department: 'Electronics Engineering', academicYear: '3rd Year', maxSeats: 60 }
     },
     templateConfig: { nameY: 300, nameFontSize: 32 }
   };
@@ -123,7 +123,7 @@ async function runTest() {
   const unpacked = unpackEventFromSupabase(fetched);
   console.log('Unpacked event:', unpacked.title, 'quotaConfig:', unpacked.quotaConfig);
 
-  if (unpacked.quotaConfig?.singleClass?.department !== 'Computer Engineering') {
+  if (unpacked.quotaConfig?.singleClass?.department !== 'Electronics Engineering') {
     throw new Error('Quota config mismatch');
   }
 

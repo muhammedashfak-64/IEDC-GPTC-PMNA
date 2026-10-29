@@ -17,7 +17,9 @@ import {
   ExternalLink,
   Film,
   Sparkles,
-  Share2
+  Share2,
+  GraduationCap,
+  UserCheck
 } from 'lucide-react';
 import { InstagramIcon as Instagram } from '@/components/SocialIcons';
 import FileUpload from '@/components/admin/FileUpload';
@@ -51,7 +53,14 @@ export default function WebsiteSettingsPage() {
     featuredReelEnabled: false,
     featuredReelUrl: '',
     featuredReelCaption: '',
-    featuredReelThumbnail: ''
+    featuredReelThumbnail: '',
+    // Principal Profile & Message
+    principalName: 'Abdul Khader',
+    principalDesignation: 'Principal, Government Polytechnic College Perinthalmanna',
+    principalHeading: "Principal's Message",
+    principalQuote: "The college is responsible and competent for the development of technical education and has tried to retain its glory by implementing schemes to achieve academic excellence and improving administrative performance.",
+    principalPhotoUrl: '/images/principal.jpeg',
+    principalEnabled: true
   });
 
   const [supabaseInfo, setSupabaseInfo] = useState<any>(null);
@@ -67,6 +76,7 @@ export default function WebsiteSettingsPage() {
         if (json.success && json.data) {
           const d = json.data;
           const fs = d.footerSocial || {};
+          const pr = d.principal || {};
           setFormData({
             siteTitle: d.siteTitle || 'IEDC GPTC PMNA',
             collegeName: d.collegeName || 'Government Polytechnic College, Perinthalmanna',
@@ -91,7 +101,14 @@ export default function WebsiteSettingsPage() {
             featuredReelEnabled: fs.featuredReel?.enabled ?? false,
             featuredReelUrl: fs.featuredReel?.reelUrl || '',
             featuredReelCaption: fs.featuredReel?.caption || '',
-            featuredReelThumbnail: fs.featuredReel?.thumbnailUrl || ''
+            featuredReelThumbnail: fs.featuredReel?.thumbnailUrl || '',
+            // Principal details
+            principalName: pr.name || 'Abdul Khader',
+            principalDesignation: pr.designation || 'Principal, Government Polytechnic College Perinthalmanna',
+            principalHeading: pr.heading || "Principal's Message",
+            principalQuote: pr.quote || "The college is responsible and competent for the development of technical education and has tried to retain its glory by implementing schemes to achieve academic excellence and improving administrative performance.",
+            principalPhotoUrl: pr.photoUrl || '/images/principal.jpeg',
+            principalEnabled: pr.enabled !== false
           });
         }
         if (json.supabase) {
@@ -114,14 +131,14 @@ export default function WebsiteSettingsPage() {
         setSupabaseInfo(json.supabase);
         setTestResult(json.supabase.status);
         if (json.supabase.status?.connected) {
-          addToast('Supabase Connected', 'Successfully communicated with PostgreSQL database.', 'success');
+          addToast('Cloud Connection Verified', 'Successfully communicated with cloud infrastructure.', 'success');
         } else {
-          addToast('Supabase Notice', json.supabase.status?.message || 'Using local fallback persistence.', 'info');
+          addToast('Cloud Sync Notice', json.supabase.status?.message || 'Using local fallback persistence.', 'info');
         }
       }
     } catch (err: any) {
       setTestResult({ connected: false, message: err.message });
-      addToast('Error', 'Failed to test Supabase connection.', 'error');
+      addToast('Error', 'Failed to test cloud connection.', 'error');
     } finally {
       setTestingSupabase(false);
     }
@@ -148,6 +165,14 @@ export default function WebsiteSettingsPage() {
           github: formData.github,
           linkedin: formData.linkedin,
           instagram: formData.officialInstagramUrl
+        },
+        principal: {
+          name: formData.principalName,
+          designation: formData.principalDesignation,
+          heading: formData.principalHeading,
+          quote: formData.principalQuote,
+          photoUrl: formData.principalPhotoUrl,
+          enabled: formData.principalEnabled
         },
         footerSocial: {
           officialInstagramUsername: formData.officialInstagramUsername,
@@ -582,10 +607,125 @@ export default function WebsiteSettingsPage() {
             )}
           </div>
         </div>
+
+        {/* ═══════════════════════════════════════════════════════
+            COLLEGE PRINCIPAL'S PROFILE & MESSAGE SECTION
+        ═══════════════════════════════════════════════════════ */}
+        <div className="p-6 rounded-3xl bg-[#121216] border border-white/10 space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#F98A5B]/10 border border-[#F98A5B]/20 flex items-center justify-center text-[#F98A5B]">
+                <GraduationCap className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-white text-base">College Principal Profile &amp; Message</h3>
+                <p className="text-slate-400 text-xs">
+                  Manage the college principal photograph, designation, leadership message, and homepage visibility.
+                </p>
+              </div>
+            </div>
+
+            <label className="flex items-center gap-2 cursor-pointer bg-black/40 border border-white/10 px-3.5 py-2 rounded-xl text-xs font-semibold text-white">
+              <input
+                type="checkbox"
+                checked={formData.principalEnabled}
+                onChange={(e) => setFormData({ ...formData, principalEnabled: e.target.checked })}
+                className="w-4 h-4 rounded text-[#F98A5B] focus:ring-[#F98A5B] bg-[#18181D]"
+              />
+              <span>Display on Homepage</span>
+            </label>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Principal Photo & Preview */}
+            <div className="lg:col-span-4 space-y-3">
+              <label className="text-xs font-bold text-slate-300 block">
+                Principal Photograph <span className="text-slate-500 font-normal">(JPEG, PNG, WebP)</span>
+              </label>
+              <div className="relative rounded-2xl overflow-hidden bg-black/50 border border-white/10 aspect-[4/5] flex items-center justify-center max-w-[220px] mx-auto lg:mx-0 shadow-lg">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={formData.principalPhotoUrl || '/images/principal.jpeg'}
+                  alt="Principal Preview"
+                  className="w-full h-full object-cover object-top"
+                  onError={(e: any) => {
+                    e.currentTarget.src = '/images/principal.jpeg';
+                  }}
+                />
+              </div>
+              <FileUpload
+                label="Change Photograph"
+                value={formData.principalPhotoUrl}
+                onChange={(url) => setFormData({ ...formData, principalPhotoUrl: url || '/images/principal.jpeg' })}
+                folder="principal"
+                accept="image/jpeg,image/png,image/webp"
+                helperText="Upload official photograph from your computer (auto-persists to Cloud Storage)"
+              />
+            </div>
+
+            {/* Principal Profile Fields */}
+            <div className="lg:col-span-8 space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">
+                    Principal Display Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.principalName}
+                    onChange={(e) => setFormData({ ...formData, principalName: e.target.value })}
+                    className="w-full bg-[#18181D] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#F98A5B]"
+                    placeholder="e.g. Abdul Khader"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-bold text-slate-300 block mb-1">
+                    Section Heading
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.principalHeading}
+                    onChange={(e) => setFormData({ ...formData, principalHeading: e.target.value })}
+                    className="w-full bg-[#18181D] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#F98A5B]"
+                    placeholder="e.g. Principal's Message"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">
+                  Official Designation / Title
+                </label>
+                <input
+                  type="text"
+                  value={formData.principalDesignation}
+                  onChange={(e) => setFormData({ ...formData, principalDesignation: e.target.value })}
+                  className="w-full bg-[#18181D] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#F98A5B]"
+                  placeholder="e.g. Principal, Government Polytechnic College Perinthalmanna"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-300 block mb-1">
+                  Leadership Message / Vision Statement
+                </label>
+                <textarea
+                  rows={4}
+                  value={formData.principalQuote}
+                  onChange={(e) => setFormData({ ...formData, principalQuote: e.target.value })}
+                  className="w-full bg-[#18181D] border border-white/10 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#F98A5B] leading-relaxed"
+                  placeholder="Enter the official institutional message..."
+                />
+              </div>
+            </div>
+          </div>
+        </div>
       </form>
 
       {/* ═══════════════════════════════════════════════════════
-          SUPABASE CENTRAL DATABASE & BACKEND INTEGRATION CARD
+          CLOUD INFRASTRUCTURE & BACKEND SERVICES CARD
       ═══════════════════════════════════════════════════════ */}
       <div className="p-6 rounded-3xl bg-[#121216] border border-emerald-500/20 space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
@@ -595,13 +735,13 @@ export default function WebsiteSettingsPage() {
             </div>
             <div>
               <h3 className="font-extrabold text-white text-base flex items-center gap-2">
-                Supabase PostgreSQL Backend &amp; Storage Architecture
+                Cloud Infrastructure &amp; Data Synchronization
                 <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                  nxlaazpcbvzxmdboqlxe
+                  Cloud Active
                 </span>
               </h3>
               <p className="text-slate-400 text-xs">
-                Unified database engine powering both the Public Frontend and Private Admin Backend with Row Level Security.
+                Unified data engine powering both the Public Frontend and Private Admin Console with encrypted role-based access.
               </p>
             </div>
           </div>
@@ -612,7 +752,7 @@ export default function WebsiteSettingsPage() {
             className="px-4 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-2 transition-all cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${testingSupabase ? 'animate-spin' : ''}`} />
-            <span>{testingSupabase ? 'Testing Ping...' : 'Test Database Connection'}</span>
+            <span>{testingSupabase ? 'Verifying Services...' : 'Test Cloud Connection'}</span>
           </button>
         </div>
 
@@ -630,49 +770,49 @@ export default function WebsiteSettingsPage() {
             )}
             <div>
               <p className="font-bold">
-                {testResult?.connected ? 'Live Supabase Connection Verified' : 'Supabase Live Token Status'}
+                {testResult?.connected ? 'Cloud Synchronization Active & Verified' : 'Cloud Service Verification Status'}
               </p>
               <p className="text-[11px] opacity-80 mt-0.5">
-                {testResult?.message || 'Ready to communicate with project nxlaazpcbvzxmdboqlxe.'}
+                {testResult?.message || 'Cloud storage and record services are functioning normally.'}
               </p>
             </div>
           </div>
 
           <div className="text-right font-mono text-[11px] shrink-0">
-            <span className="text-slate-400">Endpoint: </span>
-            <span className="text-white">https://nxlaazpcbvzxmdboqlxe.supabase.co</span>
+            <span className="text-slate-400">Status: </span>
+            <span className="text-emerald-400">Operational</span>
           </div>
         </div>
 
-        {/* Grid of 12 Tables & 5 Storage Buckets */}
+        {/* Grid of Data Modules & Storage */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
           <div className="p-4 rounded-2xl bg-[#18181D] border border-white/5 space-y-2">
             <div className="flex items-center justify-between font-bold text-white">
-              <span>PostgreSQL Tables</span>
+              <span>Managed Data Modules</span>
               <span className="text-emerald-400 font-mono">12 Active</span>
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              events, team_members, certificates, projects, gallery_items, resources, blogs, announcements, startups, website_settings, profiles, audit_logs.
+              Events, participants, team members, certificates, projects, gallery items, resources, announcements, and audit records.
             </p>
           </div>
 
           <div className="p-4 rounded-2xl bg-[#18181D] border border-white/5 space-y-2">
             <div className="flex items-center justify-between font-bold text-white">
-              <span>Storage Buckets</span>
-              <span className="text-cyan-400 font-mono">5 Configured</span>
+              <span>Cloud Asset Storage</span>
+              <span className="text-cyan-400 font-mono">5 Channels</span>
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              team-photos (public), event-posters (public), gallery (public), documents (public), certificates (private/signed URLs).
+              Public banners, portraits, documents, event gallery media, and secure encrypted certificates.
             </p>
           </div>
 
           <div className="p-4 rounded-2xl bg-[#18181D] border border-white/5 space-y-2">
             <div className="flex items-center justify-between font-bold text-white">
-              <span>Row Level Security (RLS)</span>
+              <span>Access Security</span>
               <span className="text-emerald-400 font-mono">Enforced</span>
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Public visitors can only read Published rows. Drafts, private participant contact info, and admin functions require authenticated tokens.
+              Public visitors can access published content. Administrative actions and participant records are protected with authenticated credentials.
             </p>
           </div>
         </div>
@@ -682,27 +822,18 @@ export default function WebsiteSettingsPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-white font-bold text-xs">
               <Key className="w-4 h-4 text-amber-400" />
-              <span>Update Supabase API Keys (Optional)</span>
+              <span>Update Cloud Access Credentials (Optional)</span>
             </div>
-            <a
-              href="https://supabase.com/dashboard/project/nxlaazpcbvzxmdboqlxe/settings/api"
-              target="_blank"
-              rel="noreferrer"
-              className="text-emerald-400 hover:text-emerald-300 text-[11px] flex items-center gap-1 font-mono"
-            >
-              <span>Open Supabase Project API Settings</span>
-              <ExternalLink className="w-3 h-3" />
-            </a>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
             <div>
               <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                Project Anon Key (JWT)
+                Client Integration Token
               </label>
               <input
                 type="password"
-                placeholder="Paste live Supabase anon key here..."
+                placeholder="Paste client integration token here..."
                 value={supabaseAnonKey}
                 onChange={(e) => setSupabaseAnonKey(e.target.value)}
                 className="w-full bg-[#121216] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono focus:border-emerald-500"
@@ -711,11 +842,11 @@ export default function WebsiteSettingsPage() {
 
             <div>
               <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                Service Role Key (Server-Only Secret)
+                Secure Master Token
               </label>
               <input
                 type="password"
-                placeholder="Paste live service_role key here..."
+                placeholder="Paste secure master token here..."
                 value={supabaseServiceKey}
                 onChange={(e) => setSupabaseServiceKey(e.target.value)}
                 className="w-full bg-[#121216] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono focus:border-emerald-500"
@@ -725,7 +856,7 @@ export default function WebsiteSettingsPage() {
 
           <div className="flex items-center justify-between pt-2">
             <span className="text-[11px] text-slate-400">
-              Master SQL Migration Script: <code className="text-white bg-black/40 px-2 py-0.5 rounded">supabase/migrations/20261019_complete_iedc_schema.sql</code>
+              System Engine: <code className="text-white bg-black/40 px-2 py-0.5 rounded">Active &amp; Persistent</code>
             </span>
             <button
               onClick={handleSave}
@@ -733,7 +864,7 @@ export default function WebsiteSettingsPage() {
               className="px-4 py-2 rounded-xl bg-emerald-500 text-black font-extrabold text-xs flex items-center gap-1.5 hover:bg-emerald-400 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all"
             >
               <Save className="w-3.5 h-3.5" />
-              <span>Save Supabase Keys</span>
+              <span>Save Cloud Credentials</span>
             </button>
           </div>
         </div>

@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import { loadDb } from '@/lib/serverStore';
+import { loadDb, getCertificateTemplates } from '@/lib/serverStore';
 import { generateSingleCertificatePng, resolveTemplateFile } from '@/lib/certificateGenerator';
+import { supabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabaseAdmin';
+import { unpackCertificateFromSupabase, unpackEventFromSupabase } from '@/lib/supabaseSync';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(
   req: NextRequest,
@@ -15,77 +21,105 @@ export async function GET(
     }
 
     const cleanId = id.trim().toUpperCase();
-    const pngPath = path.join(process.cwd(), 'public', 'certificates', `${cleanId}.png`);
 
-    // 1. If file already exists and is non-empty, stream directly
-    if (fs.existsSync(pngPath) && fs.statSync(pngPath).size > 1000) {
-      const buffer = fs.readFileSync(pngPath);
-      return new NextResponse(buffer, {
-        status: 200,
-        headers: {
-          'Content-Type': 'image/png',
-          'Content-Disposition': `inline; filename="${cleanId}.png"`,
-          'Cache-Control': 'public, max-age=3600'
-        }
-      });
-    }
-
-    // 2. If missing on disk, find in db.json and generate PNG
+    // 1. Authoritatively fetch certificate record from local cache or Supabase
     const db = loadDb();
-    const cert = (db.certificates || []).find(
+    let cert = (db.certificates || []).find(
       (c: any) => c.certificateId && c.certificateId.toUpperCase() === cleanId
     );
 
-    if (cert) {
-      const event = (db.events || []).find((e: any) => e.id === cert.eventId);
-      const isWinner =
-        cert.certificateType?.toLowerCase().includes('winner') ||
-        cert.certificateType?.toLowerCase().includes('achievement') ||
-        cert.certificateType?.toLowerCase().includes('prize') ||
-        event?.certificateType === 'Achievement';
-
-      const customParagraph = isWinner
-        ? (event?.winnerCertificateParagraph || undefined)
-        : (event?.certificateParagraph || undefined);
-
-      const targetConfig = isWinner
-        ? (event?.winnerTemplateConfig || event?.templateConfig || {})
-        : (event?.templateConfig || {});
-
-      const formattedSubtitle = isWinner
-        ? (event?.winnerCertificateTitle ? `— ${event.winnerCertificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : '— OF ACHIEVEMENT —')
-        : (event?.certificateTitle ? `— ${event.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : undefined);
-
-      const resolvedTemplatePath = await resolveTemplateFile(event?.certificateTemplateUrl);
-
-      const { pngBytes } = await generateSingleCertificatePng(
-        {
-          certificateId: cleanId,
-          recipientName: cert.participantName,
-          programName: cert.eventName,
-          programDate: cert.eventDate || cert.issueDate || new Date().toISOString().split('T')[0],
-          organizingBody: event?.organizingBody || undefined,
-          role: cert.certificateType,
-          certificateType: isWinner ? 'Achievement' : 'Participation',
-          awardCategory: isWinner ? (cert.awardCategory || event?.awardCategory || 'Winner') : undefined,
-          certificateSubtitle: formattedSubtitle,
-          customParagraph,
-          customTemplatePath: resolvedTemplatePath
-        },
-        targetConfig
-      );
-
-      return new NextResponse(pngBytes as any, {
-        status: 200,
-        headers: {
-          'Content-Type': 'image/png',
-          'Content-Disposition': `inline; filename="${cleanId}.png"`,
-          'Cache-Control': 'public, max-age=3600'
-        }
-      });
+    if (!cert && isSupabaseAdminConfigured()) {
+      const { data: remoteCert } = await supabaseAdmin
+        .from('certificates')
+        .select('*')
+        .eq('certificate_id', cleanId)
+        .single();
+      if (remoteCert) {
+        cert = unpackCertificateFromSupabase(remoteCert);
+      }
     }
 
-    return new NextResponse('Certificate PNG not found', { status: 404 });
+    if (!cert) {
+      return new NextResponse('Certificate not found for the given ID.', { status: 404 });
+    }
+
+    // 2. Authoritatively fetch event record
+    let event = (db.events || []).find((e: any) => e.id === cert.eventId);
+    if (!event && isSupabaseAdminConfigured() && cert.eventId) {
+      const { data: remoteEvent } = await supabaseAdmin
+        .from('events')
+        .select('*')
+        .eq('id', cert.eventId)
+        .single();
+      if (remoteEvent) {
+        event = unpackEventFromSupabase(remoteEvent);
+      }
+    }
+
+    // 3. Documented Template Selection Priority:
+    const allTemplates = getCertificateTemplates();
+    const activeGlobalTemplate = allTemplates.find((t: any) => t.isActive) || allTemplates[0];
+    const templateToUse = event?.certificateTemplateUrl || activeGlobalTemplate?.cleanUrl || activeGlobalTemplate?.pdfUrl || undefined;
+
+    const resolvedTemplatePath = await resolveTemplateFile(templateToUse);
+
+    const isWinner =
+      cert.certificateType?.toLowerCase().includes('winner') ||
+      cert.certificateType?.toLowerCase().includes('achievement') ||
+      cert.certificateType?.toLowerCase().includes('prize') ||
+      event?.certificateType === 'Achievement';
+
+    const customParagraph = isWinner
+      ? (event?.winnerCertificateParagraph || undefined)
+      : (event?.certificateParagraph || undefined);
+
+    const defaultTemplateConfig = activeGlobalTemplate?.templateConfig || undefined;
+    const targetConfig = {
+      ...(defaultTemplateConfig || {}),
+      ...(isWinner
+        ? (event?.winnerTemplateConfig || event?.templateConfig || {})
+        : (event?.templateConfig || {}))
+    };
+
+    const formattedSubtitle = isWinner
+      ? (event?.winnerCertificateTitle ? `— ${event.winnerCertificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : '— OF ACHIEVEMENT —')
+      : (event?.certificateTitle ? `— ${event.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : undefined);
+
+    const { pngBytes } = await generateSingleCertificatePng(
+      {
+        certificateId: cleanId,
+        recipientName: cert.participantName,
+        programName: cert.eventName,
+        programDate: cert.eventDate || cert.issueDate || new Date().toISOString().split('T')[0],
+        organizingBody: event?.organizingBody || undefined,
+        role: cert.certificateType,
+        certificateType: isWinner ? 'Achievement' : 'Participation',
+        awardCategory: isWinner ? (cert.awardCategory || event?.awardCategory || 'Winner') : undefined,
+        certificateSubtitle: formattedSubtitle,
+        recipientIntro: isWinner ? 'THIS CERTIFICATE IS AWARDED TO' : undefined,
+        customParagraph,
+        customTemplatePath: resolvedTemplatePath
+      },
+      targetConfig
+    );
+
+    // Cache fresh PNG on disk
+    try {
+      const publicCertDir = path.join(process.cwd(), 'public', 'certificates');
+      if (!fs.existsSync(publicCertDir)) {
+        fs.mkdirSync(publicCertDir, { recursive: true });
+      }
+      fs.writeFileSync(path.join(publicCertDir, `${cleanId}.png`), pngBytes);
+    } catch {}
+
+    return new NextResponse(pngBytes as any, {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/png',
+        'Content-Disposition': `inline; filename="${cleanId}.png"`,
+        'Cache-Control': 'no-cache, no-store, must-revalidate'
+      }
+    });
   } catch (err: any) {
     return new NextResponse(`Error retrieving certificate PNG: ${err.message}`, { status: 500 });
   }

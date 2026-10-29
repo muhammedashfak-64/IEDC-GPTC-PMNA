@@ -396,6 +396,12 @@ export async function syncAnnouncementToSupabase(ann: any, isUpdate = false) {
   });
 }
 
+export async function deleteAnnouncementFromSupabase(id: string) {
+  return safeDbOp('deleteAnnouncementFromSupabase', async () => {
+    return supabaseAdmin.from('announcements').delete().eq('id', id);
+  });
+}
+
 // -------------------------------------------------------------
 // STARTUPS
 // -------------------------------------------------------------

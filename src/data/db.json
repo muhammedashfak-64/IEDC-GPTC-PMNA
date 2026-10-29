@@ -114,7 +114,7 @@
       "staffId": "IEDC001",
       "isActive": true,
       "createdAt": "2026-01-10T10:00:00Z",
-      "lastLoginAt": "2026-10-20T17:58:31.726Z",
+      "lastLoginAt": "2026-10-29T10:43:32.951Z",
       "linkedProfileId": "fac-002",
       "linkedProfileType": "faculty",
       "permissions": [
@@ -126,7 +126,7 @@
         "projects",
         "gallery"
       ],
-      "updatedAt": "2026-10-20T17:46:59.249Z"
+      "updatedAt": "2026-10-29T10:43:32.956Z"
     },
     {
       "id": "usr-studentlead-01",
@@ -136,7 +136,7 @@
       "full_name": "Anshadh pk",
       "role": "student_operator",
       "phone": "9847123456",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "designation": "Student Lead (Chairperson)",
       "avatar": "/uploads/portraits/transparent/lead-01_1792518453874_transparent.png",
       "staffId": "SL001",
@@ -190,10 +190,10 @@
       "date": "2026-10-26",
       "time": "09:00 AM - 05:00 PM",
       "venue": "Main Auditorium & ICFC Lab",
-      "description": "DRONE ",
+      "description": "Updated description for testing at 1793265144510",
       "speaker": "",
-      "totalSeats": 111,
-      "seatsAvailable": 105,
+      "totalSeats": 50,
+      "seatsAvailable": 43,
       "bannerImage": "https://roboprenr.com/media/images/Drone-Workshop-Image.jpg",
       "brochureUrl": "https://roboprenr.com/media/images/Drone-Workshop-Image.jpg",
       "registrationLink": "",
@@ -242,95 +242,95 @@
       },
       "awardCategory": "First Prize Winner",
       "quotaConfig": {
-        "participationType": "Entire College",
+        "participationType": "Statewide",
         "singleClass": {
           "department": "Mechanical Engineering",
           "academicYear": "Second Year",
           "maxSeats": 25
         },
         "classes": {
-          "Electronics Engineering__First Year": {
-            "department": "Electronics Engineering",
-            "academicYear": "First Year",
-            "enabled": true,
-            "maxSeats": 8
-          },
-          "Electronics Engineering__Second Year": {
-            "department": "Electronics Engineering",
-            "academicYear": "Second Year",
-            "enabled": true,
-            "maxSeats": 8
-          },
-          "Electronics Engineering__Third Year": {
-            "department": "Electronics Engineering",
-            "academicYear": "Third Year",
-            "enabled": true,
-            "maxSeats": 8
-          },
           "Civil Engineering__First Year": {
             "department": "Civil Engineering",
             "academicYear": "First Year",
             "enabled": true,
-            "maxSeats": 8
+            "maxSeats": 4
           },
           "Civil Engineering__Second Year": {
             "department": "Civil Engineering",
             "academicYear": "Second Year",
             "enabled": true,
-            "maxSeats": 8
+            "maxSeats": 4
           },
           "Civil Engineering__Third Year": {
             "department": "Civil Engineering",
             "academicYear": "Third Year",
             "enabled": true,
-            "maxSeats": 8
+            "maxSeats": 4
           },
           "Mechanical Engineering__First Year": {
             "department": "Mechanical Engineering",
             "academicYear": "First Year",
             "enabled": true,
-            "maxSeats": 8
+            "maxSeats": 10
           },
           "Mechanical Engineering__Second Year": {
             "department": "Mechanical Engineering",
             "academicYear": "Second Year",
             "enabled": true,
-            "maxSeats": 8
+            "maxSeats": 4
           },
           "Mechanical Engineering__Third Year": {
             "department": "Mechanical Engineering",
             "academicYear": "Third Year",
             "enabled": true,
-            "maxSeats": 8
+            "maxSeats": 4
           },
           "Electrical and Electronics Engineering__First Year": {
             "department": "Electrical and Electronics Engineering",
             "academicYear": "First Year",
             "enabled": true,
-            "maxSeats": 8
+            "maxSeats": 4
           },
           "Electrical and Electronics Engineering__Second Year": {
             "department": "Electrical and Electronics Engineering",
             "academicYear": "Second Year",
             "enabled": true,
-            "maxSeats": 8
+            "maxSeats": 4
           },
           "Electrical and Electronics Engineering__Third Year": {
             "department": "Electrical and Electronics Engineering",
             "academicYear": "Third Year",
             "enabled": true,
-            "maxSeats": 8
+            "maxSeats": 4
+          },
+          "Electronics Engineering__First Year": {
+            "department": "Electronics Engineering",
+            "academicYear": "First Year",
+            "enabled": true,
+            "maxSeats": 2
+          },
+          "Electronics Engineering__Second Year": {
+            "department": "Electronics Engineering",
+            "academicYear": "Second Year",
+            "enabled": true,
+            "maxSeats": 4
+          },
+          "Electronics Engineering__Third Year": {
+            "department": "Electronics Engineering",
+            "academicYear": "Third Year",
+            "enabled": true,
+            "maxSeats": 4
           }
         },
         "externalQuota": {
-          "enabled": false,
-          "maxSeats": 0
+          "enabled": true,
+          "maxSeats": 2
         },
-        "waitlistEnabled": true,
+        "waitlistEnabled": false,
         "reallocationLogs": []
       },
       "createdAt": "2026-10-20T02:26:42.389713+00:00",
-      "updatedAt": "2026-10-28T06:53:21.212Z"
+      "updatedAt": "2026-10-29T09:16:20.955Z"
     },
     {
       "id": "evt-1792507055299",
@@ -479,10 +479,38 @@
   ],
   "registrations": [
     {
+      "id": "reg-1793171741665-5z3a",
+      "registrationCode": "REG-2026-50699",
+      "eventId": "evt-1792463201770",
+      "eventTitle": "DRONE WORKSHOP",
+      "studentName": "adhil",
+      "registerNumber": "",
+      "email": "ashfakacdjdwu64@gmail.com",
+      "phone": "9539584545",
+      "department": "Electronics Engineering",
+      "academicYear": "Third Year",
+      "collegeName": "Govt Polytechnic College Perinthalmanna",
+      "participationCategory": "Internal",
+      "district": "Malappuram",
+      "course": "",
+      "additionalNotes": "",
+      "status": "Attended",
+      "attendance": "Present",
+      "attendanceMethod": "MANUAL",
+      "attendedAt": "2026-10-28T07:18:10.032Z",
+      "markedBy": "Muhammed Ashfak O",
+      "markedById": "usr-mainadmin-01",
+      "waitlistPosition": null,
+      "passToken": "pass_9cdbe7cf8eef48676ce208fe",
+      "qrPayload": "IEDCPASS:evt-1792463201770:REG-2026-50699:pass_9cdbe7cf8eef48676ce208fe",
+      "consent": true,
+      "registeredAt": "2026-10-28T07:15:41.665+00:00",
+      "createdAt": "2026-10-28T07:15:41.665+00:00",
+      "updatedAt": "2026-10-28T07:18:10.038+00:00"
+    },
+    {
       "id": "reg-1793170401212-jloc",
       "registrationCode": "REG-2026-28152",
-      "passToken": "pass_fa716ef12179d770dd741819",
-      "qrPayload": "IEDCPASS:evt-1792463201770:REG-2026-28152:pass_fa716ef12179d770dd741819",
       "eventId": "evt-1792463201770",
       "eventTitle": "DRONE WORKSHOP",
       "studentName": "sreeranjan",
@@ -496,16 +524,19 @@
       "district": "Malappuram",
       "course": "",
       "additionalNotes": "",
-      "status": "Confirmed",
-      "attendance": null,
-      "attendanceMethod": null,
-      "attendedAt": null,
-      "markedBy": null,
-      "markedById": null,
+      "status": "Attended",
+      "attendance": "Present",
+      "attendanceMethod": "MANUAL",
+      "attendedAt": "2026-10-28T07:18:06.260Z",
+      "markedBy": "Muhammed Ashfak O",
+      "markedById": "usr-mainadmin-01",
       "waitlistPosition": null,
+      "passToken": "pass_fa716ef12179d770dd741819",
+      "qrPayload": "IEDCPASS:evt-1792463201770:REG-2026-28152:pass_fa716ef12179d770dd741819",
       "consent": true,
-      "registeredAt": "2026-10-28T06:53:21.212Z",
-      "createdAt": "2026-10-28T06:53:21.212Z"
+      "registeredAt": "2026-10-28T06:53:21.212+00:00",
+      "createdAt": "2026-10-28T06:53:21.212+00:00",
+      "updatedAt": "2026-10-28T07:18:06.266+00:00"
     },
     {
       "id": "reg-1793009644371-2zvk",
@@ -523,19 +554,19 @@
       "district": "Malappuram",
       "course": "",
       "additionalNotes": "",
-      "status": "Confirmed",
-      "attendance": null,
-      "attendanceMethod": null,
-      "attendedAt": null,
-      "markedBy": null,
-      "markedById": null,
+      "status": "Attended",
+      "attendance": "Present",
+      "attendanceMethod": "MANUAL",
+      "attendedAt": "2026-10-29T04:29:08.498Z",
+      "markedBy": "Muhammed Ashfak O",
+      "markedById": "usr-mainadmin-01",
       "waitlistPosition": null,
       "passToken": "pass_3eb635ff4f962e7b15804650",
       "qrPayload": "IEDCPASS:evt-1792463201770:REG-2026-30633:pass_3eb635ff4f962e7b15804650",
       "consent": true,
       "registeredAt": "2026-10-26T10:14:04.371+00:00",
       "createdAt": "2026-10-26T10:14:04.371+00:00",
-      "updatedAt": "2026-10-26T10:14:04.377+00:00"
+      "updatedAt": "2026-10-29T04:29:08.503+00:00"
     },
     {
       "id": "reg-1792572900901-8qcm",
@@ -553,19 +584,19 @@
       "district": "",
       "course": "",
       "additionalNotes": "",
-      "status": "Confirmed",
-      "attendance": "Absent",
-      "attendanceMethod": null,
-      "attendedAt": null,
-      "markedBy": null,
-      "markedById": null,
+      "status": "Attended",
+      "attendance": "Present",
+      "attendanceMethod": "MANUAL",
+      "attendedAt": "2026-10-29T04:29:05.070Z",
+      "markedBy": "Muhammed Ashfak O",
+      "markedById": "usr-mainadmin-01",
       "waitlistPosition": null,
       "passToken": "pass_d6084621f388c5ce0ecbb116",
       "qrPayload": "IEDCPASS:evt-1792463201770:REG-2026-49488:pass_d6084621f388c5ce0ecbb116",
       "consent": true,
       "registeredAt": "2026-10-21T08:55:00.901+00:00",
       "createdAt": "2026-10-21T08:55:00.901+00:00",
-      "updatedAt": "2026-10-23T08:19:03.589+00:00"
+      "updatedAt": "2026-10-29T04:29:05.075+00:00"
     },
     {
       "id": "reg-1792498112837-6ngo",
@@ -606,7 +637,7 @@
       "registerNumber": "24010322235",
       "email": "panshadh@gmail.com",
       "phone": "7034265962",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "3rd Year (Sem 5 & 6)",
       "collegeName": "Govt Polytechnic College Perinthalmanna",
       "participationCategory": "Internal",
@@ -666,7 +697,7 @@
       "registerNumber": "GPTC-2026-EC-03",
       "email": "gamma_1793169813477@gptcpmna.ac.in",
       "phone": "9876543212",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "Third Year",
       "collegeName": "Govt Polytechnic College Perinthalmanna",
       "participationCategory": "Internal",
@@ -730,7 +761,7 @@
       "registerNumber": "",
       "email": "alpha_1793169813477@gptcpmna.ac.in",
       "phone": "9876543210",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "First Year",
       "collegeName": "Govt Polytechnic College Perinthalmanna",
       "participationCategory": "Internal",
@@ -762,7 +793,7 @@
       "registerNumber": "GPTC-2026-EC-03",
       "email": "gamma_1793169698448@gptcpmna.ac.in",
       "phone": "9876543212",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "Third Year",
       "collegeName": "Govt Polytechnic College Perinthalmanna",
       "participationCategory": "Internal",
@@ -826,7 +857,7 @@
       "registerNumber": "",
       "email": "alpha_1793169698448@gptcpmna.ac.in",
       "phone": "9876543210",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "First Year",
       "collegeName": "Govt Polytechnic College Perinthalmanna",
       "participationCategory": "Internal",
@@ -858,7 +889,7 @@
       "registerNumber": "GPTC-2026-EC-03",
       "email": "gamma_1793169590872@gptcpmna.ac.in",
       "phone": "9876543212",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "Third Year",
       "collegeName": "Govt Polytechnic College Perinthalmanna",
       "participationCategory": "Internal",
@@ -918,7 +949,7 @@
       "registerNumber": "",
       "email": "alpha_1793169590872@gptcpmna.ac.in",
       "phone": "9876543210",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "First Year",
       "collegeName": "Govt Polytechnic College Perinthalmanna",
       "participationCategory": "Internal",
@@ -948,7 +979,7 @@
       "registerNumber": "GPTC-2026-EC-03",
       "email": "gamma_1793169462291@gptcpmna.ac.in",
       "phone": "9876543212",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "Third Year",
       "collegeName": "Govt Polytechnic College Perinthalmanna",
       "participationCategory": "Internal",
@@ -1008,7 +1039,7 @@
       "registerNumber": "",
       "email": "alpha_1793169462291@gptcpmna.ac.in",
       "phone": "9876543210",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "First Year",
       "collegeName": "Govt Polytechnic College Perinthalmanna",
       "participationCategory": "Internal",
@@ -1038,7 +1069,7 @@
       "registerNumber": "GPTC-2026-EC-03",
       "email": "gamma_1793169287736@gptcpmna.ac.in",
       "phone": "9876543212",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "Third Year",
       "collegeName": "Govt Polytechnic College Perinthalmanna",
       "participationCategory": "Internal",
@@ -1098,7 +1129,7 @@
       "registerNumber": "",
       "email": "alpha_1793169287736@gptcpmna.ac.in",
       "phone": "9876543210",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "First Year",
       "collegeName": "Govt Polytechnic College Perinthalmanna",
       "participationCategory": "Internal",
@@ -1497,7 +1528,7 @@
       "registerNumber": "2401032236",
       "email": "muhammedashfako64@gmail.com",
       "phone": "6282159152",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "2nd Year",
       "collegeName": "Govt Polytechnic College Perinthalmanna",
       "additionalNotes": "",
@@ -1545,7 +1576,7 @@
       "registerNumber": "21051299",
       "email": "ashfak.test@gptcpmna.edu.in",
       "phone": "9847123456",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "2nd Year",
       "collegeName": "Govt Polytechnic College Perinthalmanna",
       "additionalNotes": "",
@@ -1587,7 +1618,7 @@
       "registerNumber": "21051299",
       "email": "ashfak.test@gptcpmna.edu.in",
       "phone": "9847123456",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "2nd Year",
       "collegeName": "Govt Polytechnic College Perinthalmanna",
       "additionalNotes": "",
@@ -1621,7 +1652,7 @@
       "registerNumber": "21051234",
       "email": "rahul.v@gptcpmna.edu.in",
       "phone": "9847123456",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "status": "Attended",
       "registeredAt": "2026-08-01T10:00:00Z"
     },
@@ -1700,7 +1731,7 @@
       "registerNumber": "21051203",
       "email": "aswinjithk@gptcpmna.edu.in",
       "phone": "9847334455",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "2nd Year",
       "collegeName": "Govt Polytechnic College Perinthalmanna",
       "additionalNotes": "Workshop hands-on session completed",
@@ -1766,7 +1797,7 @@
       "registerNumber": "21051206",
       "email": "fathimap@gptcpmna.edu.in",
       "phone": "9847667788",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "2nd Year",
       "collegeName": "Govt Polytechnic College Perinthalmanna",
       "additionalNotes": "Workshop hands-on session completed",
@@ -1876,7 +1907,7 @@
       "registerNumber": "21051211",
       "email": "mohammedmubashira@gptcpmna.edu.in",
       "phone": "9847112244",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "2nd Year",
       "collegeName": "Govt Polytechnic College Perinthalmanna",
       "additionalNotes": "Workshop hands-on session completed",
@@ -1964,7 +1995,7 @@
       "registerNumber": "21051215",
       "email": "shibinfarhanv@gptcpmna.edu.in",
       "phone": "9847556688",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "2nd Year",
       "collegeName": "Govt Polytechnic College Perinthalmanna",
       "additionalNotes": "Workshop hands-on session completed",
@@ -2008,7 +2039,7 @@
       "registerNumber": "21051217",
       "email": "muhammedashfako@gptcpmna.edu.in",
       "phone": "9847123456",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "2nd Year",
       "collegeName": "Govt Polytechnic College Perinthalmanna",
       "additionalNotes": "Workshop hands-on session completed",
@@ -2988,7 +3019,7 @@
       "id": "com-001",
       "name": "Rahul V",
       "position": "Chairperson (Student Lead)",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "academicYear": "2025 - 2026",
       "bio": "Passionate software developer and robotics enthusiast directing IEDC operations, hackathons, and technical bootcamps.",
       "linkedinUrl": "https://linkedin.com/in/rahul-v-iedc",
@@ -3523,6 +3554,216 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "log-1793270612975-g3gf",
+      "userId": "usr-mainadmin-01",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "ANNOUNCEMENT_DELETE",
+      "details": "Deleted announcement: Updated Test Announcement Title",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T10:43:32.975Z"
+    },
+    {
+      "id": "log-1793270612970-2jg5",
+      "userId": "usr-mainadmin-01",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "ANNOUNCEMENT_UPDATE",
+      "details": "Updated announcement: Updated Test Announcement Title",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T10:43:32.970Z"
+    },
+    {
+      "id": "log-1793270612963-zkte",
+      "userId": "usr-mainadmin-01",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "ANNOUNCEMENT_CREATE",
+      "details": "Broadcast announcement: Temporary Test Announcement",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T10:43:32.963Z"
+    },
+    {
+      "id": "log-1793270612958-qgrq",
+      "userId": "usr-mainadmin-01",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "USER_PASSWORD_RESET",
+      "details": "Password reset initiated for operator @iedc.faculty",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T10:43:32.958Z"
+    },
+    {
+      "id": "log-1793270612954-dtow",
+      "userId": "usr-faculty-01",
+      "userName": "System / Anonymous",
+      "userRole": "faculty_coordinator",
+      "action": "ADMIN_LOGIN_SUCCESS",
+      "details": "User Anuroop (@iedc.faculty) logged in via faculty_coordinator",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T10:43:32.954Z"
+    },
+    {
+      "id": "log-1793270612949-ovbu",
+      "userId": "usr-mainadmin-01",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "USER_PASSWORD_RESET",
+      "details": "Password reset initiated for operator @iedc.faculty",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T10:43:32.949Z"
+    },
+    {
+      "id": "log-1793270612943-47cm",
+      "userId": "usr-faculty-01",
+      "userName": "System / Anonymous",
+      "userRole": "faculty_coordinator",
+      "action": "ADMIN_LOGIN_SUCCESS",
+      "details": "User Anuroop (@iedc.faculty) logged in via faculty_coordinator",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T10:43:32.943Z"
+    },
+    {
+      "id": "log-1793265381583-u609",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "REGISTRATION_DELETE",
+      "details": "Deleted registration for EXTERNAL STUDENT 2 (reg-1793265376797-njjv)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T09:16:21.583Z"
+    },
+    {
+      "id": "log-1793265380952-ai6c",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "REGISTRATION_DELETE",
+      "details": "Deleted registration for EXTERNAL STUDENT 1 (reg-1793265375870-s83m)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T09:16:20.952Z"
+    },
+    {
+      "id": "log-1793265379918-zqr1",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "REGISTRATION_DELETE",
+      "details": "Deleted registration for MECH STUDENT 1 (reg-1793265374539-s76v)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T09:16:19.918Z"
+    },
+    {
+      "id": "log-1793265378728-znno",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "REGISTRATION_DELETE",
+      "details": "Deleted registration for EC STUDENT 1 (reg-1793265373244-zpmh)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T09:16:18.728Z"
+    },
+    {
+      "id": "log-1793265372817-zo0d",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: DRONE WORKSHOP",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T09:16:12.817Z"
+    },
+    {
+      "id": "log-1793265229450-tept",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: DRONE WORKSHOP",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T09:13:49.450Z"
+    },
+    {
+      "id": "log-1793265149391-muyx",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "REGISTRATION_DELETE",
+      "details": "Deleted registration for VERIFICATION TEST MECH (reg-1793265143852-slwo)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T09:12:29.391Z"
+    },
+    {
+      "id": "log-1793265147789-g27x",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "REGISTRATION_DELETE",
+      "details": "Deleted registration for VERIFICATION TEST EEE (reg-1793265141965-1v1o)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T09:12:27.789Z"
+    },
+    {
+      "id": "log-1793265146409-y8jp",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "REGISTRATION_DELETE",
+      "details": "Deleted registration for VERIFICATION TEST ELECTRONICS (reg-1793265140902-x335)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T09:12:26.409Z"
+    },
+    {
+      "id": "log-1793265144823-0jst",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: DRONE WORKSHOP",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T09:12:24.823Z"
+    },
+    {
+      "id": "log-1793265036891-p816",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "REGISTRATION_DELETE",
+      "details": "Deleted registration for VERIFICATION TEST MECH (reg-1793265030740-yv95)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T09:10:36.891Z"
+    },
+    {
+      "id": "log-1793265036231-l050",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "REGISTRATION_DELETE",
+      "details": "Deleted registration for VERIFICATION TEST EEE (reg-1793265028841-3o70)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T09:10:36.231Z"
+    },
+    {
+      "id": "log-1793265034607-ewso",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "REGISTRATION_DELETE",
+      "details": "Deleted registration for VERIFICATION TEST ELECTRONICS (reg-1793265026471-m2yq)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T09:10:34.607Z"
+    },
+    {
+      "id": "log-1793265032724-6p33",
+      "userId": "anonymous",
+      "userName": "System / Anonymous",
+      "userRole": "guest",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: DRONE WORKSHOP",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-29T09:10:32.724Z"
+    },
     {
       "id": "log-1793169834816-wsq1",
       "userId": "usr-mainadmin-01",
@@ -7896,7 +8137,7 @@
       "eventId": "evt-3d-printing",
       "name": "MUHAMMED ASHFAK O",
       "role": "Student Lead",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "email": "ashfak@gptcpmna.edu.in",
       "phone": "9847123456",
       "certificateEligible": true,
@@ -7908,7 +8149,7 @@
       "eventId": "evt-3d-printing",
       "name": "RAHUL V",
       "role": "Program Coordinator",
-      "department": "Computer Engineering",
+      "department": "Electronics Engineering",
       "email": "rahul.v@gptcpmna.edu.in",
       "phone": "9847111222",
       "certificateEligible": true,

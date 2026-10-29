@@ -155,10 +155,11 @@ export default function CertificatesDownloadPage() {
                 type="text"
                 required
                 autoComplete="off"
-                placeholder="Enter your full registered name"
+                placeholder="Enter your full registered name (e.g. MUHAMMED ASHFAK)"
                 value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="w-full bg-[#18181D] border border-white/10 focus:border-white/30 rounded-xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none"
+                onChange={(e) => setFullName(e.target.value.toUpperCase())}
+                onBlur={(e) => setFullName(e.target.value.trim().toUpperCase())}
+                className="w-full bg-[#18181D] border border-white/10 focus:border-white/30 rounded-xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none uppercase"
               />
             </div>
             <span className="text-[10px] text-slate-400 mt-1 block">
@@ -268,6 +269,15 @@ export default function CertificatesDownloadPage() {
                 >
                   <ImageIcon className="w-4 h-4 text-purple-400" />
                   <span>Download PNG</span>
+                </a>
+
+                <a
+                  href={`/api/public/certificates/${retrievedCert.certificateId}/jpg`}
+                  download={`Certificate_${retrievedCert.participantName?.replace(/\s+/g, '_')}_IEDC.jpg`}
+                  className="px-3.5 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-xs font-bold text-amber-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <ImageIcon className="w-4 h-4 text-amber-400" />
+                  <span>Download JPG</span>
                 </a>
 
                 <Link

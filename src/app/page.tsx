@@ -150,6 +150,15 @@ export default function HomePage() {
     ? eventDateObj.toLocaleString('en-US', { month: 'short' }).toUpperCase()
     : '---';
 
+  const principalSettings = homepageData.settings?.principal || {
+    name: 'Abdul Khader',
+    designation: 'Principal, Government Polytechnic College Perinthalmanna',
+    heading: "Principal's Message",
+    quote: "The college is responsible and competent for the development of technical education and has tried to retain its glory by implementing schemes to achieve academic excellence and improving administrative performance.",
+    photoUrl: '/images/principal.jpeg',
+    enabled: true
+  };
+
   return (
     <div className="relative overflow-hidden min-h-screen bg-[#0F0F10]">
       <ParticleBackground />
@@ -574,90 +583,89 @@ export default function HomePage() {
       {/* ═══════════════════════════════════════════════════════
           COLLEGE PRINCIPAL'S MESSAGE SECTION
       ═══════════════════════════════════════════════════════ */}
-      <section id="principal-message" className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10 space-y-10">
-        <div className="glass-iedc p-8 sm:p-12 rounded-3xl border border-white/12 shadow-2xl overflow-hidden relative backdrop-blur-xl">
-          {/* Subtle ambient lighting */}
-          <div className="absolute -top-32 -right-32 w-96 h-96 bg-white/[0.03] rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-[#F98A5B]/[0.03] rounded-full blur-3xl pointer-events-none" />
+      {principalSettings.enabled !== false && (
+        <section id="principal-message" className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto relative z-10 space-y-10">
+          <div className="glass-iedc p-8 sm:p-12 rounded-3xl border border-white/12 shadow-2xl overflow-hidden relative backdrop-blur-xl">
+            {/* Subtle ambient lighting */}
+            <div className="absolute -top-32 -right-32 w-96 h-96 bg-white/[0.03] rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-32 -left-32 w-96 h-96 bg-[#F98A5B]/[0.03] rounded-full blur-3xl pointer-events-none" />
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center relative z-10">
-            {/* Principal's Photo Column */}
-            <div className="lg:col-span-5 flex flex-col items-center sm:items-start text-center sm:text-left">
-              <div className="relative group w-full max-w-xs mx-auto lg:mx-0">
-                <div className="absolute -inset-1 rounded-3xl bg-gradient-to-b from-white/20 via-white/5 to-transparent blur-sm group-hover:opacity-100 transition-opacity" />
-                <div className="relative rounded-2xl overflow-hidden bg-[#16161A] border border-white/15 shadow-2xl aspect-[4/5] flex items-center justify-center">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/images/principal.jpeg"
-                    alt="Abdul Khader, Principal - Govt Polytechnic College Perinthalmanna"
-                    className="w-full h-full object-cover object-top filter grayscale contrast-110 hover:grayscale-0 transition-all duration-500"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
-                  <div className="absolute bottom-3 left-3 right-3 text-left">
-                    <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded bg-black/60 text-emerald-400 border border-emerald-500/30 backdrop-blur-md">
-                      Verified Institution Head
-                    </span>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center relative z-10">
+              {/* Principal's Photo Column */}
+              <div className="lg:col-span-5 flex flex-col items-center sm:items-start text-center sm:text-left">
+                <div className="relative group w-full max-w-xs mx-auto lg:mx-0">
+                  <div className="absolute -inset-1 rounded-3xl bg-gradient-to-b from-white/20 via-white/5 to-transparent blur-sm group-hover:opacity-100 transition-opacity" />
+                  <div className="relative rounded-2xl overflow-hidden bg-[#16161A] border border-white/15 shadow-2xl aspect-[4/5] flex items-center justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={principalSettings.photoUrl || "/images/principal.jpeg"}
+                      alt={`${principalSettings.name || 'Principal'} - Govt Polytechnic College Perinthalmanna`}
+                      className="w-full h-full object-cover object-top filter grayscale contrast-110 hover:grayscale-0 transition-all duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent pointer-events-none" />
+                    <div className="absolute bottom-3 left-3 right-3 text-left">
+                      <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded bg-black/60 text-emerald-400 border border-emerald-500/30 backdrop-blur-md">
+                        Verified Institution Head
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 space-y-1 w-full max-w-xs mx-auto lg:mx-0">
+                  <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                    {principalSettings.name || 'Abdul Khader'}
+                  </h3>
+                  <p className="text-xs font-semibold text-[#F98A5B]">
+                    {principalSettings.designation || 'Principal, Government Polytechnic College Perinthalmanna'}
+                  </p>
+                  <div className="pt-2 flex items-center justify-center sm:justify-start gap-2 text-[11px] text-slate-400">
+                    <Building2 className="w-3.5 h-3.5 text-slate-500" />
+                    <span>DTE Kerala · Institution Code 017</span>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-5 space-y-1 w-full max-w-xs mx-auto lg:mx-0">
-                <h3 className="text-xl sm:text-2xl font-black text-white tracking-tight">
-                  Abdul Khader
-                </h3>
-                <p className="text-xs font-semibold text-[#F98A5B]">
-                  Principal, Government Polytechnic College Perinthalmanna
-                </p>
-                <div className="pt-2 flex items-center justify-center sm:justify-start gap-2 text-[11px] text-slate-400">
-                  <Building2 className="w-3.5 h-3.5 text-slate-500" />
-                  <span>DTE Kerala · Institution Code 017</span>
+              {/* Principal's Verified Message Column */}
+              <div className="lg:col-span-7 space-y-6">
+                <div className="space-y-3">
+                  <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300 text-xs font-mono font-bold tracking-wider uppercase">
+                    <GraduationCap className="w-3.5 h-3.5 text-[#F98A5B]" /> Leadership &amp; Institutional Vision
+                  </div>
+                  <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
+                    {principalSettings.heading || "Principal's Message"}
+                  </h2>
                 </div>
-              </div>
-            </div>
 
-            {/* Principal's Verified Message Column */}
-            <div className="lg:col-span-7 space-y-6">
-              <div className="space-y-3">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300 text-xs font-mono font-bold tracking-wider uppercase">
-                  <GraduationCap className="w-3.5 h-3.5 text-[#F98A5B]" /> Leadership &amp; Institutional Vision
+                {/* Verified official message */}
+                <div className="relative pl-6 sm:pl-8 border-l-2 border-[#F98A5B]/40 space-y-4">
+                  <p className="text-slate-200 text-sm sm:text-base leading-relaxed italic whitespace-pre-line">
+                    &ldquo;{principalSettings.quote || 'The college is responsible and competent for the development of technical education and has tried to retain its glory by implementing schemes to achieve academic excellence and improving administrative performance.'}&rdquo;
+                  </p>
+                  <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
+                    Through the <strong className="text-white">Innovation and Entrepreneurship Development Centre (IEDC)</strong>, we encourage students to step beyond textbooks, test real prototypes, and cultivate leadership skills that empower both industry and society.
+                  </p>
                 </div>
-                <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-                  Principal&apos;s Message
-                </h2>
-              </div>
 
-              {/* Verified official message from https://www.gptcperinthalmanna.in/ */}
-              <div className="relative pl-6 sm:pl-8 border-l-2 border-[#F98A5B]/40 space-y-4">
-                <p className="text-slate-200 text-sm sm:text-base leading-relaxed italic">
-                  &ldquo;The college is responsible and competent for the development of technical education and has tried to retain its glory by implementing schemes to achieve academic excellence and improving administrative performance.&rdquo;
-                </p>
-                <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-                  &ldquo;Our various programmes and initiatives include formation of various academic committees, prompt utilization of government funds, enhancement of infrastructure and other facilities, and various activities to boost the academic performance of students and staff.&rdquo;
-                </p>
-                <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-                  Through the <strong className="text-white">Innovation and Entrepreneurship Development Centre (IEDC)</strong>, we encourage students to step beyond textbooks, test real prototypes, and cultivate leadership skills that empower both industry and society.
-                </p>
-              </div>
-
-              {/* Official College Portal Link */}
-              <div className="pt-2 flex flex-wrap items-center gap-4">
-                <a
-                  href="https://www.gptcperinthalmanna.in/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-white transition-all group"
-                >
-                  <span>Official College Portal</span>
-                  <ExternalLink className="w-3.5 h-3.5 text-[#F98A5B] group-hover:translate-x-0.5 transition-transform" />
-                </a>
-                <span className="text-[11px] text-slate-400">
-                  Government Polytechnic College, Angadippuram P.O., Perinthalmanna
-                </span>
+                {/* Official College Portal Link */}
+                <div className="pt-2 flex flex-wrap items-center gap-4">
+                  <a
+                    href="https://www.gptcperinthalmanna.in/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-bold text-white transition-all group"
+                  >
+                    <span>Official College Portal</span>
+                    <ExternalLink className="w-3.5 h-3.5 text-[#F98A5B] group-hover:translate-x-0.5 transition-transform" />
+                  </a>
+                  <span className="text-[11px] text-slate-400">
+                    Government Polytechnic College, Angadippuram P.O., Perinthalmanna
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ═══════════════════════════════════════════════════════
           OUR INNOVATION ECOSYSTEM (Dedicated Section)

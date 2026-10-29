@@ -39,26 +39,29 @@ export function normalizeDepartment(dept?: string): string {
   if (!dept) return 'Electronics Engineering';
   const clean = dept.toLowerCase().trim();
 
-  // Computer Engineering / Science
-  if (clean.includes('comp') || clean.includes('cs') || clean === 'cse' || clean === 'ct') {
-    return 'Computer Engineering';
+  // 1. Electrical and Electronics Engineering (EEE) - Must check first before Electronics because EEE contains "electronics"
+  if (clean.includes('electrical') || clean.includes('eee') || clean === 'ee') {
+    return 'Electrical and Electronics Engineering';
   }
-  // Electronics
+
+  // 2. Electronics Engineering (EC)
   if (clean.includes('electron') || clean === 'ec' || clean === 'ece') {
     return 'Electronics Engineering';
   }
-  // Electrical / EEE
-  if (clean.includes('electr') || clean === 'eee' || clean === 'ee') {
-    return 'Electrical and Electronics Engineering';
-  }
-  // Civil
+
+  // 3. Civil Engineering
   if (clean.includes('civil') || clean === 'ce') {
     return 'Civil Engineering';
   }
-  // Mechanical
+
+  // 4. Mechanical Engineering
   if (clean.includes('mech') || clean === 'me') {
     return 'Mechanical Engineering';
   }
+
+  // Exact match against official college departments
+  const exact = COLLEGE_DEPARTMENTS.find((d) => d.toLowerCase() === clean);
+  if (exact) return exact;
 
   return dept.trim();
 }
@@ -138,13 +141,13 @@ export function calculateQuotaSummary(
   let internalConfirmed = 0;
   let totalWaitlist = 0;
 
-  // Process all configured departments
+  // Process all configured official college departments (strictly excluding non-existent departments)
   const allDepts = Array.from(
     new Set([
       ...COLLEGE_DEPARTMENTS,
       ...Object.keys(rawConfig.classes || {})
         .map((k) => parseClassKey(k).department)
-        .filter(Boolean)
+        .filter((d) => Boolean(d) && !d.toLowerCase().includes('computer'))
     ])
   );
 
@@ -182,7 +185,7 @@ export function calculateQuotaSummary(
       });
 
       const confirmedList = classRegs.filter(
-        (r: any) => r.status === 'Confirmed' || r.status === 'Attended'
+        (r: any) => r.status === 'Confirmed' || r.status === 'Attended' || r.status === 'Registered'
       );
       const waitlistList = classRegs.filter((r: any) => r.status === 'Waitlisted');
       const attendedList = classRegs.filter((r: any) => r.status === 'Attended');
@@ -230,7 +233,7 @@ export function calculateQuotaSummary(
   const externalRegs = eventRegs.filter((r: any) => isExternalParticipant(r));
 
   const extConfirmedList = externalRegs.filter(
-    (r: any) => r.status === 'Confirmed' || r.status === 'Attended'
+    (r: any) => r.status === 'Confirmed' || r.status === 'Attended' || r.status === 'Registered'
   );
   const extWaitlistList = externalRegs.filter((r: any) => r.status === 'Waitlisted');
   const extConfirmed = extConfirmedList.length;
@@ -256,8 +259,14 @@ export function calculateQuotaSummary(
     status: extStatus
   };
 
-  const totalCapacity = totalInternalSeats + extMaxSeats;
+  // Authoritative total capacity: Preserve admin-configured event.totalSeats
+  const totalCapacity = Number(event.totalSeats) > 0 ? Number(event.totalSeats) : totalInternalSeats + extMaxSeats;
   const totalConfirmed = internalConfirmed + extConfirmed;
+  const remainingOverall = Math.max(0, totalCapacity - totalConfirmed);
+  const remainingByQuotas = Math.max(0, (totalInternalSeats - internalConfirmed) + extRemaining);
+  const totalRemaining = rawConfig.participationType === 'Statewide' || Object.keys(rawConfig.classes || {}).length > 0
+    ? Math.min(remainingOverall, remainingByQuotas)
+    : remainingOverall;
 
   return {
     eventId: event.id,
@@ -344,4 +353,160 @@ export function validateSeatTransfer(
   }
 
   return { valid: true, availableToTransfer };
+}
+
+/**
+ * Normalizes personal name to UPPERCASE while trimming excess spaces.
+ * Strictly for student/participant/leader/recipient names.
+ */
+export function normalizePersonalName(name?: string): string {
+  if (!name) return '';
+  return name.trim().toUpperCase();
+}
+
+/**
+ * Calculates the exact registration closing deadline for an event in Asia/Kolkata timezone (+05:30).
+ * Rule:
+ * 1. If administrator explicitly configured registrationClosingDate, use that.
+ * 2. Otherwise, automatically close at 11:00 AM IST on the event/program date.
+ */
+export function getEventRegistrationDeadline(event: any): Date | null {
+  if (!event) return null;
+
+  // 1. Explicitly configured registration closing date/time
+  if (event.registrationClosingDate) {
+    const explicit = new Date(event.registrationClosingDate);
+    if (!isNaN(explicit.getTime())) {
+      return explicit;
+    }
+  }
+
+  // 2. Default: 11:00 AM IST on event date
+  if (event.date) {
+    const match = String(event.date).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const [_, y, m, d] = match;
+      // 11:00 AM Indian Standard Time (UTC+05:30)
+      return new Date(`${y}-${m}-${d}T11:00:00+05:30`);
+    }
+    const parsedDate = new Date(event.date);
+    if (!isNaN(parsedDate.getTime())) {
+      const istString = parsedDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+      const match2 = istString.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (match2) {
+        const [_, y, m, d] = match2;
+        return new Date(`${y}-${m}-${d}T11:00:00+05:30`);
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Evaluates the live registration status of an event:
+ * - Start date check
+ * - 11:00 AM IST event date cutoff (or explicit closing date)
+ * - registrationOpen flag
+ * - status === 'Published'
+ */
+export function getEventRegistrationStatus(event: any, now: Date = new Date()): {
+  isOpen: boolean;
+  statusText: string;
+  reason?: string;
+  deadline: Date | null;
+  deadlineFormatted: string;
+} {
+  if (!event) {
+    return {
+      isOpen: false,
+      statusText: 'Event Not Found',
+      reason: 'Event does not exist',
+      deadline: null,
+      deadlineFormatted: ''
+    };
+  }
+
+  const deadline = getEventRegistrationDeadline(event);
+  const deadlineFormatted = deadline
+    ? deadline.toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      })
+    : '';
+
+  if (event.status && event.status !== 'Published') {
+    return {
+      isOpen: false,
+      statusText: 'Unpublished',
+      reason: `Event is currently ${event.status}`,
+      deadline,
+      deadlineFormatted
+    };
+  }
+
+  if (event.registrationOpen === false) {
+    return {
+      isOpen: false,
+      statusText: 'Registration Closed',
+      reason: 'Registration has been closed by administration',
+      deadline,
+      deadlineFormatted
+    };
+  }
+
+  if (event.registrationStartDate) {
+    const start = new Date(event.registrationStartDate);
+    if (!isNaN(start.getTime()) && now < start) {
+      const startFormatted = start.toLocaleString('en-IN', {
+        timeZone: 'Asia/Kolkata',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+      return {
+        isOpen: false,
+        statusText: 'Opens Soon',
+        reason: `Registration opens on ${startFormatted}`,
+        deadline,
+        deadlineFormatted
+      };
+    }
+  }
+
+  if (deadline && now >= deadline) {
+    return {
+      isOpen: false,
+      statusText: 'Registration Closed',
+      reason: `Registration closed at ${deadlineFormatted} (11:00 AM IST cutoff)`,
+      deadline,
+      deadlineFormatted
+    };
+  }
+
+  if (typeof event.seatsAvailable === 'number' && event.seatsAvailable <= 0) {
+    return {
+      isOpen: false,
+      statusText: 'Housefull',
+      reason: 'All allocated seats have been filled',
+      deadline,
+      deadlineFormatted
+    };
+  }
+
+  return {
+    isOpen: true,
+    statusText: 'Registration Open',
+    reason: deadline ? `Closes on ${deadlineFormatted}` : 'Open',
+    deadline,
+    deadlineFormatted
+  };
 }

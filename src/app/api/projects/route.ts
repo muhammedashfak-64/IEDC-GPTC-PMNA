@@ -33,7 +33,7 @@ export async function GET() {
             id: 'proj-2',
             title: 'Polytechnic AI Attendance & QR Pass System',
             description: 'Face recognition and encrypted QR pass generator for instant campus workshop check-ins.',
-            department: 'Computer Engineering',
+            department: 'Electronics Engineering',
             technology: ['Next.js', 'OpenCV', 'TypeScript', 'TailwindCSS'],
             year: '2026',
             status: 'Completed',

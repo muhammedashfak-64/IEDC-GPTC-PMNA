@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
-import os from 'os';
-import { loadDb } from '@/lib/serverStore';
+import { loadDb, getCertificateTemplates } from '@/lib/serverStore';
 import { generateSingleCertificatePdf, resolveTemplateFile } from '@/lib/certificateGenerator';
 import { supabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabaseAdmin';
+import { unpackCertificateFromSupabase, unpackEventFromSupabase } from '@/lib/supabaseSync';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(
   req: NextRequest,
@@ -20,115 +21,125 @@ export async function GET(
     }
 
     const cleanId = id.trim().toUpperCase();
-    const pdfFileName = `${cleanId}.pdf`;
 
-    // 1. Check local public/certificates
-    const publicPdfPath = path.join(process.cwd(), 'public', 'certificates', pdfFileName);
-    if (fs.existsSync(publicPdfPath) && fs.statSync(publicPdfPath).size > 1000) {
-      const buffer = fs.readFileSync(publicPdfPath);
-      return new NextResponse(buffer, {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/pdf',
-          'Content-Disposition': `inline; filename="${cleanId}.pdf"`,
-          'Cache-Control': 'public, max-age=3600'
-        }
-      });
-    }
-
-    // 2. Check /tmp/certificates
-    const tmpPdfPath = path.join(os.tmpdir(), 'certificates', pdfFileName);
-    if (fs.existsSync(tmpPdfPath) && fs.statSync(tmpPdfPath).size > 1000) {
-      const buffer = fs.readFileSync(tmpPdfPath);
-      return new NextResponse(buffer, {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/pdf',
-          'Content-Disposition': `inline; filename="${cleanId}.pdf"`,
-          'Cache-Control': 'public, max-age=3600'
-        }
-      });
-    }
-
-    // 3. Check Supabase Storage
-    if (isSupabaseAdminConfigured()) {
-      try {
-        const { data: fileData, error: sErr } = await supabaseAdmin.storage
-          .from('certificates')
-          .download(pdfFileName);
-        if (!sErr && fileData) {
-          const buffer = Buffer.from(await fileData.arrayBuffer());
-          return new NextResponse(buffer, {
-            status: 200,
-            headers: {
-              'Content-Type': 'application/pdf',
-              'Content-Disposition': `inline; filename="${cleanId}.pdf"`,
-              'Cache-Control': 'public, max-age=3600'
-            }
-          });
-        }
-      } catch {}
-    }
-
-    // 4. Generate on the fly from db record
+    // 1. Authoritatively fetch certificate record from local cache or Supabase
     const db = loadDb();
-    const cert = (db.certificates || []).find(
+    let cert = (db.certificates || []).find(
       (c: any) => c.certificateId && c.certificateId.toUpperCase() === cleanId
     );
 
-    if (cert) {
-      const event = (db.events || []).find((e: any) => e.id === cert.eventId);
-      const isWinner =
-        cert.certificateType?.toLowerCase().includes('winner') ||
-        cert.certificateType?.toLowerCase().includes('achievement') ||
-        cert.certificateType?.toLowerCase().includes('prize') ||
-        event?.certificateType === 'Achievement';
-
-      const customParagraph = isWinner
-        ? (event?.winnerCertificateParagraph || undefined)
-        : (event?.certificateParagraph || undefined);
-
-      const targetConfig = isWinner
-        ? (event?.winnerTemplateConfig || event?.templateConfig || {})
-        : (event?.templateConfig || {});
-
-      const formattedSubtitle = isWinner
-        ? (event?.winnerCertificateTitle ? `— ${event.winnerCertificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : '— OF ACHIEVEMENT —')
-        : (event?.certificateTitle ? `— ${event.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : undefined);
-
-      const activeGlobalTemplate = (db.certificateTemplates || []).find((t: any) => t.isActive);
-      const templateToUse = event?.certificateTemplateUrl || activeGlobalTemplate?.cleanUrl || undefined;
-      const resolvedTemplatePath = await resolveTemplateFile(templateToUse);
-
-      const generated = await generateSingleCertificatePdf(
-        {
-          certificateId: cleanId,
-          recipientName: cert.participantName,
-          programName: cert.eventName,
-          programDate: cert.eventDate || cert.issueDate || new Date().toISOString().split('T')[0],
-          organizingBody: event?.organizingBody || undefined,
-          role: cert.certificateType,
-          certificateType: isWinner ? 'Achievement' : 'Participation',
-          awardCategory: isWinner ? (cert.awardCategory || event?.awardCategory || 'Winner') : undefined,
-          certificateSubtitle: formattedSubtitle,
-          recipientIntro: isWinner ? 'THIS CERTIFICATE IS AWARDED TO' : undefined,
-          customParagraph,
-          customTemplatePath: resolvedTemplatePath
-        },
-        targetConfig
-      );
-
-      return new NextResponse(Buffer.from(generated.pdfBytes), {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/pdf',
-          'Content-Disposition': `inline; filename="${cleanId}.pdf"`,
-          'Cache-Control': 'public, max-age=3600'
-        }
-      });
+    if (!cert && isSupabaseAdminConfigured()) {
+      const { data: remoteCert } = await supabaseAdmin
+        .from('certificates')
+        .select('*')
+        .eq('certificate_id', cleanId)
+        .single();
+      if (remoteCert) {
+        cert = unpackCertificateFromSupabase(remoteCert);
+      }
     }
 
-    return new NextResponse('Certificate PDF not found', { status: 404 });
+    if (!cert) {
+      return new NextResponse('Certificate not found for the given ID.', { status: 404 });
+    }
+
+    // 2. Authoritatively fetch event record
+    let event = (db.events || []).find((e: any) => e.id === cert.eventId);
+    if (!event && isSupabaseAdminConfigured() && cert.eventId) {
+      const { data: remoteEvent } = await supabaseAdmin
+        .from('events')
+        .select('*')
+        .eq('id', cert.eventId)
+        .single();
+      if (remoteEvent) {
+        event = unpackEventFromSupabase(remoteEvent);
+      }
+    }
+
+    // 3. Documented Template Selection Priority:
+    // Priority 1: Explicitly assigned active template for the event
+    // Priority 2: Configured active global template
+    const allTemplates = getCertificateTemplates();
+    const activeGlobalTemplate = allTemplates.find((t: any) => t.isActive) || allTemplates[0];
+    const templateToUse = event?.certificateTemplateUrl || activeGlobalTemplate?.cleanUrl || activeGlobalTemplate?.pdfUrl || undefined;
+
+    if (!templateToUse) {
+      return new NextResponse(
+        'No valid certificate template is configured for this event. Please contact the administrator.',
+        { status: 400 }
+      );
+    }
+
+    // 4. Resolve template file from storage or local path
+    const resolvedTemplatePath = await resolveTemplateFile(templateToUse);
+    if (!resolvedTemplatePath) {
+      return new NextResponse(
+        `The assigned certificate template (${templateToUse}) could not be retrieved from storage. Please verify the template file in Admin settings.`,
+        { status: 500 }
+      );
+    }
+
+    // 5. Build typography and text settings
+    const isWinner =
+      cert.certificateType?.toLowerCase().includes('winner') ||
+      cert.certificateType?.toLowerCase().includes('achievement') ||
+      cert.certificateType?.toLowerCase().includes('prize') ||
+      event?.certificateType === 'Achievement';
+
+    const customParagraph = isWinner
+      ? (event?.winnerCertificateParagraph || undefined)
+      : (event?.certificateParagraph || undefined);
+
+    const defaultTemplateConfig = activeGlobalTemplate?.templateConfig || undefined;
+    const targetConfig = {
+      ...(defaultTemplateConfig || {}),
+      ...(isWinner
+        ? (event?.winnerTemplateConfig || event?.templateConfig || {})
+        : (event?.templateConfig || {}))
+    };
+
+    const formattedSubtitle = isWinner
+      ? (event?.winnerCertificateTitle ? `— ${event.winnerCertificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : '— OF ACHIEVEMENT —')
+      : (event?.certificateTitle ? `— ${event.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : undefined);
+
+    // 6. Generate fresh PDF using the exact authoritative assigned template
+    const generated = await generateSingleCertificatePdf(
+      {
+        certificateId: cleanId,
+        recipientName: cert.participantName,
+        programName: cert.eventName,
+        programDate: cert.eventDate || cert.issueDate || new Date().toISOString().split('T')[0],
+        organizingBody: event?.organizingBody || undefined,
+        role: cert.certificateType,
+        certificateType: isWinner ? 'Achievement' : 'Participation',
+        awardCategory: isWinner ? (cert.awardCategory || event?.awardCategory || 'Winner') : undefined,
+        certificateSubtitle: formattedSubtitle,
+        recipientIntro: isWinner ? 'THIS CERTIFICATE IS AWARDED TO' : undefined,
+        customParagraph,
+        customTemplatePath: resolvedTemplatePath
+      },
+      targetConfig
+    );
+
+    // 7. Update disk cache with the fresh generated PDF
+    try {
+      const publicCertDir = path.join(process.cwd(), 'public', 'certificates');
+      if (!fs.existsSync(publicCertDir)) {
+        fs.mkdirSync(publicCertDir, { recursive: true });
+      }
+      fs.writeFileSync(path.join(publicCertDir, `${cleanId}.pdf`), Buffer.from(generated.pdfBytes));
+    } catch (e) {
+      console.warn('Failed to cache fresh certificate PDF on disk:', e);
+    }
+
+    return new NextResponse(Buffer.from(generated.pdfBytes), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `inline; filename="${cleanId}.pdf"`,
+        'Cache-Control': 'no-cache, no-store, must-revalidate'
+      }
+    });
   } catch (err: any) {
     return new NextResponse(`Error retrieving certificate: ${err.message}`, { status: 500 });
   }

@@ -146,7 +146,7 @@ export default function HomepageManagementPage() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        addToast('Homepage Content Saved', 'All changes published to database and live on the public site!', 'success');
+        addToast('Homepage Content Saved', 'All changes published live on the public site!', 'success');
       } else {
         addToast('Save Notice', data.error || 'Failed to update homepage', 'error');
       }
@@ -329,7 +329,7 @@ export default function HomepageManagementPage() {
                 onChange={(url) => setFormData({ ...formData, campusPhotoUrl: url || '/campus-main.jpeg' })}
                 folder="homepage"
                 accept="image/jpeg,image/png,image/webp"
-                helperText="Upload official college campus photograph from your computer. Stored securely in Supabase."
+                helperText="Upload official college campus photograph from your computer. Stored securely in Cloud Storage."
               />
               {formData.campusPhotoUrl && (
                 <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
@@ -622,7 +622,7 @@ export default function HomepageManagementPage() {
             className="w-full py-3.5 rounded-2xl bg-white hover:bg-slate-200 text-black font-extrabold text-xs shadow-lg flex items-center justify-center gap-2 cursor-pointer transition-all"
           >
             <CheckCircle2 className="w-4 h-4" />
-            <span>{saving ? 'Saving Changes...' : 'Save & Publish Live to Supabase'}</span>
+            <span>{saving ? 'Saving Changes...' : 'Save & Publish Live'}</span>
           </button>
         </div>
 

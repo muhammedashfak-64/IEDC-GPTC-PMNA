@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSettings, getEventsAsync, getProjects, getPartners, getAnnouncements } from '@/lib/serverStore';
+import { getEventRegistrationStatus } from '@/lib/quotaUtils';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -33,10 +34,20 @@ export async function GET() {
       }
     };
 
+    const principal = {
+      name: rawSettings.principal?.name || 'Abdul Khader',
+      designation: rawSettings.principal?.designation || 'Principal, Government Polytechnic College Perinthalmanna',
+      heading: rawSettings.principal?.heading || "Principal's Message",
+      quote: rawSettings.principal?.quote || "The college is responsible and competent for the development of technical education and has tried to retain its glory by implementing schemes to achieve academic excellence and improving administrative performance.",
+      photoUrl: rawSettings.principal?.photoUrl || '/images/principal.jpeg',
+      enabled: rawSettings.principal?.enabled !== false
+    };
+
     const settings = {
       ...rawSettings,
       heroVisual,
-      footerSocial
+      footerSocial,
+      principal
     };
 
     // All published events intended for public viewing
@@ -44,30 +55,23 @@ export async function GET() {
     const today = new Date();
     const todayStr = today.toISOString().split('T')[0];
 
-    // Compute dynamic registration status for each event according to CMS rules
+    // Compute dynamic registration status for each event according to CMS rules and 11:00 AM IST cutoff
     const enrichedEvents = allPublishedEvents.map((evt: any) => {
       const eventDateStr = evt.date ? String(evt.date).split('T')[0] : '';
       const isPast = eventDateStr ? eventDateStr < todayStr : false;
       const isToday = eventDateStr === todayStr;
 
+      const regStatus = getEventRegistrationStatus(evt, today);
       let registrationStatus: 'Registration Open' | 'Registration Closing Soon' | 'Registration Closed' | 'Ongoing' = 'Registration Open';
 
       if (isToday) {
-        registrationStatus = 'Ongoing';
-      } else if (isPast) {
+        registrationStatus = regStatus.isOpen ? 'Ongoing' : 'Registration Closed';
+      } else if (!regStatus.isOpen || isPast) {
         registrationStatus = 'Registration Closed';
-      } else if (evt.registrationOpen === false || (typeof evt.seatsAvailable === 'number' && evt.seatsAvailable <= 0)) {
-        registrationStatus = 'Registration Closed';
-      } else if (evt.registrationDeadline) {
-        const deadlineDate = new Date(evt.registrationDeadline);
-        const timeDiff = deadlineDate.getTime() - today.getTime();
-        if (timeDiff <= 0) {
-          registrationStatus = 'Registration Closed';
-        } else if (timeDiff <= 48 * 60 * 60 * 1000) {
-          registrationStatus = 'Registration Closing Soon';
-        } else {
-          registrationStatus = 'Registration Open';
-        }
+      } else if (regStatus.deadline && regStatus.deadline.getTime() - today.getTime() <= 48 * 60 * 60 * 1000) {
+        registrationStatus = 'Registration Closing Soon';
+      } else {
+        registrationStatus = 'Registration Open';
       }
 
       return {

@@ -601,7 +601,7 @@ export default function AdminEventsPage() {
                     type="number"
                     required
                     value={formData.totalSeats}
-                    onChange={(e) => setFormData({ ...formData, totalSeats: Number(e.target.value), seatsAvailable: Number(e.target.value) })}
+                    onChange={(e) => setFormData({ ...formData, totalSeats: Number(e.target.value) })}
                     className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
                   />
                 </div>

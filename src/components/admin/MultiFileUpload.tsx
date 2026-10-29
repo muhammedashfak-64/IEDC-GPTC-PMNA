@@ -173,7 +173,7 @@ export default function MultiFileUpload({
         <div className="p-3 rounded-xl bg-black/40 border border-white/10 flex items-center gap-3 text-xs font-mono text-white">
           <RefreshCw className="w-4 h-4 animate-spin text-[#F98A5B]" />
           <span>
-            Uploading file {uploadCount.current} of {uploadCount.total} to Supabase Storage...
+            Uploading file {uploadCount.current} of {uploadCount.total} to Cloud Storage...
           </span>
         </div>
       )}

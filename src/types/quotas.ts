@@ -1,9 +1,8 @@
 export const COLLEGE_DEPARTMENTS = [
-  'Computer Engineering',
-  'Electronics Engineering',
   'Civil Engineering',
   'Mechanical Engineering',
-  'Electrical and Electronics Engineering'
+  'Electrical and Electronics Engineering',
+  'Electronics Engineering'
 ] as const;
 
 export const COLLEGE_ACADEMIC_YEARS = [

@@ -9,6 +9,7 @@ import { Footer } from '@/components/Footer';
 import { AIChatbot } from '@/components/AIChatbot';
 import { IntroAnimation } from '@/components/IntroAnimation';
 import { ParticleBackground } from '@/components/ParticleBackground';
+import { Analytics } from '@vercel/analytics/next';
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -84,6 +85,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
           )}
         </AppProvider>
+        <Analytics />
       </body>
     </html>
   );
