@@ -21,10 +21,15 @@ import {
   syncGalleryToSupabase,
   deleteGalleryFromSupabase,
   syncResourceToSupabase,
+  deleteResourceFromSupabase,
   syncBlogToSupabase,
+  deleteBlogFromSupabase,
+  syncBrochureToSupabase,
+  deleteBrochureFromSupabase,
   syncAnnouncementToSupabase,
   deleteAnnouncementFromSupabase,
   syncStartupToSupabase,
+  deleteStartupFromSupabase,
   syncSettingsToSupabase,
   syncAuditLogToSupabase,
   syncRegistrationToSupabase,
@@ -686,7 +691,9 @@ export async function registerStudentForEvent(data: {
   email: string;
   phone: string;
   department?: string;
+  branch?: string;
   academicYear?: string;
+  semester?: string | null;
   collegeName?: string;
   participationCategory?: 'Internal' | 'External';
   district?: string;
@@ -712,11 +719,13 @@ export async function registerStudentForEvent(data: {
 async function doRegisterStudentForEventAsync(data: {
   eventId: string;
   studentName: string;
-  registerNumber: string;
+  registerNumber?: string;
   email: string;
   phone: string;
   department?: string;
+  branch?: string;
   academicYear?: string;
+  semester?: string | null;
   collegeName?: string;
   participationCategory?: 'Internal' | 'External';
   district?: string;
@@ -881,6 +890,34 @@ async function doRegisterStudentForEventAsync(data: {
       throw new Error('External college registration is currently disabled for this program.');
     }
 
+    // External student mandatory validation
+    if (!data.collegeName?.trim()) {
+      throw new Error('Please enter your Institution / College Name.');
+    }
+    const extBranch = data.branch?.trim() || data.department?.trim();
+    if (!extBranch) {
+      throw new Error('Please enter your Branch / Department name.');
+    }
+    if (!data.academicYear?.trim()) {
+      throw new Error('Please select your Academic Year of study.');
+    }
+
+    // Dynamic semester validation against selected year
+    if (data.semester?.trim()) {
+      const allowedSemesters: Record<string, string[]> = {
+        'First Year': ['Semester 1', 'Semester 2'],
+        'Second Year': ['Semester 3', 'Semester 4'],
+        'Third Year': ['Semester 5', 'Semester 6'],
+        'Fourth Year': ['Semester 7', 'Semester 8']
+      };
+      const allowed = allowedSemesters[data.academicYear.trim()];
+      if (allowed && !allowed.includes(data.semester.trim())) {
+        throw new Error(
+          `Selected semester "${data.semester}" is not valid for ${data.academicYear}. Allowed semesters: ${allowed.join(', ')}.`
+        );
+      }
+    }
+
     if (quotaConfig.externalClosingDate) {
       const extClose = new Date(quotaConfig.externalClosingDate);
       if (!isNaN(extClose.getTime()) && now > extClose) {
@@ -928,9 +965,19 @@ async function doRegisterStudentForEventAsync(data: {
     registerNumber: cleanRegNo,
     email: cleanEmail,
     phone: data.phone.trim(),
-    department: data.department ? normalizeDepartment(data.department) : 'General',
-    academicYear: data.academicYear ? normalizeAcademicYear(data.academicYear) : 'First Year',
-    collegeName: data.collegeName?.trim() || 'Govt Polytechnic College Perinthalmanna',
+    department: participationCategory === 'Internal'
+      ? (data.department ? normalizeDepartment(data.department) : 'General')
+      : (data.branch?.trim() || data.department?.trim() || 'General'),
+    branch: participationCategory === 'Internal'
+      ? (data.department ? normalizeDepartment(data.department) : 'General')
+      : (data.branch?.trim() || data.department?.trim() || 'General'),
+    academicYear: participationCategory === 'Internal'
+      ? (data.academicYear ? normalizeAcademicYear(data.academicYear) : 'First Year')
+      : (data.academicYear?.trim() || 'First Year'),
+    semester: data.semester?.trim() || null,
+    collegeName: participationCategory === 'Internal'
+      ? 'Govt Polytechnic College Perinthalmanna'
+      : (data.collegeName?.trim() || 'Other College'),
     participationCategory,
     district: data.district?.trim() || '',
     course: data.course?.trim() || '',
@@ -1613,6 +1660,77 @@ export async function ensureCertificatePdfExists(cert: any, force = false): Prom
   } catch (err: any) {
     console.error(`ensureCertificatePdfExists failed for ${cert?.certificateId}:`, err.message);
     return `/certificates/${cert.certificateId}.pdf`;
+  }
+}
+
+export async function ensureCertificatePngExists(cert: any, force = false): Promise<string> {
+  try {
+    const certId = cert.certificateId;
+    if (!certId) return '';
+    const pngFileName = `${certId}.png`;
+    const localOutputDir = path.join(process.cwd(), 'public', 'certificates');
+    const localFilePath = path.join(localOutputDir, pngFileName);
+
+    const tmpFilePath = path.join(os.tmpdir(), 'certificates', pngFileName);
+    if (
+      !force &&
+      ((fs.existsSync(localFilePath) && fs.statSync(localFilePath).size > 5000) ||
+      (fs.existsSync(tmpFilePath) && fs.statSync(tmpFilePath).size > 5000))
+    ) {
+      return `/api/public/certificates/${certId}/png`;
+    }
+
+    const db = loadDb();
+    const event = (db.events || []).find((e: any) => e.id === cert.eventId);
+
+    const isWinner =
+      cert.certificateType?.toLowerCase().includes('winner') ||
+      cert.certificateType?.toLowerCase().includes('achievement') ||
+      cert.certificateType?.toLowerCase().includes('prize') ||
+      event?.certificateType === 'Achievement';
+
+    const customParagraph = isWinner
+      ? (event?.winnerCertificateParagraph || undefined)
+      : (event?.certificateParagraph || undefined);
+
+    const targetConfig = isWinner
+      ? (event?.winnerTemplateConfig || event?.templateConfig || {})
+      : (event?.templateConfig || {});
+
+    const formattedSubtitle = isWinner
+      ? (event?.winnerCertificateTitle ? `— ${event.winnerCertificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : '— OF ACHIEVEMENT —')
+      : (event?.certificateTitle ? `— ${event.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : undefined);
+
+    const allTemplates = getCertificateTemplates();
+    const activeGlobalTemplate = allTemplates.find((t: any) => t.isActive) || allTemplates[0];
+    const templateToUse = event?.certificateTemplateUrl || activeGlobalTemplate?.cleanUrl || undefined;
+    const resolvedTemplatePath = await resolveTemplateFile(templateToUse);
+    const defaultTemplateConfig = activeGlobalTemplate?.templateConfig || undefined;
+
+    const finalConfig = {
+      ...(defaultTemplateConfig || {}),
+      ...(targetConfig || {})
+    };
+
+    const result = await generateSingleCertificatePng({
+      certificateId: certId,
+      recipientName: cert.participantName,
+      programName: cert.eventName,
+      programDate: cert.eventDate || cert.issueDate || new Date().toISOString().split('T')[0],
+      organizingBody: event?.organizingBody || undefined,
+      role: cert.certificateType,
+      certificateType: isWinner ? 'Achievement' : 'Participation',
+      awardCategory: isWinner ? (cert.awardCategory || event?.awardCategory || 'Winner') : undefined,
+      certificateSubtitle: formattedSubtitle,
+      recipientIntro: isWinner ? 'THIS CERTIFICATE IS AWARDED TO' : undefined,
+      customParagraph,
+      customTemplatePath: resolvedTemplatePath
+    }, finalConfig);
+
+    return result.publicUrl || `/certificates/${pngFileName}`;
+  } catch (err: any) {
+    console.error(`ensureCertificatePngExists failed for ${cert?.certificateId}:`, err.message);
+    return `/certificates/${cert.certificateId}.png`;
   }
 }
 
@@ -2344,8 +2462,12 @@ export async function generateProgramCertificatesZip(
   for (const c of certs) {
     const fileName = `${c.certificateId}.${ext}`;
     const localPath = path.join(process.cwd(), 'public', 'certificates', fileName);
-    if (!fs.existsSync(localPath)) {
-      await ensureCertificatePdfExists(c);
+    if (!fs.existsSync(localPath) || fs.statSync(localPath).size < 1000) {
+      if (format === 'png') {
+        await ensureCertificatePngExists(c, true);
+      } else {
+        await ensureCertificatePdfExists(c, true);
+      }
     }
     if (fs.existsSync(localPath)) {
       const fileData = fs.readFileSync(localPath);
@@ -3353,8 +3475,32 @@ export function createBrochure(data: any, user: AuthUser) {
   };
   db.brochures.unshift(newBro);
   saveDb(db);
+  syncBrochureToSupabase(newBro, false).catch(() => {});
   addAuditLog('BROCHURE_UPLOAD', user, `Uploaded brochure: ${newBro.title}`);
   return newBro;
+}
+
+export function updateBrochure(id: string, updates: any, user: AuthUser) {
+  const db = loadDb();
+  if (!db.brochures) db.brochures = [];
+  const idx = db.brochures.findIndex((b: any) => b.id === id);
+  if (idx === -1) return null;
+  db.brochures[idx] = { ...db.brochures[idx], ...updates, updatedAt: new Date().toISOString() };
+  saveDb(db);
+  syncBrochureToSupabase(db.brochures[idx], true).catch(() => {});
+  addAuditLog('BROCHURE_UPDATE', user, `Updated brochure: ${db.brochures[idx].title}`);
+  return db.brochures[idx];
+}
+
+export function deleteBrochure(id: string, user: AuthUser) {
+  const db = loadDb();
+  if (!db.brochures) db.brochures = [];
+  const item = db.brochures.find((b: any) => b.id === id);
+  db.brochures = db.brochures.filter((b: any) => b.id !== id);
+  saveDb(db);
+  deleteBrochureFromSupabase(id).catch(() => {});
+  if (item) addAuditLog('BROCHURE_DELETE', user, `Deleted brochure: ${item.title}`);
+  return true;
 }
 
 export async function syncTemplatesToSupabase(templates: any[]) {
@@ -3575,6 +3721,29 @@ export function createStartup(data: any, user: AuthUser) {
   return newStartup;
 }
 
+export function updateStartup(id: string, updates: any, user: AuthUser) {
+  const db = loadDb();
+  if (!db.startups) db.startups = [];
+  const idx = db.startups.findIndex((s: any) => s.id === id);
+  if (idx === -1) return null;
+  db.startups[idx] = { ...db.startups[idx], ...updates, updatedAt: new Date().toISOString() };
+  saveDb(db);
+  syncStartupToSupabase(db.startups[idx], true).catch(() => {});
+  addAuditLog('STARTUP_UPDATE', user, `Updated startup: ${db.startups[idx].name}`);
+  return db.startups[idx];
+}
+
+export function deleteStartup(id: string, user: AuthUser) {
+  const db = loadDb();
+  if (!db.startups) db.startups = [];
+  const item = db.startups.find((s: any) => s.id === id);
+  db.startups = db.startups.filter((s: any) => s.id !== id);
+  saveDb(db);
+  deleteStartupFromSupabase(id).catch(() => {});
+  if (item) addAuditLog('STARTUP_DELETE', user, `Deleted startup: ${item.name}`);
+  return true;
+}
+
 export function getResources() {
   const db = loadDb();
   return db.resources || [];
@@ -3621,6 +3790,7 @@ export function deleteResource(id: string, user: AuthUser) {
   const item = db.resources.find((r: any) => r.id === id);
   db.resources = db.resources.filter((r: any) => r.id !== id);
   saveDb(db);
+  deleteResourceFromSupabase(id).catch(() => {});
   if (item) addAuditLog('RESOURCE_DELETE', user, `Deleted resource: ${item.title}`);
   return true;
 }
@@ -3652,6 +3822,29 @@ export function createBlog(data: any, user: AuthUser) {
   syncBlogToSupabase(newBlog, false).catch(() => {});
   addAuditLog('BLOG_CREATE', user, `Created blog post: ${newBlog.title}`);
   return newBlog;
+}
+
+export function updateBlog(id: string, updates: any, user: AuthUser) {
+  const db = loadDb();
+  if (!db.blogs) db.blogs = [];
+  const idx = db.blogs.findIndex((b: any) => b.id === id);
+  if (idx === -1) return null;
+  db.blogs[idx] = { ...db.blogs[idx], ...updates, updatedAt: new Date().toISOString() };
+  saveDb(db);
+  syncBlogToSupabase(db.blogs[idx], true).catch(() => {});
+  addAuditLog('BLOG_UPDATE', user, `Updated blog post: ${db.blogs[idx].title}`);
+  return db.blogs[idx];
+}
+
+export function deleteBlog(id: string, user: AuthUser) {
+  const db = loadDb();
+  if (!db.blogs) db.blogs = [];
+  const item = db.blogs.find((b: any) => b.id === id);
+  db.blogs = db.blogs.filter((b: any) => b.id !== id);
+  saveDb(db);
+  deleteBlogFromSupabase(id).catch(() => {});
+  if (item) addAuditLog('BLOG_DELETE', user, `Deleted blog post: ${item.title}`);
+  return true;
 }
 
 export function getAnnouncements() {

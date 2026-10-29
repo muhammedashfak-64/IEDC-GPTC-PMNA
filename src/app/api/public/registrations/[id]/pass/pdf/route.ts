@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadDb } from '@/lib/serverStore';
 import { generatePassPdf, ensurePassFiles } from '@/lib/passGenerator';
+import { supabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabaseAdmin';
+import { unpackRegistrationFromSupabase, unpackEventFromSupabase } from '@/lib/supabaseSync';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function GET(
   req: NextRequest,
@@ -12,8 +17,31 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'Registration ID required' }, { status: 400 });
     }
 
+    const cleanId = id.trim();
     const db = loadDb();
-    const reg = (db.registrations || []).find((r: any) => r.id === id || r.registrationCode === id);
+    let reg = (db.registrations || []).find(
+      (r: any) =>
+        r.id === cleanId ||
+        r.registrationCode === cleanId ||
+        (r.registrationCode && r.registrationCode.toUpperCase() === cleanId.toUpperCase())
+    );
+
+    // Fallback to authoritative Supabase database
+    if (!reg && isSupabaseAdminConfigured()) {
+      try {
+        const { data: remoteReg } = await supabaseAdmin
+          .from('registrations')
+          .select('*')
+          .or(`id.eq.${cleanId},registration_code.eq.${cleanId},registration_code.eq.${cleanId.toUpperCase()}`)
+          .single();
+        if (remoteReg) {
+          reg = unpackRegistrationFromSupabase(remoteReg);
+        }
+      } catch (dbErr) {
+        console.warn('Supabase pass PDF registration lookup notice:', dbErr);
+      }
+    }
+
     if (!reg) {
       return NextResponse.json({ success: false, error: 'Registration record not found' }, { status: 404 });
     }
@@ -22,21 +50,39 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'This registration has been cancelled or invalidated' }, { status: 403 });
     }
 
-    const event = (db.events || []).find((e: any) => e.id === reg.eventId) || {
-      id: reg.eventId,
-      title: reg.eventTitle || 'Campus Event',
-      date: reg.registeredAt?.split('T')[0] || ''
-    };
+    let event = (db.events || []).find((e: any) => e.id === reg.eventId);
+    if (!event && isSupabaseAdminConfigured() && reg.eventId) {
+      try {
+        const { data: remoteEvt } = await supabaseAdmin
+          .from('events')
+          .select('*')
+          .eq('id', reg.eventId)
+          .single();
+        if (remoteEvt) {
+          event = unpackEventFromSupabase(remoteEvt);
+        }
+      } catch {}
+    }
+
+    if (!event) {
+      event = {
+        id: reg.eventId,
+        title: reg.eventTitle || 'Campus Event',
+        date: reg.registeredAt?.split('T')[0] || ''
+      };
+    }
 
     const pdfBuffer = await generatePassPdf(reg, event);
     ensurePassFiles(reg, event).catch(console.error);
 
     const safeName = (reg.studentName || 'Student').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safeCode = (reg.registrationCode || reg.id).replace(/[^a-zA-Z0-9_-]/g, '_');
+
     return new NextResponse(pdfBuffer as any, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `inline; filename="IEDC_Entry_Pass_${safeName}.pdf"`,
+        'Content-Disposition': `attachment; filename="IEDC_Pass_${safeName}_${safeCode}.pdf"`,
         'Cache-Control': 'public, max-age=3600'
       }
     });

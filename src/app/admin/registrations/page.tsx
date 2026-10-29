@@ -30,6 +30,7 @@ import {
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { isExternalParticipant, isInternalParticipant } from '@/lib/quotaUtils';
 
 export default function AdminRegistrationsPage() {
   const { addToast } = useAdmin();
@@ -40,7 +41,10 @@ export default function AdminRegistrationsPage() {
   // Filters & Search
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedEventId, setSelectedEventId] = useState('All');
+  const [selectedGroup, setSelectedGroup] = useState<'All' | 'Internal' | 'External'>('All');
   const [selectedDepartment, setSelectedDepartment] = useState('All');
+  const [selectedYear, setSelectedYear] = useState('All');
+  const [selectedSemester, setSelectedSemester] = useState('All');
   const [selectedStatus, setSelectedStatus] = useState('All');
   const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'name'>('newest');
 
@@ -100,6 +104,13 @@ export default function AdminRegistrationsPage() {
         const matchesEvent = selectedEventId === 'All' || r.eventId === selectedEventId;
         const matchesDept = selectedDepartment === 'All' || r.department === selectedDepartment;
         const matchesStatus = selectedStatus === 'All' || r.status === selectedStatus;
+        const isExt = isExternalParticipant(r);
+        const matchesGroup =
+          selectedGroup === 'All' ||
+          (selectedGroup === 'Internal' && !isExt) ||
+          (selectedGroup === 'External' && isExt);
+        const matchesYear = selectedYear === 'All' || r.academicYear === selectedYear;
+        const matchesSemester = selectedSemester === 'All' || r.semester === selectedSemester;
         const cleanSearch = searchTerm.toLowerCase().trim();
         const matchesSearch =
           !cleanSearch ||
@@ -107,9 +118,11 @@ export default function AdminRegistrationsPage() {
           r.registerNumber?.toLowerCase().includes(cleanSearch) ||
           r.registrationCode?.toLowerCase().includes(cleanSearch) ||
           r.email?.toLowerCase().includes(cleanSearch) ||
-          r.phone?.includes(cleanSearch);
+          r.phone?.includes(cleanSearch) ||
+          r.collegeName?.toLowerCase().includes(cleanSearch) ||
+          r.branch?.toLowerCase().includes(cleanSearch);
 
-        return matchesEvent && matchesDept && matchesStatus && matchesSearch;
+        return matchesEvent && matchesDept && matchesStatus && matchesGroup && matchesYear && matchesSemester && matchesSearch;
       })
       .sort((a, b) => {
         if (sortBy === 'newest') {
@@ -120,15 +133,17 @@ export default function AdminRegistrationsPage() {
         }
         return (a.studentName || '').localeCompare(b.studentName || '');
       });
-  }, [registrations, selectedEventId, selectedDepartment, selectedStatus, searchTerm, sortBy]);
+  }, [registrations, selectedEventId, selectedDepartment, selectedStatus, selectedGroup, selectedYear, selectedSemester, searchTerm, sortBy]);
 
   // Statistics
   const stats = useMemo(() => {
     const total = registrations.length;
+    const internalCount = registrations.filter((r) => isInternalParticipant(r)).length;
+    const externalCount = registrations.filter((r) => isExternalParticipant(r)).length;
     const confirmed = registrations.filter((r) => r.status === 'Confirmed').length;
     const attended = registrations.filter((r) => r.status === 'Attended').length;
     const cancelled = registrations.filter((r) => r.status === 'Cancelled').length;
-    return { total, confirmed, attended, cancelled };
+    return { total, internalCount, externalCount, confirmed, attended, cancelled };
   }, [registrations]);
 
   // Paginated View
@@ -210,20 +225,28 @@ export default function AdminRegistrationsPage() {
         ? events.find((e) => e.id === selectedEventId)?.title || 'Selected_Event'
         : 'All_Events';
 
-    const cleanRows = recordsToExport.map((r, index) => ({
-      'Sl No': index + 1,
-      'Registration ID': r.registrationCode || r.id,
-      'Full Name': r.studentName,
-      'Admission Number': r.registerNumber || 'N/A',
-      'Department': r.department,
-      'Academic Year': r.academicYear || '2nd Year',
-      'Email Address': r.email,
-      'Mobile Number': r.phone || 'N/A',
-      'Program / Event': r.eventTitle || 'Campus Event',
-      'Registration Date': r.registeredAt ? new Date(r.registeredAt).toLocaleString('en-IN') : 'N/A',
-      'Attendance Status': r.attendance || (r.status === 'Attended' ? 'Present' : 'Not Marked'),
-      'Status': r.status || 'Confirmed'
-    }));
+    const cleanRows = recordsToExport.map((r, index) => {
+      const isOurCollege =
+        r.registrationGroup === 'our_college' ||
+        (!r.registrationGroup && (!r.collegeName || r.collegeName.toLowerCase().includes('perinthalmanna')));
+      return {
+        'Sl No': index + 1,
+        'Registration ID': r.registrationCode || r.id,
+        'Full Name': r.studentName,
+        'Registration Group': isOurCollege ? 'GPTC PMNA' : 'Other College',
+        'College / Institution': r.collegeName || (isOurCollege ? 'GPTC Perinthalmanna' : 'Other College'),
+        'Admission / Reg No': r.registerNumber || 'N/A',
+        'Branch / Department': r.branch || r.department || 'N/A',
+        'Academic Year': r.academicYear || 'N/A',
+        'Semester': r.semester || 'N/A',
+        'Email Address': r.email,
+        'Mobile Number': r.phone || 'N/A',
+        'Program / Event': r.eventTitle || 'Campus Event',
+        'Registration Date': r.registeredAt ? new Date(r.registeredAt).toLocaleString('en-IN') : 'N/A',
+        'Attendance Status': r.attendance || (r.status === 'Attended' ? 'Present' : 'Not Marked'),
+        'Status': r.status || 'Confirmed'
+      };
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(cleanRows);
 
@@ -232,9 +255,12 @@ export default function AdminRegistrationsPage() {
       { wch: 8 },  // Sl No
       { wch: 20 }, // Reg ID
       { wch: 24 }, // Name
-      { wch: 18 }, // Admission No
-      { wch: 25 }, // Dept
+      { wch: 16 }, // Group
+      { wch: 32 }, // College
+      { wch: 18 }, // Reg No
+      { wch: 25 }, // Dept / Branch
       { wch: 15 }, // Year
+      { wch: 12 }, // Semester
       { wch: 28 }, // Email
       { wch: 16 }, // Phone
       { wch: 28 }, // Event
@@ -272,20 +298,28 @@ export default function AdminRegistrationsPage() {
       return;
     }
 
-    const cleanRows = recordsToExport.map((r, index) => ({
-      'Sl No': index + 1,
-      'Registration ID': r.registrationCode || r.id,
-      'Full Name': r.studentName,
-      'Admission Number': r.registerNumber || 'N/A',
-      'Department': r.department,
-      'Academic Year': r.academicYear || '2nd Year',
-      'Email Address': r.email,
-      'Mobile Number': r.phone || 'N/A',
-      'Program / Event': r.eventTitle || 'Campus Event',
-      'Registration Date': r.registeredAt ? new Date(r.registeredAt).toLocaleString('en-IN') : 'N/A',
-      'Attendance Status': r.attendance || (r.status === 'Attended' ? 'Present' : 'Not Marked'),
-      'Status': r.status || 'Confirmed'
-    }));
+    const cleanRows = recordsToExport.map((r, index) => {
+      const isOurCollege =
+        r.registrationGroup === 'our_college' ||
+        (!r.registrationGroup && (!r.collegeName || r.collegeName.toLowerCase().includes('perinthalmanna')));
+      return {
+        'Sl No': index + 1,
+        'Registration ID': r.registrationCode || r.id,
+        'Full Name': r.studentName,
+        'Registration Group': isOurCollege ? 'GPTC PMNA' : 'Other College',
+        'College / Institution': r.collegeName || (isOurCollege ? 'GPTC Perinthalmanna' : 'Other College'),
+        'Admission / Reg No': r.registerNumber || 'N/A',
+        'Branch / Department': r.branch || r.department || 'N/A',
+        'Academic Year': r.academicYear || 'N/A',
+        'Semester': r.semester || 'N/A',
+        'Email Address': r.email,
+        'Mobile Number': r.phone || 'N/A',
+        'Program / Event': r.eventTitle || 'Campus Event',
+        'Registration Date': r.registeredAt ? new Date(r.registeredAt).toLocaleString('en-IN') : 'N/A',
+        'Attendance Status': r.attendance || (r.status === 'Attended' ? 'Present' : 'Not Marked'),
+        'Status': r.status || 'Confirmed'
+      };
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(cleanRows);
     const csvContent = XLSX.utils.sheet_to_csv(worksheet);
@@ -341,7 +375,7 @@ export default function AdminRegistrationsPage() {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     doc.setTextColor(80, 80, 80);
-    doc.text('Student Event Registrations & Participant Master Report', 14, 21);
+    doc.text('Statewide Student Event Registrations & Participant Master Report', 14, 21);
 
     // Meta details line
     doc.setFontSize(8.5);
@@ -363,25 +397,35 @@ export default function AdminRegistrationsPage() {
       'Sl',
       'Reg ID',
       'Participant Name',
-      'Register No',
-      'Department',
-      'Event Name',
+      'Group',
+      'College / Institution',
+      'Branch / Dept',
+      'Year/Sem',
       'Mobile No',
-      'Status',
-      'Date'
+      'Status'
     ];
 
-    const tableRows = recordsToExport.map((r, i) => [
-      i + 1,
-      r.registrationCode || r.id,
-      r.studentName,
-      r.registerNumber,
-      r.department,
-      r.eventTitle || 'Campus Event',
-      r.phone || 'N/A',
-      r.status,
-      r.registeredAt ? new Date(r.registeredAt).toLocaleDateString('en-IN') : 'N/A'
-    ]);
+    const tableRows = recordsToExport.map((r, i) => {
+      const isOurCollege =
+        r.registrationGroup === 'our_college' ||
+        (!r.registrationGroup && (!r.collegeName || r.collegeName.toLowerCase().includes('perinthalmanna')));
+      const groupLabel = isOurCollege ? 'GPTC PMNA' : 'Other College';
+      const collegeDisplay = isOurCollege ? 'GPTC Perinthalmanna' : (r.collegeName || 'Other College');
+      const branchDisplay = r.branch || r.department || 'N/A';
+      const yearSem = `${r.academicYear || ''} ${r.semester ? `(${r.semester})` : ''}`.trim() || 'N/A';
+
+      return [
+        i + 1,
+        r.registrationCode || r.id,
+        r.studentName,
+        groupLabel,
+        collegeDisplay,
+        branchDisplay,
+        yearSem,
+        r.phone || 'N/A',
+        r.status
+      ];
+    });
 
     autoTable(doc, {
       head: [tableColumns],
@@ -397,20 +441,20 @@ export default function AdminRegistrationsPage() {
       },
       styles: {
         fontSize: 7.5,
-        cellPadding: 2.5,
+        cellPadding: 2.2,
         textColor: [30, 30, 30],
         overflow: 'linebreak'
       },
       columnStyles: {
-        0: { cellWidth: 10 },
-        1: { cellWidth: 26, fontStyle: 'bold' },
-        2: { cellWidth: 42, fontStyle: 'bold' },
+        0: { cellWidth: 8 },
+        1: { cellWidth: 24, fontStyle: 'bold' },
+        2: { cellWidth: 38, fontStyle: 'bold' },
         3: { cellWidth: 24 },
-        4: { cellWidth: 40 },
-        5: { cellWidth: 48 },
-        6: { cellWidth: 26 },
-        7: { cellWidth: 22 },
-        8: { cellWidth: 25 }
+        4: { cellWidth: 46 },
+        5: { cellWidth: 38 },
+        6: { cellWidth: 22 },
+        7: { cellWidth: 24 },
+        8: { cellWidth: 20 }
       },
       didDrawPage: (data) => {
         // Footer: Page Number
@@ -693,16 +737,32 @@ export default function AdminRegistrationsPage() {
 
                     {/* Student Name & Reg No */}
                     <td className="py-4 px-4">
-                      <div className="font-bold text-white text-sm">{reg.studentName}</div>
-                      <div className="text-[11px] font-mono text-slate-400">
-                        {reg.registerNumber} • {reg.academicYear || '2nd Year'}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-white text-sm">{reg.studentName}</span>
+                        {reg.registrationGroup === 'other_college' || (reg.collegeName && !reg.collegeName.toLowerCase().includes('perinthalmanna')) ? (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-500/15 border border-purple-500/30 text-purple-300">
+                            Other College
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-[#F98A5B]/15 border border-[#F98A5B]/30 text-[#F98A5B]">
+                            GPTC PMNA
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] font-mono text-slate-400 mt-0.5">
+                        {reg.registerNumber || 'No Reg No'} • {reg.academicYear || '2nd Year'} {reg.semester ? `(${reg.semester})` : ''}
                       </div>
                     </td>
 
                     {/* Event & Department */}
                     <td className="py-4 px-4 max-w-xs">
                       <div className="font-semibold text-white truncate">{reg.eventTitle || 'Campus Event'}</div>
-                      <div className="text-[11px] text-slate-400 truncate">{reg.department}</div>
+                      <div className="text-[11px] text-slate-400 truncate">
+                        {reg.branch || reg.department || 'N/A'}
+                        {reg.collegeName && !reg.collegeName.toLowerCase().includes('perinthalmanna') && (
+                          <span className="text-slate-500 block truncate text-[10px]">{reg.collegeName}</span>
+                        )}
+                      </div>
                     </td>
 
                     {/* Contact Info & WhatsApp */}
@@ -853,28 +913,40 @@ export default function AdminRegistrationsPage() {
 
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div>
+                  <span className="text-slate-500 block text-[10px] font-mono">REGISTRATION GROUP</span>
+                  <span className="font-bold text-[#F98A5B]">
+                    {selectedRegistration.registrationGroup === 'other_college' || (selectedRegistration.collegeName && !selectedRegistration.collegeName.toLowerCase().includes('perinthalmanna'))
+                      ? 'Other College'
+                      : 'GPTC PMNA'}
+                  </span>
+                </div>
+                <div>
                   <span className="text-slate-500 block text-[10px] font-mono">ADMISSION / REG NO</span>
-                  <span className="font-bold text-white">{selectedRegistration.registerNumber}</span>
+                  <span className="font-bold text-white">{selectedRegistration.registerNumber || 'N/A'}</span>
                 </div>
                 <div>
-                  <span className="text-slate-500 block text-[10px] font-mono">DEPARTMENT</span>
-                  <span className="text-white">{selectedRegistration.department}</span>
+                  <span className="text-slate-500 block text-[10px] font-mono">BRANCH / DEPARTMENT</span>
+                  <span className="text-white">{selectedRegistration.branch || selectedRegistration.department || 'N/A'}</span>
                 </div>
                 <div>
-                  <span className="text-slate-500 block text-[10px] font-mono">ACADEMIC YEAR</span>
-                  <span className="text-white">{selectedRegistration.academicYear || '2nd Year'}</span>
+                  <span className="text-slate-500 block text-[10px] font-mono">ACADEMIC YEAR &amp; SEM</span>
+                  <span className="text-white">
+                    {selectedRegistration.academicYear || 'N/A'} {selectedRegistration.semester ? `(${selectedRegistration.semester})` : ''}
+                  </span>
                 </div>
-                <div>
-                  <span className="text-slate-500 block text-[10px] font-mono">COLLEGE</span>
-                  <span className="text-white truncate block">{selectedRegistration.collegeName}</span>
+                <div className="col-span-2">
+                  <span className="text-slate-500 block text-[10px] font-mono">COLLEGE / INSTITUTION</span>
+                  <span className="text-white truncate block">
+                    {selectedRegistration.collegeName || 'Government Polytechnic College Perinthalmanna'}
+                  </span>
                 </div>
                 <div>
                   <span className="text-slate-500 block text-[10px] font-mono">EMAIL</span>
-                  <span className="text-white">{selectedRegistration.email}</span>
+                  <span className="text-white truncate block">{selectedRegistration.email}</span>
                 </div>
                 <div>
                   <span className="text-slate-500 block text-[10px] font-mono">MOBILE / WHATSAPP</span>
-                  <span className="text-white font-mono">{selectedRegistration.phone}</span>
+                  <span className="text-white font-mono">{selectedRegistration.phone || 'N/A'}</span>
                 </div>
               </div>
 

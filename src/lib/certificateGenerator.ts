@@ -684,16 +684,13 @@ export async function generateSingleCertificatePng(
 
   // If the template path points to a PDF, automatically substitute the companion high-res raster master image
   if (resolvedTemplatePath.toLowerCase().endsWith('.pdf')) {
-    const companionJpg = path.join(path.dirname(resolvedTemplatePath), 'extracted_clean_master.jpg');
-    const companionUploads = path.join(process.cwd(), 'public', 'uploads', 'certificate-templates', 'IEDC_PARTICIPATE_CERTICICATE_1792467393382.png');
-    const companionDefault = path.join(process.cwd(), 'public', 'uploads', 'certificate-templates', 'IEDC_CERTIFICATE_TEMPLATE_1792565763716.jpg');
+    const companionMasterJpg = path.join(process.cwd(), 'public', 'uploads', 'certificate-templates', 'IEDC_CERTIFICATE_TEMPLATE_1792565763716.jpg');
+    const companionUploadsPng = path.join(process.cwd(), 'public', 'uploads', 'certificate-templates', 'IEDC_PARTICIPATE_CERTICICATE_1792467393382.png');
 
-    if (fs.existsSync(companionJpg)) {
-      resolvedTemplatePath = companionJpg;
-    } else if (fs.existsSync(companionUploads)) {
-      resolvedTemplatePath = companionUploads;
-    } else if (fs.existsSync(companionDefault)) {
-      resolvedTemplatePath = companionDefault;
+    if (fs.existsSync(companionMasterJpg)) {
+      resolvedTemplatePath = companionMasterJpg;
+    } else if (fs.existsSync(companionUploadsPng)) {
+      resolvedTemplatePath = companionUploadsPng;
     }
   }
 
@@ -708,6 +705,14 @@ export async function generateSingleCertificatePng(
   const nameRgb = normalizeColorToRgb(config.nameColor, [139 / 255, 0, 0]);
   const nameHex =
     '#' + nameRgb.map((c) => Math.round(c * 255).toString(16).padStart(2, '0')).join('');
+  const nameX =
+    config.nameX !== undefined && config.nameX !== null && !isNaN(Number(config.nameX)) && Number(config.nameX) !== 0
+      ? Number(config.nameX) * scale
+      : imgWidth / 2;
+  const nameAnchor =
+    config.nameX !== undefined && config.nameX !== null && !isNaN(Number(config.nameX)) && Number(config.nameX) !== 0
+      ? 'start'
+      : 'middle';
 
   const paraY = (595.5 - normalizeNumber(config.paraY, DEFAULT_CERT_CONFIG.paraY)) * scale;
   const paraFontSize = normalizeNumber(config.paraFontSize, DEFAULT_CERT_CONFIG.paraFontSize, 8, 30) * scale;
@@ -715,6 +720,12 @@ export async function generateSingleCertificatePng(
   const paraRgb = normalizeColorToRgb(config.paraColor, [31 / 255, 41 / 255, 55 / 255]);
   const paraHex =
     '#' + paraRgb.map((c) => Math.round(c * 255).toString(16).padStart(2, '0')).join('');
+  const paraAlign = config.paraAlign || 'center';
+  const paraX =
+    config.paraX !== undefined && config.paraX !== null && !isNaN(Number(config.paraX)) && Number(config.paraX) !== 0
+      ? Number(config.paraX) * scale
+      : imgWidth / 2;
+  const paraAnchor = paraAlign === 'left' ? 'start' : paraAlign === 'right' ? 'end' : 'middle';
 
   const isTypeB =
     params.certificateType?.toLowerCase().includes('achievement') ||
@@ -761,18 +772,35 @@ export async function generateSingleCertificatePng(
   const svgLines = paraLines
     .map((line, idx) => {
       const lineY = paraY + idx * paraLineSpacing;
-      return `<text x="${imgWidth / 2}" y="${lineY}" class="para">${escapeXml(line)}</text>`;
+      return `<text x="${paraX}" y="${lineY}" class="para">${escapeXml(line)}</text>`;
     })
     .join('\n');
+
+  const subtitleY = (595.5 - normalizeNumber(config.subtitleY, 398)) * scale;
+  const introY = (595.5 - normalizeNumber(config.introY, 363)) * scale;
 
   const svgContent = `
     <svg width="${imgWidth}" height="${imgHeight}" xmlns="http://www.w3.org/2000/svg">
       <style>
-        .name { fill: ${nameHex}; font-size: ${nameFontSize}px; font-family: Helvetica, Arial, sans-serif; font-weight: bold; text-anchor: middle; }
-        .para { fill: ${paraHex}; font-size: ${paraFontSize}px; font-family: Helvetica, Arial, sans-serif; text-anchor: middle; }
+        .name { fill: ${nameHex}; font-size: ${nameFontSize}px; font-family: Helvetica, Arial, sans-serif; font-weight: bold; text-anchor: ${nameAnchor}; }
+        .para { fill: ${paraHex}; font-size: ${paraFontSize}px; font-family: Helvetica, Arial, sans-serif; font-weight: ${config.paraBold ? 'bold' : 'normal'}; text-anchor: ${paraAnchor}; }
+        .subtitle { fill: #1A2456; font-size: ${13 * scale}px; font-family: Helvetica, Arial, sans-serif; font-weight: bold; text-anchor: middle; }
+        .intro { fill: #1F2937; font-size: ${11 * scale}px; font-family: Helvetica, Arial, sans-serif; text-anchor: middle; }
         .cert-id { fill: #9CA3AF; font-size: ${9 * scale}px; font-family: Helvetica, Arial, sans-serif; text-anchor: middle; font-weight: bold; }
       </style>
-      <text x="${imgWidth / 2}" y="${nameY}" class="name">${escapeXml(recipientName)}</text>
+      ${
+        isTypeB
+          ? `
+          <text x="${imgWidth / 2}" y="${subtitleY}" class="subtitle">${escapeXml(
+              params.certificateSubtitle || '— OF ACHIEVEMENT —'
+            )}</text>
+          <text x="${imgWidth / 2}" y="${introY}" class="intro">${escapeXml(
+              params.recipientIntro || 'THIS CERTIFICATE IS AWARDED TO'
+            )}</text>
+          `
+          : ''
+      }
+      <text x="${nameX}" y="${nameY}" class="name">${escapeXml(recipientName)}</text>
       ${svgLines}
       ${
         config.showCertId !== false && params.certificateId

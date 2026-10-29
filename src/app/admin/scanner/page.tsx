@@ -48,7 +48,10 @@ function QRScannerContent() {
 
   // Scanner States
   const [isScanning, setIsScanning] = useState(false);
+  const [isStartingCamera, setIsStartingCamera] = useState(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+  const [availableCameras, setAvailableCameras] = useState<Array<{ id: string; label: string }>>([]);
+  const [selectedCameraId, setSelectedCameraId] = useState<string>('');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
@@ -143,53 +146,133 @@ function QRScannerContent() {
   };
 
   // Start live QR scanner
-  const startScanner = async () => {
+  const startScanner = async (overrideCameraId?: string) => {
     setCameraError(null);
     if (!selectedEventId) {
-      setCameraError('Please select an event before scanning passes.');
+      setCameraError('Please select an active event before scanning passes.');
       return;
     }
+
+    if (typeof window !== 'undefined' && !window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      setCameraError('Camera access requires HTTPS or localhost. Please ensure you are connected securely over HTTPS.');
+      return;
+    }
+
+    setIsStartingCamera(true);
 
     try {
       const { Html5Qrcode } = await import('html5-qrcode');
 
-      // Check if scanner instance already exists
+      // Stop any existing scanner instance safely
       if (scannerRef.current) {
         try {
           await scannerRef.current.stop();
+          scannerRef.current.clear();
         } catch {}
+        scannerRef.current = null;
+      }
+
+      // Enumerate available camera devices
+      let devices: Array<{ id: string; label: string }> = [];
+      try {
+        devices = await Html5Qrcode.getCameras();
+        if (devices && devices.length > 0) {
+          setAvailableCameras(devices.map((d) => ({ id: d.id, label: d.label || `Camera ${d.id.slice(0, 5)}` })));
+        }
+      } catch (devErr) {
+        console.warn('Camera enumeration note:', devErr);
       }
 
       const html5QrCode = new Html5Qrcode('qr-reader-container');
       scannerRef.current = html5QrCode;
 
+      // Choose optimal camera device
+      let cameraConfig: any = { facingMode: facingMode };
+      const targetId = overrideCameraId || selectedCameraId;
+
+      if (targetId && devices.some((d) => d.id === targetId)) {
+        cameraConfig = targetId;
+      } else if (devices.length > 0) {
+        // Look for rear/environment camera on phones/tablets, or pick first available camera on laptop/desktop
+        const backCamera = devices.find((d) => /back|rear|environment/i.test(d.label));
+        const chosen = facingMode === 'environment' && backCamera ? backCamera : devices[0];
+        cameraConfig = chosen.id;
+        setSelectedCameraId(chosen.id);
+      }
+
       const qrConfig = {
-        fps: 10,
-        qrbox: { width: 250, height: 250 }
+        fps: 15,
+        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+          const edge = Math.min(viewfinderWidth, viewfinderHeight);
+          const boxSize = Math.max(180, Math.floor(edge * 0.72));
+          return { width: boxSize, height: boxSize };
+        },
+        aspectRatio: 1.0,
+        disableFlip: facingMode === 'environment'
       };
 
       await html5QrCode.start(
-        { facingMode: facingMode },
+        cameraConfig,
         qrConfig,
         (decodedText) => {
           handlePassScanned(decodedText);
         },
         () => {
-          // Ignore parse errors per frame
+          // Frame-by-frame scanning interval (silent)
         }
       );
 
+      // Force video element to play and fill container nicely
+      setTimeout(() => {
+        try {
+          const container = document.getElementById('qr-reader-container');
+          const video = container?.querySelector('video');
+          if (video) {
+            video.setAttribute('playsinline', 'true');
+            video.setAttribute('autoplay', 'true');
+            video.muted = true;
+            video.style.width = '100%';
+            video.style.height = '100%';
+            video.style.objectFit = 'cover';
+            video.play().catch(() => {});
+          }
+        } catch {}
+      }, 150);
+
       setIsScanning(true);
+      setCameraError(null);
     } catch (err: any) {
-      console.error('Camera start error:', err);
+      console.error('Camera initialization error:', err);
       let msg = err.message || 'Unable to access device camera.';
-      if (msg.includes('NotAllowedError') || msg.includes('Permission denied')) {
-        msg = 'Camera permission was denied. Please allow camera access in your browser address bar and reload.';
-      } else if (msg.includes('secure context') || (typeof window !== 'undefined' && !window.isSecureContext && window.location.hostname !== 'localhost')) {
-        msg = 'Camera scanning requires HTTPS or localhost. Please ensure the website is accessed over a secure HTTPS connection.';
+      if (
+        msg.includes('NotAllowedError') ||
+        msg.includes('Permission denied') ||
+        msg.includes('permission')
+      ) {
+        msg = 'Camera permission was denied. Please click the camera/lock icon in your browser address bar, set Camera to "Allow", and reload.';
+      } else if (
+        msg.includes('NotFoundError') ||
+        msg.includes('DevicesNotFoundError') ||
+        msg.includes('no camera')
+      ) {
+        msg = 'No camera hardware detected on this device. You can still use the Manual Pass Check-In below.';
+      } else if (msg.includes('NotReadableError') || msg.includes('already in use')) {
+        msg = 'Camera is already in use by another application or tab. Please close other camera apps and retry.';
+      } else if (
+        msg.includes('OverconstrainedError') ||
+        msg.includes('ConstraintNotSatisfiedError')
+      ) {
+        msg = 'The requested camera configuration is not supported by your hardware. Try switching between Front / Rear camera.';
+      } else if (
+        msg.includes('secure context') ||
+        (typeof window !== 'undefined' && !window.isSecureContext && window.location.hostname !== 'localhost')
+      ) {
+        msg = 'Camera scanning requires HTTPS or localhost. Please access this website over HTTPS.';
       }
       setCameraError(msg);
       setIsScanning(false);
+    } finally {
+      setIsStartingCamera(false);
     }
   };
 
@@ -205,6 +288,16 @@ function QRScannerContent() {
       scannerRef.current = null;
     }
     setIsScanning(false);
+    setIsStartingCamera(false);
+  };
+
+  // Switch specific camera
+  const handleSelectCamera = async (cameraId: string) => {
+    setSelectedCameraId(cameraId);
+    if (isScanning) {
+      await stopScanner();
+      startScanner(cameraId);
+    }
   };
 
   // Toggle front/rear camera
@@ -216,7 +309,7 @@ function QRScannerContent() {
       setTimeout(() => {
         setFacingMode(nextMode);
         startScanner();
-      }, 200);
+      }, 150);
     }
   };
 
@@ -427,31 +520,77 @@ function QRScannerContent() {
         {/* Left Column: Camera Viewport & Controls (7 Cols) */}
         <div className="lg:col-span-7 space-y-4">
           <div className="p-4 sm:p-6 rounded-3xl bg-[#121216] border border-white/10 space-y-4 shadow-2xl relative overflow-hidden">
+            {/* Inline CSS to force html5-qrcode video to render visibly with proper aspect ratio */}
+            <style jsx global>{`
+              #qr-reader-container {
+                width: 100% !important;
+                height: 100% !important;
+                position: relative !important;
+                border: none !important;
+                background: transparent !important;
+              }
+              #qr-reader-container video {
+                width: 100% !important;
+                height: 100% !important;
+                object-fit: cover !important;
+                display: block !important;
+                border-radius: 1rem !important;
+              }
+              #qr-reader-container__scan_region {
+                background: transparent !important;
+                width: 100% !important;
+                height: 100% !important;
+              }
+              #qr-reader-container__scan_region video {
+                width: 100% !important;
+                height: 100% !important;
+                object-fit: cover !important;
+              }
+              #qr-reader-container__dashboard {
+                display: none !important;
+              }
+              #qr-reader-container__camera_selection {
+                display: none !important;
+              }
+            `}</style>
+
             {/* Viewport Box */}
             <div className="relative aspect-square max-w-[420px] mx-auto rounded-2xl overflow-hidden bg-black border border-white/10 flex flex-col items-center justify-center">
-              {/* HTML5 QR Code Mount Element */}
+              {/* HTML5 QR Code Mount Element - always mounted with non-zero dimensions */}
               <div
                 id="qr-reader-container"
-                className={`w-full h-full ${!isScanning ? 'hidden' : ''}`}
+                className="absolute inset-0 w-full h-full"
               />
 
-              {!isScanning && (
-                <div className="p-8 text-center space-y-3">
+              {/* Idle State Overlay */}
+              {!isScanning && !isStartingCamera && (
+                <div className="absolute inset-0 bg-[#0B0B0D] z-10 flex flex-col items-center justify-center p-8 text-center space-y-3">
                   <div className="w-16 h-16 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mx-auto text-slate-400">
                     <Camera className="w-8 h-8 text-[#F98A5B]" />
                   </div>
                   <div>
                     <h3 className="font-bold text-white text-sm">Camera Idle</h3>
-                    <p className="text-slate-400 text-xs mt-1">
+                    <p className="text-slate-400 text-xs mt-1 max-w-[280px]">
                       Click &quot;Start Scanning Camera&quot; to begin scanning attendee passes.
                     </p>
                   </div>
                 </div>
               )}
 
+              {/* Camera Starting / Connecting Overlay */}
+              {isStartingCamera && (
+                <div className="absolute inset-0 bg-black/85 z-20 flex flex-col items-center justify-center p-6 text-center space-y-3">
+                  <RefreshCw className="w-8 h-8 text-[#F98A5B] animate-spin" />
+                  <p className="text-white font-bold text-sm">Connecting Camera...</p>
+                  <p className="text-slate-400 text-xs max-w-[260px]">
+                    Requesting camera stream and initializing optical recognition.
+                  </p>
+                </div>
+              )}
+
               {/* Viewfinder Target Graphic (when scanning) */}
               {isScanning && (
-                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center z-10">
                   <div className="w-64 h-64 border-2 border-[#F98A5B] rounded-2xl relative animate-pulse shadow-[0_0_20px_rgba(249,138,91,0.3)]">
                     <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-white rounded-tl" />
                     <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-white rounded-tr" />
@@ -462,7 +601,7 @@ function QRScannerContent() {
               )}
 
               {scanProcessing && (
-                <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-10">
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-20">
                   <div className="p-4 rounded-2xl bg-[#1A1A22] border border-white/20 text-white font-bold text-xs flex items-center gap-2">
                     <RefreshCw className="w-4 h-4 text-[#F98A5B] animate-spin" />
                     <span>Verifying Pass...</span>
@@ -471,11 +610,38 @@ function QRScannerContent() {
               )}
             </div>
 
-            {/* Camera Error Message */}
+            {/* Camera Error Message with Retry button */}
             {cameraError && (
-              <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                <span>{cameraError}</span>
+              <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-300 text-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                  <span>{cameraError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => startScanner()}
+                  className="px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-white font-bold text-xs shrink-0 cursor-pointer transition-colors"
+                >
+                  Retry Camera
+                </button>
+              </div>
+            )}
+
+            {/* Camera Switcher Dropdown (if multiple devices detected) */}
+            {availableCameras.length > 1 && (
+              <div className="flex items-center gap-2 px-1">
+                <label className="text-[11px] font-mono text-slate-400 shrink-0">DEVICE:</label>
+                <select
+                  value={selectedCameraId}
+                  onChange={(e) => handleSelectCamera(e.target.value)}
+                  className="w-full bg-[#18181D] border border-white/10 rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-[#F98A5B]"
+                >
+                  {availableCameras.map((cam) => (
+                    <option key={cam.id} value={cam.id}>
+                      {cam.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
 
@@ -484,11 +650,12 @@ function QRScannerContent() {
               {!isScanning ? (
                 <button
                   type="button"
-                  onClick={startScanner}
-                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#F98A5B] to-[#EC3A74] hover:opacity-90 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-[#F98A5B]/20 transition-all cursor-pointer"
+                  onClick={() => startScanner()}
+                  disabled={isStartingCamera}
+                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-[#F98A5B] to-[#EC3A74] hover:opacity-90 disabled:opacity-50 text-white font-bold text-xs sm:text-sm flex items-center gap-2 shadow-lg shadow-[#F98A5B]/20 transition-all cursor-pointer"
                 >
                   <Camera className="w-4 h-4" />
-                  <span>Start Scanning Camera</span>
+                  <span>{isStartingCamera ? 'Connecting...' : 'Start Scanning Camera'}</span>
                 </button>
               ) : (
                 <button
@@ -504,7 +671,8 @@ function QRScannerContent() {
               <button
                 type="button"
                 onClick={toggleCameraFacing}
-                className="px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer"
+                disabled={isStartingCamera}
+                className="px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
                 title="Switch Camera (Front / Rear)"
               >
                 <FlipHorizontal className="w-4 h-4 text-[#F98A5B]" />

@@ -349,6 +349,12 @@ export async function syncResourceToSupabase(res: any, isUpdate = false) {
   });
 }
 
+export async function deleteResourceFromSupabase(id: string) {
+  return safeDbOp('deleteResourceFromSupabase', async () => {
+    return supabaseAdmin.from('resources').delete().eq('id', id);
+  });
+}
+
 // -------------------------------------------------------------
 // BLOGS
 // -------------------------------------------------------------
@@ -371,6 +377,39 @@ export async function syncBlogToSupabase(blog: any, isUpdate = false) {
       return supabaseAdmin.from('blogs').upsert(row, { onConflict: 'id' });
     }
     return supabaseAdmin.from('blogs').insert(row);
+  });
+}
+
+export async function deleteBlogFromSupabase(id: string) {
+  return safeDbOp('deleteBlogFromSupabase', async () => {
+    return supabaseAdmin.from('blogs').delete().eq('id', id);
+  });
+}
+
+// -------------------------------------------------------------
+// BROCHURES
+// -------------------------------------------------------------
+export async function syncBrochureToSupabase(bro: any, isUpdate = false) {
+  return safeDbOp('syncBrochureToSupabase', async () => {
+    const row = {
+      id: bro.id,
+      title: bro.title,
+      event_id: bro.eventId || bro.event_id || null,
+      file_url: bro.fileUrl || bro.file_url || '',
+      file_size: bro.fileSize || bro.file_size || '',
+      downloads: bro.downloads || 0
+    };
+
+    if (isUpdate) {
+      return supabaseAdmin.from('brochures').upsert(row, { onConflict: 'id' });
+    }
+    return supabaseAdmin.from('brochures').insert(row);
+  });
+}
+
+export async function deleteBrochureFromSupabase(id: string) {
+  return safeDbOp('deleteBrochureFromSupabase', async () => {
+    return supabaseAdmin.from('brochures').delete().eq('id', id);
   });
 }
 
@@ -429,6 +468,12 @@ export async function syncStartupToSupabase(startup: any, isUpdate = false) {
       return supabaseAdmin.from('startups').upsert(row, { onConflict: 'id' });
     }
     return supabaseAdmin.from('startups').insert(row);
+  });
+}
+
+export async function deleteStartupFromSupabase(id: string) {
+  return safeDbOp('deleteStartupFromSupabase', async () => {
+    return supabaseAdmin.from('startups').delete().eq('id', id);
   });
 }
 
@@ -495,6 +540,8 @@ export async function syncRegistrationToSupabase(reg: any, isUpdate = false) {
     if (reg.markedById) extraMeta.markedById = reg.markedById;
     if (reg.attendanceMethod) extraMeta.attendanceMethod = reg.attendanceMethod;
     if (reg.status) extraMeta.status = reg.status;
+    if (reg.semester) extraMeta.semester = reg.semester;
+    if (reg.branch) extraMeta.branch = reg.branch;
 
     // Preserve exact original student registration number
     const rawRegNum = typeof reg.registerNumber === 'string' ? reg.registerNumber.trim() : (reg.register_number ? String(reg.register_number).trim() : '');
@@ -606,6 +653,8 @@ export function unpackRegistrationFromSupabase(row: any): any {
     participationCategory: meta.participationCategory || (isExternal ? 'External' : 'Internal'),
     district: meta.district || '',
     course: meta.course || '',
+    semester: meta.semester || null,
+    branch: meta.branch || row.department || '',
     additionalNotes,
     status: trueStatus,
     attendance: meta.attendance || (row.status === 'Attended' ? 'Present' : (row.status === 'Cancelled' ? 'Absent' : null)),

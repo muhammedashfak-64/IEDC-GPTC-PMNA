@@ -47,6 +47,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Please enter your institution / college name.' }, { status: 400 });
     }
 
+    if (participationCategory === 'External') {
+      const extBranch = String(body.branch || body.department || '').trim();
+      if (!extBranch) {
+        return NextResponse.json({ success: false, error: 'Please enter your branch / department name.' }, { status: 400 });
+      }
+    }
+
     if (body.consent === false) {
       return NextResponse.json({ success: false, error: 'Consent to attend and adhere to event guidelines is required.' }, { status: 400 });
     }
@@ -57,8 +64,10 @@ export async function POST(req: NextRequest) {
       registerNumber,
       email,
       phone,
-      department: department || body.course || 'External',
+      department: department || body.branch || body.course || 'External',
+      branch: body.branch || department || body.course || '',
       academicYear: body.academicYear || 'First Year',
+      semester: body.semester || null,
       collegeName: collegeName || 'Govt Polytechnic College Perinthalmanna',
       participationCategory,
       district: body.district ? String(body.district).trim() : '',

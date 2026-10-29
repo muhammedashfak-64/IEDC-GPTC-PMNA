@@ -41,8 +41,27 @@ export async function POST(
       return NextResponse.json({ success: false, error: 'Please enter a valid 10-digit mobile number.' }, { status: 400 });
     }
 
-    if (!department) {
+    const collegeName = String(body.collegeName || '').trim();
+    const isExternal =
+      body.participationCategory === 'External' ||
+      (collegeName &&
+        !collegeName.toLowerCase().includes('perinthalmanna') &&
+        !collegeName.toLowerCase().includes('gptc pmna'));
+
+    const participationCategory: 'Internal' | 'External' = isExternal ? 'External' : 'Internal';
+
+    if (participationCategory === 'Internal' && !department) {
       return NextResponse.json({ success: false, error: 'Please select your academic department.' }, { status: 400 });
+    }
+
+    if (participationCategory === 'External') {
+      if (!collegeName) {
+        return NextResponse.json({ success: false, error: 'Please enter your institution / college name.' }, { status: 400 });
+      }
+      const extBranch = String(body.branch || body.department || '').trim();
+      if (!extBranch) {
+        return NextResponse.json({ success: false, error: 'Please enter your branch / department name.' }, { status: 400 });
+      }
     }
 
     if (body.consent === false) {
@@ -55,9 +74,14 @@ export async function POST(
       registerNumber,
       email,
       phone,
-      department,
-      academicYear: body.academicYear || '2nd Year',
-      collegeName: body.collegeName || 'Govt Polytechnic College Perinthalmanna',
+      department: department || body.branch || 'External',
+      branch: body.branch || department || '',
+      academicYear: body.academicYear || 'First Year',
+      semester: body.semester || null,
+      collegeName: collegeName || 'Govt Polytechnic College Perinthalmanna',
+      participationCategory,
+      district: body.district ? String(body.district).trim() : '',
+      course: body.course ? String(body.course).trim() : '',
       additionalNotes: body.additionalNotes || '',
       consent: true
     });

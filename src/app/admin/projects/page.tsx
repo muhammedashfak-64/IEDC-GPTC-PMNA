@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAdmin } from '@/context/AdminContext';
-import { Cpu, Plus, Search, Trash2, Edit3, Code2, ExternalLink, CheckCircle2 } from 'lucide-react';
+import { Cpu, Plus, Search, Trash2, Edit3, Code2, ExternalLink, CheckCircle2, AlertTriangle } from 'lucide-react';
 import FileUpload from '@/components/admin/FileUpload';
 
 export default function AdminProjectsPage() {
@@ -13,6 +13,7 @@ export default function AdminProjectsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingProject, setEditingProject] = useState<any>(null);
+  const [deletingProject, setDeletingProject] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     title: '',
@@ -102,12 +103,13 @@ export default function AdminProjectsPage() {
     }
   };
 
-  const handleDelete = async (id: string, title: string) => {
-    if (!confirm(`Delete project "${title}"?`)) return;
+  const confirmDelete = async () => {
+    if (!deletingProject) return;
     try {
-      const res = await fetch(`/api/admin/projects?id=${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/admin/projects?id=${deletingProject.id}`, { method: 'DELETE' });
       if (res.ok) {
-        addToast('Deleted', `Project ${title} removed.`, 'info');
+        addToast('Deleted', `Project "${deletingProject.title}" removed.`, 'info');
+        setDeletingProject(null);
         loadData();
       }
     } catch (err: any) {
@@ -243,7 +245,7 @@ export default function AdminProjectsPage() {
                 <button onClick={() => openEdit(proj)} className="p-1.5 rounded-lg text-slate-400 hover:text-white">
                   <Edit3 className="w-4 h-4" />
                 </button>
-                <button onClick={() => handleDelete(proj.id, proj.title)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400">
+                <button onClick={() => setDeletingProject(proj)} className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 cursor-pointer" title="Delete Project">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
@@ -383,6 +385,45 @@ export default function AdminProjectsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* DELETE CONFIRMATION MODAL */}
+      {deletingProject && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-[#121216] border border-rose-500/30 rounded-3xl p-6 sm:p-8 space-y-4 shadow-2xl">
+            <div className="flex items-center gap-3 text-rose-400">
+              <div className="p-2.5 rounded-2xl bg-rose-500/10 border border-rose-500/30">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Delete Project</h3>
+                <span className="text-xs text-rose-400">Permanent Action</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Are you sure you want to permanently delete the student project{' '}
+              <strong className="text-white font-bold">&quot;{deletingProject.title}&quot;</strong>?
+              This project will be removed from the public showcase.
+            </p>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setDeletingProject(null)}
+                className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold text-xs transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDelete}
+                className="flex-1 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-extrabold text-xs transition-colors cursor-pointer shadow-lg shadow-rose-500/20"
+              >
+                Yes, Delete Project
+              </button>
+            </div>
           </div>
         </div>
       )}

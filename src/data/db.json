@@ -2652,7 +2652,7 @@
       "pdfUrl": "/uploads/certificate-templates/test_template_1793169823719.png",
       "cleanUrl": "/uploads/certificate-templates/test_template_1793169823719.png",
       "previewPdf": "/uploads/certificate-templates/test_template_1793169823719.png",
-      "isActive": true,
+      "isActive": false,
       "templateConfig": {
         "nameY": 305.5,
         "nameFontSize": 32.5,
@@ -2707,7 +2707,7 @@
       "pdfUrl": "/templates/reference_certificate.pdf",
       "cleanUrl": "/templates/clean_master_template.pdf",
       "previewPdf": "/templates/test_generated_certificate.pdf",
-      "isActive": false,
+      "isActive": true,
       "version": 1,
       "createdAt": "2026-10-22T23:00:08.604Z",
       "description": "Preserves exact borders, logos, Principal Abdul Kader KT & Coordinator Anuroop P signatures, and typography."

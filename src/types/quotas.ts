@@ -11,6 +11,20 @@ export const COLLEGE_ACADEMIC_YEARS = [
   'Third Year'
 ] as const;
 
+export const EXTERNAL_ACADEMIC_YEARS = [
+  'First Year',
+  'Second Year',
+  'Third Year',
+  'Fourth Year'
+] as const;
+
+export const SEMESTERS_BY_YEAR: Record<string, string[]> = {
+  'First Year': ['Semester 1', 'Semester 2'],
+  'Second Year': ['Semester 3', 'Semester 4'],
+  'Third Year': ['Semester 5', 'Semester 6'],
+  'Fourth Year': ['Semester 7', 'Semester 8']
+};
+
 export type CollegeDepartment = typeof COLLEGE_DEPARTMENTS[number];
 export type CollegeAcademicYear = typeof COLLEGE_ACADEMIC_YEARS[number];
 

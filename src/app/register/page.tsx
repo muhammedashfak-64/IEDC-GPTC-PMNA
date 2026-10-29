@@ -66,7 +66,9 @@ function RegisterFormContent() {
     studentName: '',
     registerNumber: '',
     department: 'Electronics Engineering',
+    branch: '',
     academicYear: 'First Year',
+    semester: 'Semester 1',
     email: '',
     phone: '',
     collegeName: 'Govt Polytechnic College Perinthalmanna',
@@ -75,6 +77,21 @@ function RegisterFormContent() {
     additionalNotes: '',
     consent: true
   });
+
+  const handleYearChange = (newYear: string) => {
+    const semestersMap: Record<string, string[]> = {
+      'First Year': ['Semester 1', 'Semester 2'],
+      'Second Year': ['Semester 3', 'Semester 4'],
+      'Third Year': ['Semester 5', 'Semester 6'],
+      'Fourth Year': ['Semester 7', 'Semester 8']
+    };
+    const allowed = semestersMap[newYear] || ['Semester 1', 'Semester 2'];
+    setFormData((prev) => ({
+      ...prev,
+      academicYear: newYear,
+      semester: allowed[0]
+    }));
+  };
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -197,9 +214,15 @@ function RegisterFormContent() {
       return;
     }
 
-    if (participationCategory === 'External' && !formData.collegeName.trim()) {
-      setErrorMessage('Please enter your Institution / College name.');
-      return;
+    if (participationCategory === 'External') {
+      if (!formData.collegeName.trim()) {
+        setErrorMessage('Please enter your Institution / College name.');
+        return;
+      }
+      if (!formData.branch.trim()) {
+        setErrorMessage('Please enter your Branch / Department name (e.g. Computer Science, Mechanical, Electronics, etc.).');
+        return;
+      }
     }
 
     if (!formData.consent) {
@@ -210,17 +233,20 @@ function RegisterFormContent() {
     setSubmitting(true);
 
     try {
+      const chosenDept = participationCategory === 'Internal' ? formData.department : formData.branch.trim();
       const res = await fetch('/api/public/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           eventId: selectedEventId,
           ...formData,
+          department: chosenDept,
+          branch: chosenDept,
           participationCategory,
           collegeName:
             participationCategory === 'Internal'
               ? 'Govt Polytechnic College Perinthalmanna'
-              : formData.collegeName
+              : formData.collegeName.trim()
         })
       });
 
@@ -338,12 +364,15 @@ function RegisterFormContent() {
                 </div>
               )}
               <div className="flex justify-between border-b border-white/5 pb-1.5">
-                <span className="text-neutral-500 font-medium">Department:</span>
+                <span className="text-neutral-500 font-medium">Branch / Dept:</span>
                 <span className="text-white">{registeredData.department}</span>
               </div>
               <div className="flex justify-between border-b border-white/5 pb-1.5">
-                <span className="text-neutral-500 font-medium">Academic Year:</span>
-                <span className="text-white">{registeredData.academicYear}</span>
+                <span className="text-neutral-500 font-medium">Year &amp; Semester:</span>
+                <span className="text-white">
+                  {registeredData.academicYear}
+                  {registeredData.semester ? ` • ${registeredData.semester}` : ''}
+                </span>
               </div>
               <div className="flex justify-between border-b border-white/5 pb-1.5">
                 <span className="text-neutral-500 font-medium">Institution:</span>
@@ -420,7 +449,9 @@ function RegisterFormContent() {
                 studentName: '',
                 registerNumber: '',
                 department: 'Electronics Engineering',
+                branch: '',
                 academicYear: 'First Year',
+                semester: 'Semester 1',
                 email: '',
                 phone: '',
                 collegeName: 'Govt Polytechnic College Perinthalmanna',
@@ -772,7 +803,7 @@ function RegisterFormContent() {
               />
             </div>
 
-            {/* If Internal: 4 Departments & 3 Academic Years */}
+            {/* If Internal: 4 Departments, 3 Academic Years & Dynamic Semesters */}
             {participationCategory === 'Internal' ? (
               <>
                 <div className="space-y-1.5">
@@ -802,31 +833,143 @@ function RegisterFormContent() {
                   <select
                     disabled={eventQuota?.participationType === 'Single Class'}
                     value={formData.academicYear}
-                    onChange={(e) => setFormData({ ...formData, academicYear: e.target.value })}
+                    onChange={(e) => handleYearChange(e.target.value)}
                     className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none disabled:opacity-60"
                   >
-                    <option value="First Year">First Year (Sem 1 & 2)</option>
-                    <option value="Second Year">Second Year (Sem 3 & 4)</option>
-                    <option value="Third Year">Third Year (Sem 5 & 6)</option>
+                    <option value="First Year">First Year</option>
+                    <option value="Second Year">Second Year</option>
+                    <option value="Third Year">Third Year</option>
                   </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">
+                    Semester <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    value={formData.semester}
+                    onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
+                    className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none"
+                  >
+                    {formData.academicYear === 'First Year' && (
+                      <>
+                        <option value="Semester 1">Semester 1</option>
+                        <option value="Semester 2">Semester 2</option>
+                      </>
+                    )}
+                    {formData.academicYear === 'Second Year' && (
+                      <>
+                        <option value="Semester 3">Semester 3</option>
+                        <option value="Semester 4">Semester 4</option>
+                      </>
+                    )}
+                    {formData.academicYear === 'Third Year' && (
+                      <>
+                        <option value="Semester 5">Semester 5</option>
+                        <option value="Semester 6">Semester 6</option>
+                      </>
+                    )}
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">
+                    Admission / Register Number <span className="text-slate-500 font-normal">(Optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 23010410"
+                    value={formData.registerNumber}
+                    onChange={(e) => setFormData({ ...formData, registerNumber: e.target.value.toUpperCase() })}
+                    className="w-full bg-[#18181D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none uppercase font-mono"
+                  />
                 </div>
               </>
             ) : (
-              /* If External: College Name, District, Course, Academic Year */
+              /* If External: College Name, Free-text Branch, Academic Year (1-4), Dynamic Semesters (1-8), District */
               <>
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 sm:col-span-2">
                   <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
                     <Building className="w-3.5 h-3.5 text-purple-400" />
-                    Institution / College Name <span className="text-red-400">*</span>
+                    College / Institution Name <span className="text-red-400">*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder="e.g. Govt Engineering College Thrissur"
+                    placeholder="e.g. Govt Engineering College Thrissur / NSS College of Engineering"
                     value={formData.collegeName}
                     onChange={(e) => setFormData({ ...formData, collegeName: e.target.value })}
                     className="w-full bg-[#18181D] border border-white/10 focus:border-purple-400 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none"
                   />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <GraduationCap className="w-3.5 h-3.5 text-purple-400" />
+                    Branch / Department <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Computer Science, AI & DS, Robotics, ECE"
+                    value={formData.branch}
+                    onChange={(e) =>
+                      setFormData({ ...formData, branch: e.target.value, department: e.target.value })
+                    }
+                    className="w-full bg-[#18181D] border border-white/10 focus:border-purple-400 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">
+                    Academic Year <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    value={formData.academicYear}
+                    onChange={(e) => handleYearChange(e.target.value)}
+                    className="w-full bg-[#18181D] border border-white/10 focus:border-purple-400 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none"
+                  >
+                    <option value="First Year">First Year (1st Year)</option>
+                    <option value="Second Year">Second Year (2nd Year)</option>
+                    <option value="Third Year">Third Year (3rd Year)</option>
+                    <option value="Fourth Year">Fourth Year (4th Year)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-300">
+                    Semester <span className="text-red-400">*</span>
+                  </label>
+                  <select
+                    value={formData.semester}
+                    onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
+                    className="w-full bg-[#18181D] border border-white/10 focus:border-purple-400 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none"
+                  >
+                    {formData.academicYear === 'First Year' && (
+                      <>
+                        <option value="Semester 1">Semester 1</option>
+                        <option value="Semester 2">Semester 2</option>
+                      </>
+                    )}
+                    {formData.academicYear === 'Second Year' && (
+                      <>
+                        <option value="Semester 3">Semester 3</option>
+                        <option value="Semester 4">Semester 4</option>
+                      </>
+                    )}
+                    {formData.academicYear === 'Third Year' && (
+                      <>
+                        <option value="Semester 5">Semester 5</option>
+                        <option value="Semester 6">Semester 6</option>
+                      </>
+                    )}
+                    {formData.academicYear === 'Fourth Year' && (
+                      <>
+                        <option value="Semester 7">Semester 7</option>
+                        <option value="Semester 8">Semester 8</option>
+                      </>
+                    )}
+                  </select>
                 </div>
 
                 <div className="space-y-1.5">
@@ -857,33 +1000,6 @@ function RegisterFormContent() {
                         {dist}
                       </option>
                     ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300">Course / Branch</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Diploma in Robotics / Mechanical Engineering"
-                    value={formData.course}
-                    onChange={(e) =>
-                      setFormData({ ...formData, course: e.target.value, department: e.target.value })
-                    }
-                    className="w-full bg-[#18181D] border border-white/10 focus:border-purple-400 rounded-xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-300">Academic Year</label>
-                  <select
-                    value={formData.academicYear}
-                    onChange={(e) => setFormData({ ...formData, academicYear: e.target.value })}
-                    className="w-full bg-[#18181D] border border-white/10 focus:border-purple-400 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none"
-                  >
-                    <option value="First Year">1st Year</option>
-                    <option value="Second Year">2nd Year</option>
-                    <option value="Third Year">3rd Year</option>
-                    <option value="Fourth Year">4th Year</option>
                   </select>
                 </div>
               </>

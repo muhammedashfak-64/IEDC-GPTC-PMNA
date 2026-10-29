@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadDb } from '@/lib/serverStore';
 import { ensurePassFiles } from '@/lib/passGenerator';
+import { supabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabaseAdmin';
+import { unpackRegistrationFromSupabase, unpackEventFromSupabase } from '@/lib/supabaseSync';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,7 +31,7 @@ export async function POST(req: NextRequest) {
     const db = loadDb();
     const registrations = db.registrations || [];
 
-    const found = registrations.find((r: any) => {
+    let found = registrations.find((r: any) => {
       if (searchCode && (r.registrationCode?.toUpperCase() === searchCode || r.id === searchCode)) {
         return true;
       }
@@ -38,6 +43,27 @@ export async function POST(req: NextRequest) {
       }
       return false;
     });
+
+    // Supabase fallback
+    if (!found && isSupabaseAdminConfigured()) {
+      try {
+        let query = supabaseAdmin.from('registrations').select('*');
+        if (searchCode) {
+          query = query.or(`registration_code.eq.${searchCode},id.eq.${searchCode}`);
+        } else if (phoneInput) {
+          query = query.eq('phone', phoneInput);
+          if (eventId && eventId !== 'All') {
+            query = query.eq('event_id', eventId);
+          }
+        }
+        const { data: remoteData } = await query.limit(1).maybeSingle();
+        if (remoteData) {
+          found = unpackRegistrationFromSupabase(remoteData);
+        }
+      } catch (dbErr) {
+        console.warn('Supabase retrieve-pass query note:', dbErr);
+      }
+    }
 
     if (!found) {
       return NextResponse.json(
@@ -53,11 +79,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const event = (db.events || []).find((e: any) => e.id === found.eventId) || {
-      id: found.eventId,
-      title: found.eventTitle || 'Campus Event',
-      date: found.registeredAt?.split('T')[0] || ''
-    };
+    let event = (db.events || []).find((e: any) => e.id === found.eventId);
+    if (!event && isSupabaseAdminConfigured() && found.eventId) {
+      try {
+        const { data: remoteEvt } = await supabaseAdmin
+          .from('events')
+          .select('*')
+          .eq('id', found.eventId)
+          .single();
+        if (remoteEvt) {
+          event = unpackEventFromSupabase(remoteEvt);
+        }
+      } catch {}
+    }
+
+    if (!event) {
+      event = {
+        id: found.eventId,
+        title: found.eventTitle || 'Campus Event',
+        date: found.registeredAt?.split('T')[0] || ''
+      };
+    }
 
     // Ensure files exist on filesystem
     const { pdfUrl, pngUrl } = await ensurePassFiles(found, event);

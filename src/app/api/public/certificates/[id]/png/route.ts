@@ -21,18 +21,21 @@ export async function GET(
     }
 
     const cleanId = id.trim().toUpperCase();
+    const rawId = id.trim();
 
     // 1. Authoritatively fetch certificate record from local cache or Supabase
     const db = loadDb();
     let cert = (db.certificates || []).find(
-      (c: any) => c.certificateId && c.certificateId.toUpperCase() === cleanId
+      (c: any) =>
+        (c.certificateId && c.certificateId.toUpperCase() === cleanId) ||
+        (c.id && (c.id === rawId || c.id.toUpperCase() === cleanId))
     );
 
     if (!cert && isSupabaseAdminConfigured()) {
       const { data: remoteCert } = await supabaseAdmin
         .from('certificates')
         .select('*')
-        .eq('certificate_id', cleanId)
+        .or(`certificate_id.eq.${cleanId},id.eq.${rawId}`)
         .single();
       if (remoteCert) {
         cert = unpackCertificateFromSupabase(remoteCert);
@@ -42,6 +45,8 @@ export async function GET(
     if (!cert) {
       return new NextResponse('Certificate not found for the given ID.', { status: 404 });
     }
+
+    const actualCertId = cert.certificateId || cleanId;
 
     // 2. Authoritatively fetch event record
     let event = (db.events || []).find((e: any) => e.id === cert.eventId);
@@ -87,7 +92,7 @@ export async function GET(
 
     const { pngBytes } = await generateSingleCertificatePng(
       {
-        certificateId: cleanId,
+        certificateId: actualCertId,
         recipientName: cert.participantName,
         programName: cert.eventName,
         programDate: cert.eventDate || cert.issueDate || new Date().toISOString().split('T')[0],
@@ -109,14 +114,17 @@ export async function GET(
       if (!fs.existsSync(publicCertDir)) {
         fs.mkdirSync(publicCertDir, { recursive: true });
       }
-      fs.writeFileSync(path.join(publicCertDir, `${cleanId}.png`), pngBytes);
+      fs.writeFileSync(path.join(publicCertDir, `${actualCertId}.png`), pngBytes);
     } catch {}
+
+    const isInline = req.nextUrl.searchParams.get('inline') === '1' || req.nextUrl.searchParams.get('preview') === '1';
+    const disposition = isInline ? `inline; filename="${actualCertId}.png"` : `attachment; filename="${actualCertId}.png"`;
 
     return new NextResponse(pngBytes as any, {
       status: 200,
       headers: {
         'Content-Type': 'image/png',
-        'Content-Disposition': `inline; filename="${cleanId}.png"`,
+        'Content-Disposition': disposition,
         'Cache-Control': 'no-cache, no-store, must-revalidate'
       }
     });

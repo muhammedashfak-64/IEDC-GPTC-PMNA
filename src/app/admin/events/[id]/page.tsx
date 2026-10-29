@@ -2416,7 +2416,7 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
 
                                 {/* Download PNG */}
                                 <a
-                                  href={`/api/public/certificates/${cert.id || cert.certificateId}/png`}
+                                  href={`/api/public/certificates/${cert.certificateId || cert.id}/png`}
                                   download={`Certificate_${safeName}_IEDC.png`}
                                   className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-300 transition-colors flex items-center gap-1 text-[11px] font-bold cursor-pointer"
                                   title="Download companion PNG certificate"

@@ -43,6 +43,9 @@ export default function AdminEventsPage() {
     title: '',
     category: 'Hackathon',
     level: 'College',
+    scope: 'College' as 'College' | 'Statewide',
+    gptcQuota: 50,
+    otherCollegeQuota: 50,
     date: new Date().toISOString().split('T')[0],
     time: '10:00 AM - 04:00 PM',
     venue: 'Main Auditorium',
@@ -87,15 +90,18 @@ export default function AdminEventsPage() {
     setEditingEvent(null);
     setFormData({
       title: '',
-      category: 'Hackathon',
+      category: 'Workshop',
       level: 'State',
+      scope: 'Statewide',
+      gptcQuota: 50,
+      otherCollegeQuota: 100,
       date: new Date().toISOString().split('T')[0],
       time: '09:00 AM - 05:00 PM',
       venue: 'Main Auditorium & ICFC Lab',
       description: '',
       speaker: '',
-      totalSeats: 100,
-      seatsAvailable: 100,
+      totalSeats: 150,
+      seatsAvailable: 150,
       bannerImage: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&auto=format&fit=crop&q=80',
       brochureUrl: '',
       registrationOpen: true,
@@ -109,10 +115,17 @@ export default function AdminEventsPage() {
 
   const openEditModal = (evt: any) => {
     setEditingEvent(evt);
+    const isStatewide = evt.quotaConfig?.participationType === 'Statewide' || evt.level?.toLowerCase().includes('state');
+    const extQuota = evt.quotaConfig?.externalQuota?.maxSeats ?? (isStatewide ? 50 : 0);
+    const gptcQuota = Math.max(1, (evt.totalSeats || 60) - (isStatewide ? extQuota : 0));
+
     setFormData({
       title: evt.title,
       category: evt.category || 'Workshop',
       level: evt.level || 'College',
+      scope: isStatewide ? 'Statewide' : 'College',
+      gptcQuota: gptcQuota,
+      otherCollegeQuota: extQuota,
       date: evt.date,
       time: evt.time || '10:00 AM - 04:00 PM',
       venue: evt.venue,
@@ -200,11 +213,35 @@ export default function AdminEventsPage() {
 
     setSubmitting(true);
     try {
+      const isStatewide = formData.scope === 'Statewide';
+      const totalSeats = isStatewide
+        ? Number(formData.gptcQuota) + Number(formData.otherCollegeQuota)
+        : Number(formData.totalSeats);
+
+      const existingConfig = editingEvent?.quotaConfig || {};
+      const quotaConfig = {
+        ...existingConfig,
+        participationType: isStatewide ? 'Statewide' : (existingConfig.participationType === 'Single Class' ? 'Single Class' : 'Entire College'),
+        externalQuota: {
+          enabled: isStatewide,
+          maxSeats: isStatewide ? Number(formData.otherCollegeQuota) : 0
+        },
+        waitlistEnabled: existingConfig.waitlistEnabled !== false
+      };
+
+      const payload = {
+        ...formData,
+        totalSeats,
+        seatsAvailable: editingEvent ? editingEvent.seatsAvailable : totalSeats,
+        level: isStatewide ? 'State' : formData.level,
+        quotaConfig
+      };
+
       if (editingEvent) {
         const res = await fetch('/api/admin/events', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: editingEvent.id, ...formData })
+          body: JSON.stringify({ id: editingEvent.id, ...payload })
         });
         const json = await res.json();
         if (res.ok && json.success) {
@@ -218,7 +255,7 @@ export default function AdminEventsPage() {
         const res = await fetch('/api/admin/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
+          body: JSON.stringify(payload)
         });
         const json = await res.json();
         if (res.ok && json.success) {
@@ -583,28 +620,104 @@ export default function AdminEventsPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Speaker / Mentor</label>
-                  <input
-                    type="text"
-                    placeholder="Er. Mohammed Shafi"
-                    value={formData.speaker}
-                    onChange={(e) => setFormData({ ...formData, speaker: e.target.value })}
-                    className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
-                  />
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Speaker / Mentor</label>
+                <input
+                  type="text"
+                  placeholder="Er. Mohammed Shafi"
+                  value={formData.speaker}
+                  onChange={(e) => setFormData({ ...formData, speaker: e.target.value })}
+                  className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                />
+              </div>
+
+              {/* Event Scope & Separate Quota Configuration */}
+              <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <label className="text-[11px] font-bold text-slate-200 uppercase block">Event Scope / Registration Category</label>
+                    <p className="text-[10px] text-slate-400">Choose whether this event is internal to GPTC PMNA or statewide.</p>
+                  </div>
+                  <div className="flex rounded-xl bg-black/40 p-1 border border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, scope: 'College' })}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        formData.scope === 'College'
+                          ? 'bg-white text-black shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Internal College Event
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData({ ...formData, scope: 'Statewide' })}
+                      className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        formData.scope === 'Statewide'
+                          ? 'bg-purple-500 text-white shadow-sm'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      Statewide Event / Workshop
+                    </button>
+                  </div>
                 </div>
 
-                <div>
-                  <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Total Seats Cap</label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.totalSeats}
-                    onChange={(e) => setFormData({ ...formData, totalSeats: Number(e.target.value) })}
-                    className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
-                  />
-                </div>
+                {formData.scope === 'Statewide' ? (
+                  <div className="pt-2 border-t border-white/10 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-1">
+                        <label className="text-[10px] font-mono font-bold text-amber-300 uppercase block">
+                          Group A: GPTC PMNA Students Quota
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={formData.gptcQuota}
+                          onChange={(e) => setFormData({ ...formData, gptcQuota: Math.max(1, Number(e.target.value)) })}
+                          className="w-full bg-[#18181D] border border-white/15 rounded-lg px-3 py-2 text-xs text-white font-mono"
+                        />
+                        <span className="text-[9px] text-amber-300/70 block">Seats reserved for our polytechnic students</span>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 space-y-1">
+                        <label className="text-[10px] font-mono font-bold text-purple-300 uppercase block">
+                          Group B: Other-College Students Quota
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          required
+                          value={formData.otherCollegeQuota}
+                          onChange={(e) => setFormData({ ...formData, otherCollegeQuota: Math.max(1, Number(e.target.value)) })}
+                          className="w-full bg-[#18181D] border border-white/15 rounded-lg px-3 py-2 text-xs text-white font-mono"
+                        />
+                        <span className="text-[9px] text-purple-300/70 block">Seats allocated for external polytechnics &amp; colleges</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-black/30 border border-white/10 text-xs">
+                      <span className="text-slate-300 font-medium">Total Allocated Statewide Seats:</span>
+                      <span className="font-mono font-bold text-white text-sm">
+                        {Number(formData.gptcQuota) + Number(formData.otherCollegeQuota)} seats
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pt-2 border-t border-white/10">
+                    <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1">Total College Seats Limit</label>
+                    <input
+                      type="number"
+                      min="1"
+                      required
+                      value={formData.totalSeats}
+                      onChange={(e) => setFormData({ ...formData, totalSeats: Math.max(1, Number(e.target.value)) })}
+                      className="w-full sm:w-48 bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white font-mono"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-4 pt-2 border-t border-white/10">
