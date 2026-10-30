@@ -335,8 +335,9 @@ export function calculateQuotaSummary(
     status: extStatus
   };
 
-  // Authoritative total capacity: Preserve admin-configured event.totalSeats
-  const totalCapacity = Number(event.totalSeats) > 0 ? Number(event.totalSeats) : totalInternalSeats + extMaxSeats;
+  // Authoritative total capacity: Preserve admin-configured event.totalSeats (camelCase or snake_case)
+  const rawSeats = event.totalSeats !== undefined && event.totalSeats !== null ? event.totalSeats : event.total_seats;
+  const totalCapacity = Number(rawSeats) > 0 ? Number(rawSeats) : totalInternalSeats + extMaxSeats;
   const totalConfirmed = internalConfirmed + extConfirmed;
   const remainingOverall = Math.max(0, totalCapacity - totalConfirmed);
   const remainingByQuotas = Math.max(0, (totalInternalSeats - internalConfirmed) + extRemaining);

@@ -183,162 +183,12 @@
   ],
   "events": [
     {
-      "id": "evt-1792463201770",
-      "title": "DRONE WORKSHOP",
-      "category": "Workshop",
-      "level": "College",
-      "date": "2026-10-26",
-      "time": "09:00 AM - 05:00 PM",
-      "venue": "Main Auditorium & ICFC Lab",
-      "description": "Updated description for testing at 1793265144510",
-      "speaker": "",
-      "totalSeats": 50,
-      "seatsAvailable": 43,
-      "bannerImage": "https://roboprenr.com/media/images/Drone-Workshop-Image.jpg",
-      "brochureUrl": "https://roboprenr.com/media/images/Drone-Workshop-Image.jpg",
-      "registrationLink": "",
-      "registrationOpen": true,
-      "certificateEligible": true,
-      "status": "Published",
-      "facultyCoordinator": "Prof. Muhammed Rashid",
-      "studentCoordinator": "Rahul V",
-      "certificateTitle": "CERTIFICATE OF PARTICIPATION",
-      "certificateParagraph": "In recognition of your outstanding participation and dedication in the State-Wide\nHands-on Workshop on drone, organized by the IEDC Cell, Government\nPolytechnic College Perinthalmanna, held on 21 July 2026.\n",
-      "certificateStatus": "Published",
-      "certificateTemplateUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/website-assets/certificate-templates/IEDC_CERTIFICATE_TEMPLATE_1792565763716.jpg",
-      "templateConfig": {
-        "nameY": 305,
-        "nameFontSize": 34,
-        "nameColor": "#8B0000",
-        "paraX": 0,
-        "paraY": 252,
-        "paraFontSize": 12.5,
-        "paraLineSpacing": 18,
-        "paraMaxWidth": 580,
-        "paraColor": "#1b222c",
-        "paraAlign": "center",
-        "paraBold": false,
-        "showCertId": true,
-        "certIdY": 45
-      },
-      "winnerCertificateTitle": "WINNER CERTIFICATE",
-      "winnerCertificateParagraph": "",
-      "winnerTemplateConfig": {
-        "nameY": 305,
-        "nameFontSize": 34,
-        "nameColor": "#8B0000",
-        "paraX": 0,
-        "paraY": 252,
-        "paraFontSize": 12.5,
-        "paraLineSpacing": 18,
-        "paraMaxWidth": 580,
-        "paraColor": "#1F2937",
-        "paraAlign": "center",
-        "paraBold": false,
-        "showCertId": true,
-        "certIdY": 45,
-        "subtitleY": 398,
-        "introY": 363
-      },
-      "awardCategory": "First Prize Winner",
-      "quotaConfig": {
-        "participationType": "Statewide",
-        "singleClass": {
-          "department": "Mechanical Engineering",
-          "academicYear": "Second Year",
-          "maxSeats": 25
-        },
-        "classes": {
-          "Civil Engineering__First Year": {
-            "department": "Civil Engineering",
-            "academicYear": "First Year",
-            "enabled": true,
-            "maxSeats": 4
-          },
-          "Civil Engineering__Second Year": {
-            "department": "Civil Engineering",
-            "academicYear": "Second Year",
-            "enabled": true,
-            "maxSeats": 4
-          },
-          "Civil Engineering__Third Year": {
-            "department": "Civil Engineering",
-            "academicYear": "Third Year",
-            "enabled": true,
-            "maxSeats": 4
-          },
-          "Mechanical Engineering__First Year": {
-            "department": "Mechanical Engineering",
-            "academicYear": "First Year",
-            "enabled": true,
-            "maxSeats": 10
-          },
-          "Mechanical Engineering__Second Year": {
-            "department": "Mechanical Engineering",
-            "academicYear": "Second Year",
-            "enabled": true,
-            "maxSeats": 4
-          },
-          "Mechanical Engineering__Third Year": {
-            "department": "Mechanical Engineering",
-            "academicYear": "Third Year",
-            "enabled": true,
-            "maxSeats": 4
-          },
-          "Electrical and Electronics Engineering__First Year": {
-            "department": "Electrical and Electronics Engineering",
-            "academicYear": "First Year",
-            "enabled": true,
-            "maxSeats": 4
-          },
-          "Electrical and Electronics Engineering__Second Year": {
-            "department": "Electrical and Electronics Engineering",
-            "academicYear": "Second Year",
-            "enabled": true,
-            "maxSeats": 4
-          },
-          "Electrical and Electronics Engineering__Third Year": {
-            "department": "Electrical and Electronics Engineering",
-            "academicYear": "Third Year",
-            "enabled": true,
-            "maxSeats": 4
-          },
-          "Electronics Engineering__First Year": {
-            "department": "Electronics Engineering",
-            "academicYear": "First Year",
-            "enabled": true,
-            "maxSeats": 2
-          },
-          "Electronics Engineering__Second Year": {
-            "department": "Electronics Engineering",
-            "academicYear": "Second Year",
-            "enabled": true,
-            "maxSeats": 4
-          },
-          "Electronics Engineering__Third Year": {
-            "department": "Electronics Engineering",
-            "academicYear": "Third Year",
-            "enabled": true,
-            "maxSeats": 4
-          }
-        },
-        "externalQuota": {
-          "enabled": true,
-          "maxSeats": 2
-        },
-        "waitlistEnabled": false,
-        "reallocationLogs": []
-      },
-      "createdAt": "2026-10-20T02:26:42.389713+00:00",
-      "updatedAt": "2026-10-29T09:16:20.955Z"
-    },
-    {
       "id": "evt-1792507055299",
       "title": "DESIGN THINKING WORKSHOP",
       "category": "Workshop",
       "level": "College",
-      "date": "2026-10-20",
-      "time": "09:00 AM - 05:00 PM",
+      "date": "2026-10-31",
+      "time": "09:30 AM - 04:30 PM",
       "venue": "College Auditorium ",
       "description": "make thinking",
       "speaker": "",
@@ -474,7 +324,307 @@
         ]
       },
       "createdAt": "2026-10-20T14:37:36.619533+00:00",
-      "updatedAt": "2026-10-29T16:28:48.192Z"
+      "updatedAt": "2026-10-30T06:06:22.838+00:00"
+    },
+    {
+      "id": "evt-1793248985249-vblyjs",
+      "title": "3D PRINTING & DESIGNING",
+      "category": "Workshop",
+      "level": "State",
+      "date": "2026-10-29",
+      "time": "09:00 AM - 05:00 PM",
+      "venue": " Auditorium ",
+      "description": "3D PRINTING & DESIGNING\n",
+      "speaker": "ARUN",
+      "totalSeats": 40,
+      "seatsAvailable": 39,
+      "bannerImage": "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&auto=format&fit=crop&q=80",
+      "brochureUrl": "",
+      "registrationLink": "",
+      "registrationOpen": true,
+      "certificateEligible": true,
+      "status": "Published",
+      "facultyCoordinator": "Prof. Muhammed Rashid",
+      "studentCoordinator": "Rahul V",
+      "certificateTitle": "CERTIFICATE OF PARTICIPATION",
+      "certificateParagraph": "",
+      "certificateStatus": "Draft",
+      "certificateTemplateUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/website-assets/certificate-templates/IEDC_PARTICIPATE_TEMP_1793253240948.png",
+      "templateConfig": {
+        "nameY": 305,
+        "nameFontSize": 34,
+        "nameColor": "#8B0000",
+        "paraX": 0,
+        "paraY": 252,
+        "paraFontSize": 12.5,
+        "paraLineSpacing": 18,
+        "paraMaxWidth": 580,
+        "paraColor": "#1F2937",
+        "paraAlign": "center",
+        "paraBold": false,
+        "showCertId": true,
+        "certIdY": 45
+      },
+      "winnerCertificateTitle": "WINNER CERTIFICATE",
+      "winnerCertificateParagraph": "",
+      "winnerTemplateConfig": {
+        "nameY": 305,
+        "nameFontSize": 34,
+        "nameColor": "#8B0000",
+        "paraX": 0,
+        "paraY": 252,
+        "paraFontSize": 12.5,
+        "paraLineSpacing": 18,
+        "paraMaxWidth": 580,
+        "paraColor": "#1F2937",
+        "paraAlign": "center",
+        "paraBold": false,
+        "showCertId": true,
+        "certIdY": 45,
+        "subtitleY": 398,
+        "introY": 363
+      },
+      "awardCategory": "First Prize Winner",
+      "quotaConfig": {
+        "participationType": "Statewide",
+        "singleClass": {
+          "department": "Mechanical Engineering",
+          "academicYear": "Second Year",
+          "maxSeats": 25
+        },
+        "classes": {
+          "Electronics Engineering__First Year": {
+            "department": "Electronics Engineering",
+            "academicYear": "First Year",
+            "enabled": true,
+            "maxSeats": 3
+          },
+          "Electronics Engineering__Second Year": {
+            "department": "Electronics Engineering",
+            "academicYear": "Second Year",
+            "enabled": true,
+            "maxSeats": 3
+          },
+          "Electronics Engineering__Third Year": {
+            "department": "Electronics Engineering",
+            "academicYear": "Third Year",
+            "enabled": true,
+            "maxSeats": 3
+          },
+          "Civil Engineering__First Year": {
+            "department": "Civil Engineering",
+            "academicYear": "First Year",
+            "enabled": true,
+            "maxSeats": 3
+          },
+          "Civil Engineering__Second Year": {
+            "department": "Civil Engineering",
+            "academicYear": "Second Year",
+            "enabled": true,
+            "maxSeats": 3
+          },
+          "Civil Engineering__Third Year": {
+            "department": "Civil Engineering",
+            "academicYear": "Third Year",
+            "enabled": true,
+            "maxSeats": 3
+          },
+          "Mechanical Engineering__First Year": {
+            "department": "Mechanical Engineering",
+            "academicYear": "First Year",
+            "enabled": true,
+            "maxSeats": 3
+          },
+          "Mechanical Engineering__Second Year": {
+            "department": "Mechanical Engineering",
+            "academicYear": "Second Year",
+            "enabled": true,
+            "maxSeats": 3
+          },
+          "Mechanical Engineering__Third Year": {
+            "department": "Mechanical Engineering",
+            "academicYear": "Third Year",
+            "enabled": true,
+            "maxSeats": 3
+          },
+          "Electrical and Electronics Engineering__First Year": {
+            "department": "Electrical and Electronics Engineering",
+            "academicYear": "First Year",
+            "enabled": true,
+            "maxSeats": 3
+          },
+          "Electrical and Electronics Engineering__Second Year": {
+            "department": "Electrical and Electronics Engineering",
+            "academicYear": "Second Year",
+            "enabled": true,
+            "maxSeats": 3
+          },
+          "Electrical and Electronics Engineering__Third Year": {
+            "department": "Electrical and Electronics Engineering",
+            "academicYear": "Third Year",
+            "enabled": true,
+            "maxSeats": 3
+          }
+        },
+        "externalQuota": {
+          "enabled": true,
+          "maxSeats": 30
+        },
+        "waitlistEnabled": true,
+        "reallocationLogs": []
+      },
+      "createdAt": "2026-10-29T04:43:05.760396+00:00",
+      "updatedAt": "2026-10-29T13:23:23.442+00:00"
+    },
+    {
+      "id": "evt-1792463201770",
+      "title": "DRONE WORKSHOP",
+      "category": "Workshop",
+      "level": "College",
+      "date": "2026-10-26",
+      "time": "09:00 AM - 05:00 PM",
+      "venue": "Main Auditorium & ICFC Lab",
+      "description": "DRONE ",
+      "speaker": "",
+      "totalSeats": 111,
+      "seatsAvailable": 104,
+      "bannerImage": "https://roboprenr.com/media/images/Drone-Workshop-Image.jpg",
+      "brochureUrl": "https://roboprenr.com/media/images/Drone-Workshop-Image.jpg",
+      "registrationLink": "",
+      "registrationOpen": true,
+      "certificateEligible": true,
+      "status": "Published",
+      "facultyCoordinator": "Prof. Muhammed Rashid",
+      "studentCoordinator": "Rahul V",
+      "certificateTitle": "CERTIFICATE OF PARTICIPATION",
+      "certificateParagraph": "In recognition of your outstanding participation and dedication in the State-Wide\nHands-on Workshop on drone, organized by the IEDC Cell, Government\nPolytechnic College Perinthalmanna, held on 21 July 2026.\n",
+      "certificateStatus": "Published",
+      "certificateTemplateUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/website-assets/certificate-templates/IEDC_CERTIFICATE_TEMPLATE_1792565763716.jpg",
+      "templateConfig": {
+        "nameY": 305,
+        "nameFontSize": 34,
+        "nameColor": "#8B0000",
+        "paraX": 0,
+        "paraY": 252,
+        "paraFontSize": 12.5,
+        "paraLineSpacing": 18,
+        "paraMaxWidth": 580,
+        "paraColor": "#1b222c",
+        "paraAlign": "center",
+        "paraBold": false,
+        "showCertId": true,
+        "certIdY": 45
+      },
+      "winnerCertificateTitle": "WINNER CERTIFICATE",
+      "winnerCertificateParagraph": "",
+      "winnerTemplateConfig": {
+        "nameY": 305,
+        "nameFontSize": 34,
+        "nameColor": "#8B0000",
+        "paraX": 0,
+        "paraY": 252,
+        "paraFontSize": 12.5,
+        "paraLineSpacing": 18,
+        "paraMaxWidth": 580,
+        "paraColor": "#1F2937",
+        "paraAlign": "center",
+        "paraBold": false,
+        "showCertId": true,
+        "certIdY": 45,
+        "subtitleY": 398,
+        "introY": 363
+      },
+      "awardCategory": "First Prize Winner",
+      "quotaConfig": {
+        "participationType": "Entire College",
+        "singleClass": {
+          "department": "Mechanical Engineering",
+          "academicYear": "Second Year",
+          "maxSeats": 25
+        },
+        "classes": {
+          "Electronics Engineering__First Year": {
+            "department": "Electronics Engineering",
+            "academicYear": "First Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Electronics Engineering__Second Year": {
+            "department": "Electronics Engineering",
+            "academicYear": "Second Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Electronics Engineering__Third Year": {
+            "department": "Electronics Engineering",
+            "academicYear": "Third Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Civil Engineering__First Year": {
+            "department": "Civil Engineering",
+            "academicYear": "First Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Civil Engineering__Second Year": {
+            "department": "Civil Engineering",
+            "academicYear": "Second Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Civil Engineering__Third Year": {
+            "department": "Civil Engineering",
+            "academicYear": "Third Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Mechanical Engineering__First Year": {
+            "department": "Mechanical Engineering",
+            "academicYear": "First Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Mechanical Engineering__Second Year": {
+            "department": "Mechanical Engineering",
+            "academicYear": "Second Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Mechanical Engineering__Third Year": {
+            "department": "Mechanical Engineering",
+            "academicYear": "Third Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Electrical and Electronics Engineering__First Year": {
+            "department": "Electrical and Electronics Engineering",
+            "academicYear": "First Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Electrical and Electronics Engineering__Second Year": {
+            "department": "Electrical and Electronics Engineering",
+            "academicYear": "Second Year",
+            "enabled": true,
+            "maxSeats": 8
+          },
+          "Electrical and Electronics Engineering__Third Year": {
+            "department": "Electrical and Electronics Engineering",
+            "academicYear": "Third Year",
+            "enabled": true,
+            "maxSeats": 8
+          }
+        },
+        "externalQuota": {
+          "enabled": false,
+          "maxSeats": 0
+        },
+        "waitlistEnabled": true,
+        "reallocationLogs": []
+      },
+      "createdAt": "2026-10-20T02:26:42.389713+00:00",
+      "updatedAt": "2026-10-29T11:18:54.388+00:00"
     }
   ],
   "registrations": [
@@ -508,7 +658,7 @@
       "consent": true,
       "registeredAt": "2026-10-29T14:25:21.542+00:00",
       "createdAt": "2026-10-29T14:25:21.542+00:00",
-      "updatedAt": "2026-10-29T14:30:57.908+00:00"
+      "updatedAt": "2026-10-30T04:23:22.446+00:00"
     },
     {
       "id": "reg-1793280557218-thic",
@@ -531,7 +681,7 @@
       "status": "Attended",
       "attendance": "Present",
       "attendanceMethod": "QR",
-      "attendedAt": "2026-10-29T14:04:33.293Z",
+      "attendedAt": "2026-10-30T04:24:06.990Z",
       "markedBy": "Muhammed Ashfak O",
       "markedById": "usr-mainadmin-01",
       "waitlistPosition": null,
@@ -540,9 +690,7 @@
       "consent": true,
       "registeredAt": "2026-10-29T13:29:17.218+00:00",
       "createdAt": "2026-10-29T13:29:17.218+00:00",
-      "updatedAt": "2026-10-29T14:04:33.3+00:00",
-      "certificateId": "IEDC-2026-22414",
-      "certificateGenerated": true
+      "updatedAt": "2026-10-30T04:24:06.997+00:00"
     },
     {
       "id": "reg-1793280499371-kn1w",
@@ -562,10 +710,10 @@
       "semester": null,
       "branch": "Electronics Engineering",
       "additionalNotes": "",
-      "status": "Attended",
-      "attendance": "Present",
-      "attendanceMethod": "QR",
-      "attendedAt": "2026-10-29T14:05:17.061Z",
+      "status": "Confirmed",
+      "attendance": "Absent",
+      "attendanceMethod": "MANUAL",
+      "attendedAt": null,
       "markedBy": "Muhammed Ashfak O",
       "markedById": "usr-mainadmin-01",
       "waitlistPosition": null,
@@ -574,9 +722,7 @@
       "consent": true,
       "registeredAt": "2026-10-29T13:28:19.371+00:00",
       "createdAt": "2026-10-29T13:28:19.371+00:00",
-      "updatedAt": "2026-10-29T14:05:17.067+00:00",
-      "certificateId": "IEDC-2026-12561",
-      "certificateGenerated": true
+      "updatedAt": "2026-10-30T04:20:43.162+00:00"
     },
     {
       "id": "reg-1793171086264-1bms",
@@ -640,9 +786,7 @@
       "consent": true,
       "registeredAt": "2026-10-23T08:07:15.498+00:00",
       "createdAt": "2026-10-23T08:07:15.498+00:00",
-      "updatedAt": "2026-10-29T13:41:20.17+00:00",
-      "certificateId": "IEDC-2026-71265",
-      "certificateGenerated": true
+      "updatedAt": "2026-10-29T13:41:20.17+00:00"
     },
     {
       "id": "reg-1792507110992-j34y",
@@ -3810,6 +3954,16 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "log-1793340383551-1mt7",
+      "userId": "admin",
+      "userName": "System / Anonymous",
+      "userRole": "admin",
+      "action": "EVENT_UPDATE",
+      "details": "Updated event: DESIGN THINKING WORKSHOP",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-10-30T06:06:23.551Z"
+    },
     {
       "id": "log-1793289009301-8kei",
       "userId": "admin-1",

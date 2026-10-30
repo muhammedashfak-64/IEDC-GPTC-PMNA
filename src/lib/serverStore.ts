@@ -338,6 +338,46 @@ export function updateSettings(newSettings: any, user: AuthUser) {
 // -------------------------------------------------------------
 // EVENTS MODULE (SUPABASE AUTHORITATIVE DATABASE WITH LOCAL CACHE)
 // -------------------------------------------------------------
+async function asyncUpdateEventSeats(eventId: string, seatsAvailable: number) {
+  try {
+    if (isSupabaseAdminConfigured()) {
+      await supabaseAdmin.from('events').update({
+        seats_available: seatsAvailable,
+        updated_at: new Date().toISOString()
+      }).eq('id', eventId);
+    }
+  } catch (err) {
+    console.error('[serverStore] asyncUpdateEventSeats error:', err);
+  }
+}
+
+async function asyncUpdateEventQuotaConfig(
+  eventId: string,
+  quotaConfig: any,
+  totalSeats: number,
+  seatsAvailable: number,
+  updatedAt: string
+) {
+  try {
+    if (isSupabaseAdminConfigured()) {
+      const { data: currentRemote } = await supabaseAdmin.from('events').select('registration_link').eq('id', eventId).single();
+      let meta: any = {};
+      if (currentRemote?.registration_link && typeof currentRemote.registration_link === 'string' && currentRemote.registration_link.startsWith('{')) {
+        try { meta = JSON.parse(currentRemote.registration_link); } catch {}
+      }
+      meta.quotaConfig = quotaConfig;
+      await supabaseAdmin.from('events').update({
+        total_seats: totalSeats,
+        seats_available: seatsAvailable,
+        registration_link: JSON.stringify(meta),
+        updated_at: updatedAt
+      }).eq('id', eventId);
+    }
+  } catch (err) {
+    console.error('[serverStore] asyncUpdateEventQuotaConfig error:', err);
+  }
+}
+
 export async function fetchEventsFromDatabase(): Promise<any[]> {
   const db = loadDb();
   try {
@@ -450,14 +490,18 @@ export async function createEvent(eventData: any, user?: Partial<AuthUser> | nul
 }
 
 export async function updateEvent(id: string, updates: any, user?: Partial<AuthUser> | null) {
-  const db = loadDb();
-  let existing = (db.events || []).find((e: any) => e.id === id);
-
-  if (!existing) {
-    const { data: remoteRow } = await supabaseAdmin.from('events').select('*').eq('id', id).single();
+  // 1. Authoritatively fetch the latest live record from Supabase
+  let existing: any = null;
+  if (isSupabaseAdminConfigured()) {
+    const { data: remoteRow, error: remoteErr } = await supabaseAdmin.from('events').select('*').eq('id', id).single();
     if (remoteRow) {
       existing = unpackEventFromSupabase(remoteRow);
     }
+  }
+
+  const db = loadDb();
+  if (!existing) {
+    existing = (db.events || []).find((e: any) => e.id === id);
   }
 
   if (!existing) {
@@ -473,8 +517,8 @@ export async function updateEvent(id: string, updates: any, user?: Partial<AuthU
   }
 
   // Count confirmed registrations authoritatively
-  const eventRegs = (db.registrations || []).filter((r: any) => r.eventId === id);
-  const confirmedCount = eventRegs.filter((r: any) =>
+  const registrations = await fetchRegistrationsFromDatabase(id);
+  const confirmedCount = registrations.filter((r: any) =>
     ['confirmed', 'attended', 'registered'].includes((r.status || '').toLowerCase())
   ).length;
 
@@ -482,8 +526,21 @@ export async function updateEvent(id: string, updates: any, user?: Partial<AuthU
 
   // If totalSeats has changed or quotaConfig exceeds newTotalSeats, automatically reconcile quotaConfig
   let finalQuotaConfig = updates.quotaConfig || existing.quotaConfig;
-  if (finalQuotaConfig && (newTotalSeats !== existing.totalSeats || typeof updates.totalSeats !== 'undefined')) {
-    finalQuotaConfig = reconcileQuotaConfigToCapacity(finalQuotaConfig, newTotalSeats, updates.level || existing.level);
+  if (finalQuotaConfig) {
+    let totalAlloc = 0;
+    if (finalQuotaConfig.classes) {
+      for (const c of Object.values(finalQuotaConfig.classes) as any[]) {
+        if (c && c.enabled) totalAlloc += Number(c.maxSeats) || 0;
+      }
+    }
+    const isStatewide = (finalQuotaConfig.participationType || updates.scope || existing.level) === 'Statewide';
+    if (isStatewide && finalQuotaConfig.externalQuota?.enabled) {
+      totalAlloc += Number(finalQuotaConfig.externalQuota?.maxSeats) || 0;
+    }
+
+    if (totalAlloc > newTotalSeats || newTotalSeats !== existing.totalSeats) {
+      finalQuotaConfig = reconcileQuotaConfigToCapacity(finalQuotaConfig, newTotalSeats, updates.level || existing.level);
+    }
   }
 
   const updatedEvt = {
@@ -505,7 +562,8 @@ export async function updateEvent(id: string, updates: any, user?: Partial<AuthU
   }
 
   // 2. Update local memory & db.json cache
-  const idx = (db.events || []).findIndex((e: any) => e.id === id);
+  if (!db.events) db.events = [];
+  const idx = db.events.findIndex((e: any) => e.id === id);
   if (idx !== -1) {
     db.events[idx] = updatedEvt;
   } else {
@@ -752,14 +810,24 @@ async function doRegisterStudentForEventAsync(data: {
   const db = loadDb();
   if (!db.events) db.events = [];
 
-  let event = db.events.find((e: any) => e.id === data.eventId);
-  if (!event) {
+  let event: any = null;
+  if (isSupabaseAdminConfigured()) {
     const { data: remoteRow } = await supabaseAdmin.from('events').select('*').eq('id', data.eventId).single();
     if (remoteRow) {
       event = unpackEventFromSupabase(remoteRow);
-      db.events.unshift(event);
-      saveDb(db);
     }
+  }
+  if (!event) {
+    event = db.events.find((e: any) => e.id === data.eventId);
+  }
+  if (event) {
+    const idx = db.events.findIndex((e: any) => e.id === data.eventId);
+    if (idx !== -1) {
+      db.events[idx] = event;
+    } else {
+      db.events.unshift(event);
+    }
+    saveDb(db);
   }
 
   if (!event) throw new Error('Selected event was not found.');
@@ -1011,17 +1079,32 @@ async function doRegisterStudentForEventAsync(data: {
   const confirmedCount = allCurrentRegs.filter((r: any) =>
     ['confirmed', 'attended', 'registered'].includes((r.status || '').toLowerCase())
   ).length;
-  const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0 ? event.totalSeats : 60;
+  const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0
+    ? event.totalSeats
+    : (event.total_seats ? Number(event.total_seats) : 24);
   event.totalSeats = currentTotalSeats;
   event.seatsAvailable = Math.max(0, currentTotalSeats - confirmedCount);
   event.updatedAt = new Date().toISOString();
 
+  // Update event in local cache
+  const evtIdx = db.events.findIndex((e: any) => e.id === data.eventId);
+  if (evtIdx !== -1) {
+    db.events[evtIdx].totalSeats = currentTotalSeats;
+    db.events[evtIdx].seatsAvailable = event.seatsAvailable;
+    db.events[evtIdx].updatedAt = event.updatedAt;
+  }
   saveDb(db);
 
-  // 7. Authoritatively save registration and updated event to Supabase
+  // 7. Authoritatively save registration and targeted event seats update to Supabase
   try {
     await syncRegistrationToSupabase(newRegistration, false);
-    await syncEventToSupabase(event, true);
+    if (isSupabaseAdminConfigured()) {
+      // Targeted update only - NEVER overwrite date, time, title, venue, or other event fields!
+      await supabaseAdmin.from('events').update({
+        seats_available: event.seatsAvailable,
+        updated_at: event.updatedAt
+      }).eq('id', data.eventId);
+    }
   } catch (syncErr: any) {
     // Roll back local record so memory/local state does not diverge from Supabase
     db.registrations = (db.registrations || []).filter((r: any) => r.id !== newRegistration.id);
@@ -1070,7 +1153,10 @@ export async function getProgramQuotaDetailsAsync(eventId: string) {
 
   if (!event) throw new Error(`Event with ID "${eventId}" not found.`);
 
-  const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0 ? event.totalSeats : 60;
+  const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0
+    ? event.totalSeats
+    : (event.total_seats ? Number(event.total_seats) : 24);
+  event.totalSeats = currentTotalSeats;
 
   // 3. Ensure quotaConfig matches currentTotalSeats and is not holding stale old capacity
   let needsSync = false;
@@ -1105,12 +1191,33 @@ export async function getProgramQuotaDetailsAsync(eventId: string) {
     ['confirmed', 'attended', 'registered'].includes((r.status || '').toLowerCase())
   ).length;
   const expectedAvailable = Math.max(0, currentTotalSeats - confirmedCount);
-  if (event.seatsAvailable !== expectedAvailable || event.totalSeats !== currentTotalSeats || needsSync) {
+  if (event.seatsAvailable !== expectedAvailable || needsSync) {
     event.totalSeats = currentTotalSeats;
     event.seatsAvailable = expectedAvailable;
     event.updatedAt = new Date().toISOString();
+    
+    // Targeted update to Supabase to prevent overwriting other event fields
+    if (isSupabaseAdminConfigured()) {
+      const meta = typeof event.registration_link === 'string' && event.registration_link.startsWith('{')
+        ? JSON.parse(event.registration_link)
+        : (typeof event.registration_link === 'object' && event.registration_link ? event.registration_link : {});
+      meta.quotaConfig = event.quotaConfig;
+      await supabaseAdmin.from('events').update({
+        total_seats: currentTotalSeats,
+        seats_available: expectedAvailable,
+        registration_link: JSON.stringify(meta),
+        updated_at: new Date().toISOString()
+      }).eq('id', eventId);
+    }
+
+    if (!db.events) db.events = [];
+    const idx = db.events.findIndex((e: any) => e.id === eventId);
+    if (idx !== -1) {
+      db.events[idx] = event;
+    } else {
+      db.events.unshift(event);
+    }
     saveDb(db);
-    syncEventToSupabase(event, true).catch(() => {});
   }
 
   return {
@@ -1126,9 +1233,12 @@ export function getProgramQuotaDetails(eventId: string) {
   if (!event) throw new Error('Event not found.');
 
   if (!event.quotaConfig) {
-    event.quotaConfig = createDefaultQuotaConfig(event.totalSeats, event.level);
+    const effTotal = typeof event.totalSeats === 'number' && event.totalSeats > 0
+      ? event.totalSeats
+      : (event.total_seats ? Number(event.total_seats) : 24);
+    event.quotaConfig = createDefaultQuotaConfig(effTotal, event.level);
     saveDb(db);
-    syncEventToSupabase(event, true).catch(console.error);
+    asyncUpdateEventQuotaConfig(eventId, event.quotaConfig, effTotal, event.seatsAvailable, new Date().toISOString());
   }
 
   const summary = calculateQuotaSummary(event, db.registrations || []);
@@ -1144,26 +1254,35 @@ export async function updateProgramQuotaConfigAsync(
   user: AuthUser,
   force = false
 ) {
-  const registrations = await fetchRegistrationsFromDatabase(eventId);
-  const db = loadDb();
-  let event = (db.events || []).find((e: any) => e.id === eventId);
-  if (!event) {
+  // 1. Authoritative event from Supabase
+  let event: any = null;
+  if (isSupabaseAdminConfigured()) {
     const { data: remoteRow } = await supabaseAdmin.from('events').select('*').eq('id', eventId).single();
     if (remoteRow) {
       event = unpackEventFromSupabase(remoteRow);
     }
   }
-  if (!event) throw new Error('Event not found.');
+
+  const db = loadDb();
+  if (!event) {
+    event = (db.events || []).find((e: any) => e.id === eventId);
+  }
+  if (!event) throw new Error(`Event with ID "${eventId}" not found.`);
+
+  const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0
+    ? event.totalSeats
+    : (event.total_seats ? Number(event.total_seats) : 24);
 
   const currentConfig: ProgramQuotaConfig =
-    event.quotaConfig || createDefaultQuotaConfig(event.totalSeats, event.level);
+    event.quotaConfig || createDefaultQuotaConfig(currentTotalSeats, event.level);
 
-  // Active confirmed registrations that consume capacity
+  // 2. Fetch authoritative live registrations
+  const registrations = await fetchRegistrationsFromDatabase(eventId);
   const activeRegs = registrations.filter(
-    (r: any) => r.status === 'Confirmed' || r.status === 'Attended'
+    (r: any) => ['confirmed', 'attended', 'registered'].includes((r.status || '').toLowerCase())
   );
 
-  // Validation: Check if any class quota is being reduced below confirmed count
+  // 3. Validation: Quota cannot be reduced below confirmed registrations
   if (!force && configUpdates.classes) {
     for (const [key, item] of Object.entries(configUpdates.classes)) {
       const { department, academicYear } = parseClassKey(key);
@@ -1182,7 +1301,7 @@ export async function updateProgramQuotaConfigAsync(
     }
   }
 
-  // Validate external quota
+  // 4. Validate external quota
   if (!force && configUpdates.externalQuota && configUpdates.externalQuota.enabled) {
     const extConfirmed = activeRegs.filter((r: any) => isExternalParticipant(r)).length;
 
@@ -1193,7 +1312,28 @@ export async function updateProgramQuotaConfigAsync(
     }
   }
 
-  // Merge configuration
+  // 5. MANDATORY VALIDATION: Total allocated quota cannot exceed event capacity
+  const mergedClasses = {
+    ...(currentConfig.classes || {}),
+    ...(configUpdates.classes || {})
+  };
+  let allocatedInternal = 0;
+  for (const c of Object.values(mergedClasses) as any[]) {
+    if (c && c.enabled) allocatedInternal += Number(c.maxSeats) || 0;
+  }
+  const isStatewide = (configUpdates.participationType || currentConfig.participationType) === 'Statewide';
+  const allocatedExternal = isStatewide && (configUpdates.externalQuota?.enabled ?? currentConfig.externalQuota?.enabled)
+    ? (Number(configUpdates.externalQuota?.maxSeats ?? currentConfig.externalQuota?.maxSeats) || 0)
+    : 0;
+  const totalAllocated = allocatedInternal + allocatedExternal;
+
+  if (!force && currentTotalSeats > 0 && totalAllocated > currentTotalSeats) {
+    throw new Error(
+      `Validation Error: Total configured quota allocation (${totalAllocated} seats: ${allocatedInternal} internal + ${allocatedExternal} external) cannot exceed the event capacity (${currentTotalSeats} seats). Please adjust your allocations before saving.`
+    );
+  }
+
+  // 6. Merge configuration safely
   event.quotaConfig = {
     ...currentConfig,
     ...configUpdates,
@@ -1208,18 +1348,43 @@ export async function updateProgramQuotaConfigAsync(
     reallocationLogs: currentConfig.reallocationLogs || []
   };
 
-  // Recalculate event seatsAvailable while preserving configured totalSeats
+  // Recalculate event seatsAvailable while strictly preserving configured totalSeats
   const summary = calculateQuotaSummary(event, registrations);
-  const confirmedCount = registrations.filter((r: any) =>
-    ['confirmed', 'attended', 'registered'].includes((r.status || '').toLowerCase())
-  ).length;
-  const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0 ? event.totalSeats : summary.totalCapacity;
+  const confirmedCount = activeRegs.length;
   event.totalSeats = currentTotalSeats;
   event.seatsAvailable = Math.max(0, currentTotalSeats - confirmedCount);
   event.updatedAt = new Date().toISOString();
 
+  // 7. Authoritatively update targeted quota & capacity fields in Supabase
+  if (isSupabaseAdminConfigured()) {
+    const { data: currentRemote } = await supabaseAdmin.from('events').select('registration_link').eq('id', eventId).single();
+    let meta: any = {};
+    if (currentRemote?.registration_link && typeof currentRemote.registration_link === 'string' && currentRemote.registration_link.startsWith('{')) {
+      try { meta = JSON.parse(currentRemote.registration_link); } catch {}
+    }
+    meta.quotaConfig = event.quotaConfig;
+
+    const { error: updErr } = await supabaseAdmin.from('events').update({
+      total_seats: currentTotalSeats,
+      seats_available: event.seatsAvailable,
+      registration_link: JSON.stringify(meta),
+      updated_at: event.updatedAt
+    }).eq('id', eventId);
+    if (updErr) {
+      console.error('[serverStore] updateProgramQuotaConfigAsync Supabase error:', updErr);
+      throw new Error(`Failed to save quota configuration to database: ${updErr.message}`);
+    }
+  }
+
+  // 8. Update in local cache
+  if (!db.events) db.events = [];
+  const idx = db.events.findIndex((e: any) => e.id === eventId);
+  if (idx !== -1) {
+    db.events[idx] = event;
+  } else {
+    db.events.unshift(event);
+  }
   saveDb(db);
-  await syncEventToSupabase(event, true);
 
   addAuditLog(
     'QUOTA_CONFIG_UPDATE',
@@ -1337,7 +1502,8 @@ export function updateProgramQuotaConfig(
   event.updatedAt = new Date().toISOString();
 
   saveDb(db);
-  syncEventToSupabase(event, true).catch(console.error);
+  const effTotal = Number(event.totalSeats ?? event.total_seats) || 24;
+  asyncUpdateEventQuotaConfig(eventId, event.quotaConfig, effTotal, event.seatsAvailable, event.updatedAt);
 
   addAuditLog(
     'QUOTA_CONFIG_UPDATE',
@@ -1428,7 +1594,8 @@ export function reallocateSeats(
   event.updatedAt = new Date().toISOString();
 
   saveDb(db);
-  syncEventToSupabase(event, true).catch(console.error);
+  const effTotal = Number(event.totalSeats ?? event.total_seats) || 24;
+  asyncUpdateEventQuotaConfig(eventId, event.quotaConfig, effTotal, event.seatsAvailable, event.updatedAt);
   addAuditLog(
     'QUOTA_SEAT_REALLOCATION',
     user,
@@ -1512,7 +1679,7 @@ export function promoteWaitlistedStudent(registrationId: string, user: AuthUser)
 
   saveDb(db);
   syncRegistrationToSupabase(reg, true).catch(console.error);
-  syncEventToSupabase(event, true).catch(console.error);
+  asyncUpdateEventSeats(reg.eventId, event.seatsAvailable);
 
   addAuditLog(
     'WAITLIST_PROMOTION',
@@ -1553,26 +1720,45 @@ export async function updateRegistrationStatus(id: string, status: string, user:
 
   // Recalculate event seats using authoritative summary
   const eventId = reg.eventId;
-  let event = (db.events || []).find((e: any) => e.id === eventId);
-  if (!event) {
+  let event: any = null;
+  if (isSupabaseAdminConfigured()) {
     const { data: remoteRow } = await supabaseAdmin.from('events').select('*').eq('id', eventId).single();
     if (remoteRow) {
       event = unpackEventFromSupabase(remoteRow);
-      if (!db.events) db.events = [];
-      db.events.push(event);
     }
+  }
+  if (!event) {
+    event = (db.events || []).find((e: any) => e.id === eventId);
   }
 
   if (event) {
-    const eventRegs = db.registrations.filter((r: any) => r.eventId === eventId);
-    const confirmedCount = eventRegs.filter((r: any) =>
+    const liveRegs = await fetchRegistrationsFromDatabase(eventId);
+    const confirmedCount = liveRegs.filter((r: any) =>
       ['confirmed', 'attended', 'registered'].includes((r.status || '').toLowerCase())
     ).length;
-    const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0 ? event.totalSeats : 60;
+    const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0
+      ? event.totalSeats
+      : (event.total_seats ? Number(event.total_seats) : 24);
     event.totalSeats = currentTotalSeats;
     event.seatsAvailable = Math.max(0, currentTotalSeats - confirmedCount);
     event.updatedAt = new Date().toISOString();
-    await syncEventToSupabase(event, true).catch(console.error);
+
+    if (isSupabaseAdminConfigured()) {
+      await supabaseAdmin.from('events').update({
+        seats_available: event.seatsAvailable,
+        updated_at: event.updatedAt
+      }).eq('id', eventId);
+    }
+
+    if (!db.events) db.events = [];
+    const evtIdx = db.events.findIndex((e: any) => e.id === eventId);
+    if (evtIdx !== -1) {
+      db.events[evtIdx].seatsAvailable = event.seatsAvailable;
+      db.events[evtIdx].totalSeats = currentTotalSeats;
+      db.events[evtIdx].updatedAt = event.updatedAt;
+    } else {
+      db.events.push(event);
+    }
   }
 
   saveDb(db);
@@ -1610,17 +1796,43 @@ export async function deleteRegistration(id: string, user: AuthUser) {
     db.registrations.splice(targetIndex, 1);
   }
 
-  const event = (db.events || []).find((e: any) => e.id === eventId);
+  let event: any = null;
+  if (isSupabaseAdminConfigured()) {
+    const { data: remoteRow } = await supabaseAdmin.from('events').select('*').eq('id', eventId).single();
+    if (remoteRow) {
+      event = unpackEventFromSupabase(remoteRow);
+    }
+  }
+  if (!event) {
+    event = (db.events || []).find((e: any) => e.id === eventId);
+  }
+
   if (event) {
-    const eventRegs = db.registrations.filter((r: any) => r.eventId === eventId);
-    const confirmedCount = eventRegs.filter((r: any) =>
+    const liveRegs = (await fetchRegistrationsFromDatabase(eventId)).filter((r: any) => r.id !== id);
+    const confirmedCount = liveRegs.filter((r: any) =>
       ['confirmed', 'attended', 'registered'].includes((r.status || '').toLowerCase())
     ).length;
-    const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0 ? event.totalSeats : 60;
+    const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0
+      ? event.totalSeats
+      : (event.total_seats ? Number(event.total_seats) : 24);
     event.totalSeats = currentTotalSeats;
     event.seatsAvailable = Math.max(0, currentTotalSeats - confirmedCount);
     event.updatedAt = new Date().toISOString();
-    await syncEventToSupabase(event, true).catch(console.error);
+
+    if (isSupabaseAdminConfigured()) {
+      await supabaseAdmin.from('events').update({
+        seats_available: event.seatsAvailable,
+        updated_at: event.updatedAt
+      }).eq('id', eventId);
+    }
+
+    if (!db.events) db.events = [];
+    const evtIdx = db.events.findIndex((e: any) => e.id === eventId);
+    if (evtIdx !== -1) {
+      db.events[evtIdx].seatsAvailable = event.seatsAvailable;
+      db.events[evtIdx].totalSeats = currentTotalSeats;
+      db.events[evtIdx].updatedAt = event.updatedAt;
+    }
   }
 
   saveDb(db);
@@ -2486,7 +2698,14 @@ export async function publishProgramCertificates(eventId: string, publish: boole
   if (evtIdx !== -1) {
     db.events[evtIdx].certificateStatus = newStatus;
     db.events[evtIdx].updatedAt = new Date().toISOString();
-    await syncEventToSupabase(db.events[evtIdx], true);
+  }
+
+  if (isSupabaseAdminConfigured()) {
+    // Targeted update to Supabase - NEVER overwrite event title, dates, or seat allocations
+    await supabaseAdmin.from('events').update({
+      certificate_status: newStatus,
+      updated_at: new Date().toISOString()
+    }).eq('id', eventId);
   }
 
   saveDb(db);
