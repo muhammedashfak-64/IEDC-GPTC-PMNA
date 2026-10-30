@@ -6,7 +6,7 @@ import JSZip from 'jszip';
 import { revalidatePath } from 'next/cache';
 import { generateSingleCertificatePdf, generateSingleCertificatePng, resolveTemplateFile } from './certificateGenerator';
 import { supabase } from '@/lib/supabase';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { supabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabaseAdmin';
 import {
   syncEventToSupabase,
   deleteEventFromSupabase,
@@ -45,6 +45,7 @@ import {
 } from '@/types/quotas';
 import {
   createDefaultQuotaConfig,
+  reconcileQuotaConfigToCapacity,
   calculateQuotaSummary,
   validateSeatTransfer,
   normalizeDepartment,
@@ -479,12 +480,19 @@ export async function updateEvent(id: string, updates: any, user?: Partial<AuthU
 
   const newSeatsAvailable = Math.max(0, newTotalSeats - confirmedCount);
 
+  // If totalSeats has changed or quotaConfig exceeds newTotalSeats, automatically reconcile quotaConfig
+  let finalQuotaConfig = updates.quotaConfig || existing.quotaConfig;
+  if (finalQuotaConfig && (newTotalSeats !== existing.totalSeats || typeof updates.totalSeats !== 'undefined')) {
+    finalQuotaConfig = reconcileQuotaConfigToCapacity(finalQuotaConfig, newTotalSeats, updates.level || existing.level);
+  }
+
   const updatedEvt = {
     ...existing,
     ...updates,
     id: existing.id, // Immutable stable database ID
     totalSeats: newTotalSeats,
     seatsAvailable: newSeatsAvailable,
+    quotaConfig: finalQuotaConfig,
     updatedAt: new Date().toISOString()
   };
 
@@ -1038,37 +1046,66 @@ export async function getProgramQuotaDetailsAsync(eventId: string) {
   // 1. Fetch live registrations from Supabase
   const registrations = await fetchRegistrationsFromDatabase(eventId);
 
-  // 2. Fetch event
+  // 2. Authoritatively fetch live event from Supabase first
+  let event: any = null;
   const db = loadDb();
-  let event = (db.events || []).find((e: any) => e.id === eventId);
-  if (!event) {
+  if (isSupabaseAdminConfigured()) {
     const { data: remoteRow } = await supabaseAdmin.from('events').select('*').eq('id', eventId).single();
     if (remoteRow) {
       event = unpackEventFromSupabase(remoteRow);
       if (!db.events) db.events = [];
-      db.events.unshift(event);
+      const idx = db.events.findIndex((e: any) => e.id === eventId);
+      if (idx !== -1) {
+        db.events[idx] = { ...db.events[idx], ...event };
+      } else {
+        db.events.unshift(event);
+      }
       saveDb(db);
     }
   }
 
-  if (!event) throw new Error(`Event with ID "${eventId}" not found.`);
-
-  if (!event.quotaConfig) {
-    event.quotaConfig = createDefaultQuotaConfig(event.totalSeats, event.level);
-    saveDb(db);
-    await syncEventToSupabase(event, true).catch(() => {});
+  if (!event) {
+    event = (db.events || []).find((e: any) => e.id === eventId);
   }
 
-  // 3. Calculate summary using authoritative registrations
+  if (!event) throw new Error(`Event with ID "${eventId}" not found.`);
+
+  const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0 ? event.totalSeats : 60;
+
+  // 3. Ensure quotaConfig matches currentTotalSeats and is not holding stale old capacity
+  let needsSync = false;
+  if (!event.quotaConfig) {
+    event.quotaConfig = createDefaultQuotaConfig(currentTotalSeats, event.level);
+    needsSync = true;
+  } else {
+    // Check if total allocated quota exceeds currentTotalSeats
+    let totalAllocatedClasses = 0;
+    if (event.quotaConfig.classes) {
+      for (const item of Object.values(event.quotaConfig.classes) as any[]) {
+        if (item && item.enabled) totalAllocatedClasses += Number(item.maxSeats) || 0;
+      }
+    }
+    const isStatewide = event.quotaConfig.participationType === 'Statewide';
+    const extQuota = isStatewide && event.quotaConfig.externalQuota?.enabled
+      ? (Number(event.quotaConfig.externalQuota.maxSeats) || 0)
+      : 0;
+    const grandTotalAllocated = totalAllocatedClasses + extQuota;
+
+    if (grandTotalAllocated > currentTotalSeats && currentTotalSeats > 0) {
+      event.quotaConfig = reconcileQuotaConfigToCapacity(event.quotaConfig, currentTotalSeats, event.level);
+      needsSync = true;
+    }
+  }
+
+  // 4. Calculate summary using authoritative registrations
   const summary = calculateQuotaSummary(event, registrations);
 
-  // 4. Ensure seatsAvailable is accurately synchronized from authoritative registrations
+  // 5. Ensure seatsAvailable is accurately synchronized from authoritative registrations
   const confirmedCount = registrations.filter((r: any) =>
     ['confirmed', 'attended', 'registered'].includes((r.status || '').toLowerCase())
   ).length;
-  const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0 ? event.totalSeats : 60;
   const expectedAvailable = Math.max(0, currentTotalSeats - confirmedCount);
-  if (event.seatsAvailable !== expectedAvailable || event.totalSeats !== currentTotalSeats) {
+  if (event.seatsAvailable !== expectedAvailable || event.totalSeats !== currentTotalSeats || needsSync) {
     event.totalSeats = currentTotalSeats;
     event.seatsAvailable = expectedAvailable;
     event.updatedAt = new Date().toISOString();
@@ -1254,6 +1291,28 @@ export function updateProgramQuotaConfig(
     }
   }
 
+  // Validate that total quota does not exceed event.totalSeats
+  const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0 ? event.totalSeats : 60;
+  const mergedClasses = {
+    ...(currentConfig.classes || {}),
+    ...(configUpdates.classes || {})
+  };
+  let allocatedInternal = 0;
+  for (const c of Object.values(mergedClasses) as any[]) {
+    if (c && c.enabled) allocatedInternal += Number(c.maxSeats) || 0;
+  }
+  const isStatewide = (configUpdates.participationType || currentConfig.participationType) === 'Statewide';
+  const allocatedExternal = isStatewide && (configUpdates.externalQuota?.enabled ?? currentConfig.externalQuota?.enabled)
+    ? (Number(configUpdates.externalQuota?.maxSeats ?? currentConfig.externalQuota?.maxSeats) || 0)
+    : 0;
+  const totalAllocated = allocatedInternal + allocatedExternal;
+
+  if (!force && currentTotalSeats > 0 && totalAllocated > currentTotalSeats) {
+    throw new Error(
+      `Validation Error: Total allocated quota (${totalAllocated} seats: ${allocatedInternal} internal + ${allocatedExternal} external) cannot exceed the event capacity (${currentTotalSeats} seats). Please adjust allocations before saving.`
+    );
+  }
+
   event.quotaConfig = {
     ...currentConfig,
     ...configUpdates,
@@ -1272,9 +1331,9 @@ export function updateProgramQuotaConfig(
   const confirmedCount = (db.registrations || []).filter((r: any) =>
     r.eventId === eventId && ['confirmed', 'attended', 'registered'].includes((r.status || '').toLowerCase())
   ).length;
-  const currentTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0 ? event.totalSeats : summary.totalCapacity;
-  event.totalSeats = currentTotalSeats;
-  event.seatsAvailable = Math.max(0, currentTotalSeats - confirmedCount);
+  const effectiveTotalSeats = typeof event.totalSeats === 'number' && event.totalSeats > 0 ? event.totalSeats : summary.totalCapacity;
+  event.totalSeats = effectiveTotalSeats;
+  event.seatsAvailable = Math.max(0, effectiveTotalSeats - confirmedCount);
   event.updatedAt = new Date().toISOString();
 
   saveDb(db);

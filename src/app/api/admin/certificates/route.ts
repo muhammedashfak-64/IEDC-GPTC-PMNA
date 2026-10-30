@@ -10,7 +10,9 @@ export async function GET(req: NextRequest) {
   const { errorResponse } = requireAdminAuth(req);
   if (errorResponse) return errorResponse;
 
-  const certificates = await getCertificatesAsync(false);
+  const { searchParams } = new URL(req.url);
+  const eventId = searchParams.get('eventId') || undefined;
+  const certificates = await getCertificatesAsync(false, eventId);
   return NextResponse.json({ success: true, count: certificates.length, data: certificates });
 }
 

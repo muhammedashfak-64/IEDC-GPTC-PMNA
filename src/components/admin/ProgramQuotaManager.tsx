@@ -243,6 +243,26 @@ export default function ProgramQuotaManager({
   // Save Quotas to Backend
   const handleSaveQuotas = async (force = false) => {
     if (!quotaConfig) return;
+
+    let allocatedInternal = 0;
+    for (const c of Object.values(quotaConfig.classes || {}) as any[]) {
+      if (c && c.enabled) allocatedInternal += Number(c.maxSeats) || 0;
+    }
+    const isStatewide = quotaConfig.participationType === 'Statewide';
+    const allocatedExternal = isStatewide && quotaConfig.externalQuota?.enabled
+      ? (Number(quotaConfig.externalQuota?.maxSeats) || 0)
+      : 0;
+    const totalAllocated = allocatedInternal + allocatedExternal;
+
+    if (!force && summary?.totalCapacity && totalAllocated > summary.totalCapacity) {
+      addToast(
+        'Allocation Exceeds Capacity',
+        `Configured allocations (${totalAllocated} seats) exceed the saved event capacity (${summary.totalCapacity} seats). Please adjust class quotas before saving.`,
+        'error'
+      );
+      return;
+    }
+
     setSaving(true);
     try {
       const res = await fetch(`/api/admin/events/${eventId}/quotas`, {
@@ -516,6 +536,52 @@ export default function ProgramQuotaManager({
             <div className="text-[9px] text-slate-500">Cap: {summary.totalCapacity}</div>
           </div>
         </div>
+
+        {/* Capacity Consistency Status Banner */}
+        {(() => {
+          let allocatedInternal = 0;
+          for (const c of Object.values(quotaConfig.classes || {}) as any[]) {
+            if (c && c.enabled) allocatedInternal += Number(c.maxSeats) || 0;
+          }
+          const isStatewide = quotaConfig.participationType === 'Statewide';
+          const allocatedExternal = isStatewide && quotaConfig.externalQuota?.enabled
+            ? (Number(quotaConfig.externalQuota?.maxSeats) || 0)
+            : 0;
+          const totalAllocated = allocatedInternal + allocatedExternal;
+          const capacity = summary.totalCapacity;
+          const regCount = registrations.length;
+
+          if (regCount > capacity) {
+            return (
+              <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />
+                <div>
+                  <span className="font-bold">Existing registrations exceed capacity:</span> The event capacity has been reduced to {capacity} seats, but {regCount} participants are already registered. Existing records are preserved, and new registrations are blocked.
+                </div>
+              </div>
+            );
+          }
+
+          if (totalAllocated > capacity) {
+            return (
+              <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 text-rose-400 shrink-0" />
+                <div>
+                  <span className="font-bold">Allocation requires correction:</span> The saved event capacity is {capacity} seats, but current configured allocations ({totalAllocated} seats) exceed this limit. Please review the distribution before saving.
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              <div>
+                <span className="font-bold">Capacity synchronized:</span> The saved event capacity ({capacity} seats) and seat distribution ({totalAllocated} allocated) are consistent and authoritative.
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Global Capacity Progress Bar */}
         <div>

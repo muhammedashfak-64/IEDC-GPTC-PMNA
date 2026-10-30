@@ -61,7 +61,7 @@ export async function GET(
         if (remoteEvt) {
           event = unpackEventFromSupabase(remoteEvt);
         }
-      } catch {}
+      } catch { }
     }
 
     if (!event) {

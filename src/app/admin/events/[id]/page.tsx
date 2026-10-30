@@ -109,6 +109,7 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
   const [sampleGenerating, setSampleGenerating] = useState(false);
   const [certTemplateTab, setCertTemplateTab] = useState<'participation' | 'winner'>('participation');
   const [availableTemplates, setAvailableTemplates] = useState<any[]>([]);
+  const [showIneligibleRecipients, setShowIneligibleRecipients] = useState(false);
 
   // Participation Template Config State
   const [templateConfig, setTemplateConfig] = useState({
@@ -154,7 +155,7 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
         fetch('/api/admin/events').then((r) => r.json()),
         fetch(`/api/admin/events/${id}/attendance`).then((r) => r.json()),
         fetch(`/api/admin/events/${id}/leaders`).then((r) => r.json()),
-        fetch('/api/admin/certificates').then((r) => r.json()),
+        fetch(`/api/admin/certificates?eventId=${encodeURIComponent(id)}`).then((r) => r.json()),
         fetch('/api/admin/certificate-templates').then((r) => r.json()).catch(() => ({ success: false, data: [] }))
       ]);
 
@@ -178,8 +179,8 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
       if (regRes.success) setRegistrations(regRes.data || []);
       if (ldrRes.success) setLeaders(ldrRes.data || []);
       if (certRes.success) {
-        const programCerts = (certRes.data || []).filter((c: any) => c.eventId === id);
-        setCertificates(programCerts);
+        const programCerts = (certRes.data || []).filter((c: any) => c.eventId === id || !c.eventId);
+        setCertificates(programCerts.length > 0 ? programCerts : (certRes.data || []));
       }
     } catch (err: any) {
       console.error(err);
@@ -435,6 +436,29 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
       addToast('Error', err.message, 'error');
     } finally {
       setGenerating(false);
+    }
+  };
+
+  // Generate Certificate for Single Recipient
+  const handleGenerateSingleRecipient = async (recipient: any) => {
+    try {
+      addToast('Generating...', `Generating certificate for ${recipient.name}`, 'info');
+      const res = await fetch(`/api/admin/events/${id}/certificates/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          singleRegistrationId: recipient.id
+        })
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        addToast('Certificate Generated', `Generated certificate for ${recipient.name}`, 'success');
+        loadProgramData();
+      } else {
+        throw new Error(json.error || 'Failed generating certificate');
+      }
+    } catch (e: any) {
+      addToast('Generation Error', e.message, 'error');
     }
   };
 
@@ -796,9 +820,13 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
   };
 
   // Filtered lists
-  const presentCount = registrations.filter(
+  const eligibleAttendees = registrations.filter(
     (r) => r.attendance === 'Present' || r.status === 'Attended'
-  ).length;
+  );
+  const eligibleLeaders = leaders.filter((l) => l.certificateEligible !== false);
+  const totalEligibleCount = eligibleAttendees.length + eligibleLeaders.length;
+  const pendingCertificatesCount = Math.max(0, totalEligibleCount - certificates.length);
+  const presentCount = eligibleAttendees.length;
   const absentCount = registrations.length - presentCount;
 
   const filteredAttendanceList = registrations.filter((r) => {
@@ -909,10 +937,16 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
         </div>
 
         <div className="glass-iedc p-4 rounded-2xl border border-blue-500/20 bg-blue-500/5">
-          <div className="text-xs text-blue-400 font-bold">Generated Certs</div>
-          <div className="text-2xl font-black text-blue-300 mt-1">{certificates.length}</div>
-          <div className="text-[10px] text-blue-400/70 mt-1">
-            Leaders: {leaders.length} eligible
+          <div className="text-xs text-blue-400 font-bold">Certificates Status</div>
+          <div className="text-2xl font-black text-blue-300 mt-1">
+            {certificates.length} <span className="text-sm font-normal text-slate-400">/ {totalEligibleCount}</span>
+          </div>
+          <div className="text-[10px] mt-1 font-bold">
+            {pendingCertificatesCount > 0 ? (
+              <span className="text-amber-400">{pendingCertificatesCount} Pending Generation</span>
+            ) : (
+              <span className="text-emerald-400">All Eligible Generated</span>
+            )}
           </div>
         </div>
       </div>
@@ -924,7 +958,7 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
           { id: 'participants', label: `2. Participants (${registrations.length})`, icon: Users },
           { id: 'leaders', label: `3. Leaders & Organizers (${leaders.length})`, icon: Award },
           { id: 'template', label: '4. Certificate Template', icon: Stamp },
-          { id: 'certificates', label: `5. Generated Certificates (${certificates.length})`, icon: Award },
+          { id: 'certificates', label: `5. Generated Certificates (${certificates.length}/${totalEligibleCount})`, icon: Award },
           { id: 'reports', label: '6. Reports & Downloads', icon: Download },
           { id: 'quotas', label: 'Quotas & Seats', icon: Layers },
           { id: 'overview', label: 'Program Settings', icon: Sliders }
@@ -2052,23 +2086,80 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
       {/* TAB 5: CERTIFICATES & DISTRIBUTION                       */}
       {/* ======================================================== */}
       {activeTab === 'certificates' && (() => {
-        const filteredCerts = certificates.filter((c) => {
+        // Build Unified Recipient List
+        const eligibleRecipientsList = [
+          ...eligibleAttendees.map((r) => {
+            const existingCert = certificates.find(
+              (c) =>
+                c.registrationId === r.id ||
+                (c.participantName && r.studentName && c.participantName.trim().toLowerCase() === r.studentName.trim().toLowerCase())
+            );
+            return {
+              id: r.id,
+              recipientKey: r.id,
+              name: r.studentName,
+              registrationId: r.registrationCode || r.id,
+              phone: r.phone,
+              email: r.email,
+              type: 'Participant',
+              attendance: 'Present',
+              isEligible: true,
+              cert: existingCert || null,
+              status: existingCert ? 'Ready' : 'Pending',
+              isLeader: false
+            };
+          }),
+          ...eligibleLeaders.map((l) => {
+            const existingCert = certificates.find(
+              (c) =>
+                c.registrationId === l.id ||
+                (c.participantName && l.name && c.participantName.trim().toLowerCase() === l.name.trim().toLowerCase())
+            );
+            return {
+              id: l.id,
+              recipientKey: l.id,
+              name: l.name,
+              registrationId: l.registerNumber || l.id,
+              phone: l.phone,
+              email: l.email,
+              type: l.role || 'Student Lead',
+              attendance: 'Present',
+              isEligible: true,
+              cert: existingCert || null,
+              status: existingCert ? 'Ready' : 'Pending',
+              isLeader: true
+            };
+          })
+        ];
+
+        const ineligibleAttendeesList = registrations.filter(
+          (r) => r.attendance === 'Absent' || (r.status !== 'Attended' && r.attendance !== 'Present' && program?.requiresAttendance !== false)
+        );
+
+        const filteredRecipients = eligibleRecipientsList.filter((item) => {
           const q = certSearch.toLowerCase().trim();
           const matchSearch =
             !q ||
-            (c.participantName || '').toLowerCase().includes(q) ||
-            (c.certificateId || '').toLowerCase().includes(q) ||
-            (c.registrationId || '').toLowerCase().includes(q);
-          const matchType = certTypeFilter === 'All' || c.certificateType === certTypeFilter;
-          const matchStatus = certStatusFilter === 'All' || c.status === certStatusFilter;
+            (item.name || '').toLowerCase().includes(q) ||
+            (item.registrationId || '').toLowerCase().includes(q) ||
+            (item.cert?.certificateId || '').toLowerCase().includes(q);
+          const matchType =
+            certTypeFilter === 'All' ||
+            item.type === certTypeFilter ||
+            (item.cert && item.cert.certificateType === certTypeFilter);
+          const matchStatus =
+            certStatusFilter === 'All' ||
+            (certStatusFilter === 'Pending' && !item.cert) ||
+            (item.cert && item.cert.status === certStatusFilter);
           return matchSearch && matchType && matchStatus;
         });
 
         const toggleSelectAllCerts = () => {
-          if (selectedCertIds.size === filteredCerts.length && filteredCerts.length > 0) {
+          const selectableKeys = filteredRecipients.filter((r) => r.cert).map((r) => r.cert!.id || r.cert!.certificateId);
+          if (selectableKeys.length > 0 && selectableKeys.every((k) => selectedCertIds.has(k))) {
             setSelectedCertIds(new Set());
           } else {
-            setSelectedCertIds(new Set(filteredCerts.map((c) => c.id || c.certificateId)));
+            setSelectedCertIds(new Set(selectableKeys));
           }
         };
 
@@ -2081,8 +2172,87 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
           });
         };
 
+        const publishedCertsCount = certificates.filter((c) => c.status === 'Published').length;
+
         return (
           <div className="space-y-6">
+            {/* Top 6 KPI Metric Cards for Certificate System */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+              <div className="glass-iedc p-3.5 rounded-2xl border border-white/10">
+                <span className="text-[10px] font-mono uppercase text-slate-400 block">Total Registered</span>
+                <span className="text-xl font-black text-white mt-0.5 block">{registrations.length}</span>
+                <span className="text-[10px] text-slate-500">Participants</span>
+              </div>
+
+              <div className="glass-iedc p-3.5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5">
+                <span className="text-[10px] font-mono uppercase text-emerald-400 block font-bold">Eligible Recipients</span>
+                <span className="text-xl font-black text-emerald-300 mt-0.5 block">{totalEligibleCount}</span>
+                <span className="text-[10px] text-emerald-400/70">Marked Present</span>
+              </div>
+
+              <div className="glass-iedc p-3.5 rounded-2xl border border-blue-500/20 bg-blue-500/5">
+                <span className="text-[10px] font-mono uppercase text-blue-400 block font-bold">Generated / Ready</span>
+                <span className="text-xl font-black text-blue-300 mt-0.5 block">{certificates.length}</span>
+                <span className="text-[10px] text-blue-400/70">PDF + PNG ready</span>
+              </div>
+
+              <div className={`glass-iedc p-3.5 rounded-2xl border ${pendingCertificatesCount > 0 ? 'border-amber-500/30 bg-amber-500/10' : 'border-white/10'}`}>
+                <span className={`text-[10px] font-mono uppercase block font-bold ${pendingCertificatesCount > 0 ? 'text-amber-400' : 'text-slate-400'}`}>
+                  Pending Generation
+                </span>
+                <span className={`text-xl font-black mt-0.5 block ${pendingCertificatesCount > 0 ? 'text-amber-300' : 'text-slate-400'}`}>
+                  {pendingCertificatesCount}
+                </span>
+                <span className="text-[10px] text-slate-500">
+                  {pendingCertificatesCount > 0 ? 'Requires Generation' : 'None Pending'}
+                </span>
+              </div>
+
+              <div className="glass-iedc p-3.5 rounded-2xl border border-rose-500/20 bg-rose-500/5">
+                <span className="text-[10px] font-mono uppercase text-rose-400 block font-bold">Ineligible (Absent)</span>
+                <span className="text-xl font-black text-rose-300 mt-0.5 block">{ineligibleAttendeesList.length}</span>
+                <span className="text-[10px] text-rose-400/70">Withheld per Policy</span>
+              </div>
+
+              <div className="glass-iedc p-3.5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5">
+                <span className="text-[10px] font-mono uppercase text-emerald-400 block font-bold">Published to Students</span>
+                <span className="text-xl font-black text-emerald-300 mt-0.5 block">{publishedCertsCount}</span>
+                <span className="text-[10px] text-emerald-400/70">Publicly accessible</span>
+              </div>
+            </div>
+
+            {/* Alert Banner */}
+            {pendingCertificatesCount > 0 ? (
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0" />
+                  <div>
+                    <h4 className="text-sm font-bold text-amber-300">
+                      Action Required: {pendingCertificatesCount} Eligible Attendee(s) Missing Certificates
+                    </h4>
+                    <p className="text-xs text-amber-200/80 mt-0.5">
+                      {pendingCertificatesCount} present participant(s) do not have generated certificate records yet. Click &quot;Generate All Pending Certificates&quot; to create them immediately.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleGenerateCertificates(false)}
+                  disabled={generating}
+                  className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-extrabold text-xs whitespace-nowrap shadow-lg flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  {generating ? 'Generating...' : `Generate All Pending (${pendingCertificatesCount})`}
+                </button>
+              </div>
+            ) : totalEligibleCount > 0 ? (
+              <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-2.5 text-xs text-emerald-300">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                <span>
+                  <strong>All Synchronized:</strong> All {totalEligibleCount} eligible attendees have high-resolution certificates generated and ready for instant distribution.
+                </span>
+              </div>
+            ) : null}
+
             {/* Generation Summary Box (when batch generated) */}
             {generationSummary && (
               <div
@@ -2222,9 +2392,9 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                     className="bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
                   >
                     <option value="All">All Types</option>
-                    <option value="Participation">Participation</option>
+                    <option value="Participant">Participation</option>
                     <option value="Achievement">Achievement / Winner</option>
-                    <option value="Organizer">Organizer / Lead</option>
+                    <option value="Student Lead">Organizer / Lead</option>
                   </select>
 
                   <select
@@ -2235,6 +2405,7 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                     <option value="All">All Statuses</option>
                     <option value="Published">Published</option>
                     <option value="Draft">Draft</option>
+                    <option value="Pending">Pending Generation</option>
                   </select>
                 </div>
 
@@ -2287,7 +2458,7 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
               </div>
             </div>
 
-            {/* Generated Certificates Table with 9 Required Columns */}
+            {/* Unified Recipients Table with All Columns */}
             <div className="glass-iedc rounded-2xl border border-white/10 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse text-xs">
@@ -2297,12 +2468,12 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                         <input
                           type="checkbox"
                           checked={
-                            filteredCerts.length > 0 &&
-                            filteredCerts.every((c) => selectedCertIds.has(c.id || c.certificateId))
+                            filteredRecipients.filter((r) => r.cert).length > 0 &&
+                            filteredRecipients.filter((r) => r.cert).every((r) => selectedCertIds.has(r.cert!.id || r.cert!.certificateId))
                           }
                           onChange={toggleSelectAllCerts}
                           className="rounded border-slate-700 text-[#F98A5B] focus:ring-[#F98A5B] bg-[#18181D] cursor-pointer"
-                          title="Select all certificates"
+                          title="Select all ready certificates"
                         />
                       </th>
                       <th className="py-3 px-3">#</th>
@@ -2318,25 +2489,22 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 text-slate-300">
-                    {filteredCerts.length === 0 ? (
+                    {filteredRecipients.length === 0 ? (
                       <tr>
                         <td colSpan={11} className="py-12 text-center text-slate-500">
                           <Award className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                          <p className="text-sm font-semibold">No certificates generated yet.</p>
+                          <p className="text-sm font-semibold">No eligible recipients found.</p>
                           <p className="text-xs mt-1">
-                            Click &quot;Generate Certificates&quot; above to create certificates for all eligible present attendees.
+                            Ensure participants are marked Present in Tab 1 (Attendance) to become eligible for certificates.
                           </p>
                         </td>
                       </tr>
                     ) : (
-                      filteredCerts.map((cert, idx) => {
-                        const certKey = cert.id || cert.certificateId;
-                        const isSelected = selectedCertIds.has(certKey);
-                        const reg = registrations.find(
-                          (r) => r.id === cert.registrationId || r.studentName === cert.participantName
-                        );
-                        const attendanceStatus = reg?.attendance || (reg?.status === 'Attended' ? 'Present' : 'Present');
-                        const safeName = (cert.participantName || 'Participant').replace(/[^a-zA-Z0-9]/g, '_').toUpperCase();
+                      filteredRecipients.map((recipient, idx) => {
+                        const cert = recipient.cert;
+                        const certKey = cert ? (cert.id || cert.certificateId) : `pending-${recipient.id}`;
+                        const isSelected = cert ? selectedCertIds.has(certKey) : false;
+                        const safeName = (recipient.name || 'Participant').replace(/[^a-zA-Z0-9]/g, '_').toUpperCase();
 
                         return (
                           <tr
@@ -2344,95 +2512,132 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                             className={`hover:bg-white/5 transition-colors ${isSelected ? 'bg-[#F98A5B]/[0.05]' : ''}`}
                           >
                             <td className="py-3 px-3 text-center">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleSelectOneCert(certKey)}
-                                className="rounded border-slate-700 text-[#F98A5B] focus:ring-[#F98A5B] bg-[#18181D] cursor-pointer"
-                              />
+                              {cert ? (
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleSelectOneCert(certKey)}
+                                  className="rounded border-slate-700 text-[#F98A5B] focus:ring-[#F98A5B] bg-[#18181D] cursor-pointer"
+                                />
+                              ) : (
+                                <span className="text-slate-600 text-xs">—</span>
+                              )}
                             </td>
                             <td className="py-3 px-3 text-slate-500 font-mono">{idx + 1}</td>
                             <td className="py-3 px-4 font-bold text-white whitespace-nowrap">
-                              {cert.participantName}
+                              {recipient.name}
+                              {recipient.isLeader && (
+                                <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] bg-purple-500/20 text-purple-300 font-normal">
+                                  Lead
+                                </span>
+                              )}
                             </td>
                             <td className="py-3 px-4 font-mono text-slate-400 whitespace-nowrap">
-                              {cert.registrationId || reg?.registrationCode || reg?.id || 'N/A'}
+                              {recipient.registrationId || 'N/A'}
                             </td>
-                            <td className="py-3 px-4 font-mono font-bold text-[#F98A5B] whitespace-nowrap">
-                              {cert.certificateId}
+                            <td className="py-3 px-4 font-mono font-bold whitespace-nowrap">
+                              {cert ? (
+                                <span className="text-[#F98A5B]">{cert.certificateId}</span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/20 text-amber-400 text-[11px] font-mono">
+                                  Pending Generation
+                                </span>
+                              )}
                             </td>
                             <td className="py-3 px-4 text-slate-300">
                               <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 font-medium text-[11px]">
-                                {cert.certificateType || 'Participation'}
+                                {cert?.certificateType || recipient.type || 'Participation'}
                               </span>
                             </td>
                             <td className="py-3 px-4 text-center">
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                                {attendanceStatus}
+                                Present
                               </span>
                             </td>
                             <td className="py-3 px-4 text-center">
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-300 border border-blue-500/30">
-                                Ready (PDF+PNG)
-                              </span>
+                              {cert ? (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/10 text-blue-300 border border-blue-500/30">
+                                  Ready (PDF+PNG)
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 animate-pulse">
+                                  Pending Generation
+                                </span>
+                              )}
                             </td>
                             <td className="py-3 px-4 text-center">
-                              <button
-                                onClick={() => handleToggleSingleCertPublication(cert)}
-                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all cursor-pointer ${
-                                  cert.status === 'Published'
-                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20'
-                                    : 'bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20'
-                                }`}
-                                title="Click to toggle publication"
-                              >
-                                {cert.status === 'Published' ? 'Published' : 'Draft'}
-                              </button>
+                              {cert ? (
+                                <button
+                                  onClick={() => handleToggleSingleCertPublication(cert)}
+                                  className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all cursor-pointer ${
+                                    cert.status === 'Published'
+                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-500/20'
+                                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/30 hover:bg-amber-500/20'
+                                  }`}
+                                  title="Click to toggle publication"
+                                >
+                                  {cert.status === 'Published' ? 'Published' : 'Draft'}
+                                </button>
+                              ) : (
+                                <span className="text-slate-500 text-[11px]">Unissued</span>
+                              )}
                             </td>
                             <td className="py-3 px-4 text-slate-400 font-mono text-[11px] whitespace-nowrap">
-                              {cert.issueDate || cert.createdAt || cert.eventDate || 'N/A'}
+                              {cert?.issueDate || cert?.createdAt || 'Pending'}
                             </td>
                             <td className="py-3 px-4 text-right whitespace-nowrap">
-                              <div className="flex items-center justify-end gap-1.5">
-                                {/* Preview */}
-                                <a
-                                  href={cert.pdfStorageUrl || `/certificates/${cert.certificateId}.pdf`}
-                                  target="_blank"
-                                  className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors flex items-center gap-1 font-mono text-[11px]"
-                                  title="Preview PDF Certificate in new tab"
-                                >
-                                  <Eye className="w-3.5 h-3.5 text-blue-400" /> Preview
-                                </a>
+                              {cert ? (
+                                <div className="flex items-center justify-end gap-1.5">
+                                  {/* Preview */}
+                                  <a
+                                    href={cert.pdfStorageUrl || `/certificates/${cert.certificateId}.pdf`}
+                                    target="_blank"
+                                    className="px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white transition-colors flex items-center gap-1 font-mono text-[11px]"
+                                    title="Preview PDF Certificate in new tab"
+                                  >
+                                    <Eye className="w-3.5 h-3.5 text-blue-400" /> Preview
+                                  </a>
 
-                                {/* Download PDF */}
-                                <a
-                                  href={cert.pdfStorageUrl || `/certificates/${cert.certificateId}.pdf`}
-                                  download={`Certificate_${safeName}_IEDC.pdf`}
-                                  className="px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-300 transition-colors flex items-center gap-1 text-[11px] font-bold cursor-pointer"
-                                  title="Download high-resolution PDF certificate"
-                                >
-                                  <Download className="w-3.5 h-3.5" /> PDF
-                                </a>
+                                  {/* Download PDF */}
+                                  <a
+                                    href={cert.pdfStorageUrl || `/certificates/${cert.certificateId}.pdf`}
+                                    download={`Certificate_${safeName}_IEDC.pdf`}
+                                    className="px-2 py-1 rounded-lg bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-300 transition-colors flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                                    title="Download high-resolution PDF certificate"
+                                  >
+                                    <Download className="w-3.5 h-3.5" /> PDF
+                                  </a>
 
-                                {/* Download PNG */}
-                                <a
-                                  href={`/api/public/certificates/${cert.certificateId || cert.id}/png`}
-                                  download={`Certificate_${safeName}_IEDC.png`}
-                                  className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-300 transition-colors flex items-center gap-1 text-[11px] font-bold cursor-pointer"
-                                  title="Download companion PNG certificate"
-                                >
-                                  <Download className="w-3.5 h-3.5" /> PNG
-                                </a>
+                                  {/* Download PNG */}
+                                  <a
+                                    href={`/api/public/certificates/${cert.certificateId || cert.id}/png`}
+                                    download={`Certificate_${safeName}_IEDC.png`}
+                                    className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/20 text-amber-300 transition-colors flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                                    title="Download companion PNG certificate"
+                                  >
+                                    <Download className="w-3.5 h-3.5" /> PNG
+                                  </a>
 
-                                {/* Regenerate */}
-                                <button
-                                  onClick={() => handleRegenerateSingleCert(cert)}
-                                  className="p-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-[#F98A5B] transition-colors cursor-pointer"
-                                  title="Regenerate this certificate"
-                                >
-                                  <RefreshCw className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
+                                  {/* Regenerate */}
+                                  <button
+                                    onClick={() => handleRegenerateSingleCert(cert)}
+                                    className="p-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-[#F98A5B] transition-colors cursor-pointer"
+                                    title="Regenerate this certificate"
+                                  >
+                                    <RefreshCw className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-end">
+                                  <button
+                                    onClick={() => handleGenerateSingleRecipient(recipient)}
+                                    className="px-2.5 py-1 rounded-lg bg-gradient-to-r from-[#F98A5B] to-[#EC3A74] text-white text-[11px] font-bold flex items-center gap-1 hover:opacity-90 shadow-sm cursor-pointer"
+                                    title="Generate certificate for this eligible participant"
+                                  >
+                                    <Award className="w-3.5 h-3.5" /> Generate Certificate
+                                  </button>
+                                </div>
+                              )}
                             </td>
                           </tr>
                         );
@@ -2442,6 +2647,66 @@ export default function ProgramWorkspacePage({ params }: { params: Promise<{ id:
                 </table>
               </div>
             </div>
+
+            {/* Collapsible Section for Ineligible / Absent Participants */}
+            {ineligibleAttendeesList.length > 0 && (
+              <div className="glass-iedc rounded-2xl border border-rose-500/20 overflow-hidden">
+                <button
+                  onClick={() => setShowIneligibleRecipients(!showIneligibleRecipients)}
+                  className="w-full p-4 flex items-center justify-between text-left hover:bg-white/5 transition-colors cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-rose-400" />
+                    <span className="text-xs font-bold text-rose-300">
+                      Ineligible / Absent Participants ({ineligibleAttendeesList.length})
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      — Participants marked absent or ineligible for certificates
+                    </span>
+                  </div>
+                  <span className="text-xs text-slate-400 font-mono">
+                    {showIneligibleRecipients ? '▲ Hide Ineligible' : '▼ View Ineligible'}
+                  </span>
+                </button>
+
+                {showIneligibleRecipients && (
+                  <div className="overflow-x-auto border-t border-rose-500/20">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="bg-rose-950/20 text-slate-400 uppercase font-mono tracking-wider">
+                          <th className="py-2.5 px-3">#</th>
+                          <th className="py-2.5 px-4 font-bold">Participant Name</th>
+                          <th className="py-2.5 px-4 font-bold">Registration ID</th>
+                          <th className="py-2.5 px-4 font-bold">Phone</th>
+                          <th className="py-2.5 px-4 font-bold">Department</th>
+                          <th className="py-2.5 px-4 text-center font-bold">Attendance</th>
+                          <th className="py-2.5 px-4 font-bold">Eligibility Reason</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5 text-slate-300">
+                        {ineligibleAttendeesList.map((r, i) => (
+                          <tr key={r.id} className="hover:bg-white/5">
+                            <td className="py-2.5 px-3 text-slate-500 font-mono">{i + 1}</td>
+                            <td className="py-2.5 px-4 font-bold text-white">{r.studentName}</td>
+                            <td className="py-2.5 px-4 font-mono text-slate-400">{r.registrationCode || r.id}</td>
+                            <td className="py-2.5 px-4 text-slate-400 font-mono">{r.phone || 'N/A'}</td>
+                            <td className="py-2.5 px-4 text-slate-400">{r.department || 'General'}</td>
+                            <td className="py-2.5 px-4 text-center">
+                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                                Absent
+                              </span>
+                            </td>
+                            <td className="py-2.5 px-4 text-rose-300/80 text-[11px]">
+                              Marked Absent — Certificate withheld per event policy
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         );
       })()}

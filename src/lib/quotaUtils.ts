@@ -125,6 +125,82 @@ export function createDefaultQuotaConfig(
   };
 }
 
+export function reconcileQuotaConfigToCapacity(
+  existingConfig: ProgramQuotaConfig | undefined | null,
+  totalSeats: number,
+  level = 'College'
+): ProgramQuotaConfig {
+  const safeTotal = Math.max(1, Number(totalSeats) || 24);
+  if (!existingConfig) {
+    return createDefaultQuotaConfig(safeTotal, level);
+  }
+
+  const isStatewide = existingConfig.participationType === 'Statewide' || level?.toLowerCase().includes('state');
+  const participationType: ProgramParticipationType =
+    existingConfig.participationType || (isStatewide ? 'Statewide' : 'Entire College');
+
+  if (participationType === 'Single Class') {
+    return {
+      ...existingConfig,
+      participationType: 'Single Class',
+      singleClass: {
+        department: existingConfig.singleClass?.department || 'Civil Engineering',
+        academicYear: existingConfig.singleClass?.academicYear || 'Second Year',
+        maxSeats: safeTotal
+      }
+    };
+  }
+
+  let externalSeats = 0;
+  let internalSeats = safeTotal;
+  if (isStatewide && existingConfig.externalQuota?.enabled) {
+    const rawExt = Number(existingConfig.externalQuota.maxSeats) || 0;
+    externalSeats = Math.min(rawExt, Math.max(1, Math.floor(safeTotal / 2)));
+    internalSeats = Math.max(1, safeTotal - externalSeats);
+  }
+
+  const enabledKeys: string[] = [];
+  const classes: Record<string, ClassQuotaItem> = {};
+
+  for (const dept of COLLEGE_DEPARTMENTS) {
+    for (const yr of COLLEGE_ACADEMIC_YEARS) {
+      const key = `${dept}__${yr}`;
+      const prevItem = existingConfig.classes?.[key];
+      const isEnabled = prevItem ? prevItem.enabled : true;
+      if (isEnabled) enabledKeys.push(key);
+      classes[key] = {
+        department: dept,
+        academicYear: yr,
+        enabled: isEnabled,
+        maxSeats: 1
+      };
+    }
+  }
+
+  const count = enabledKeys.length || 12;
+  const basePerClass = Math.max(1, Math.floor(internalSeats / count));
+  let allocated = 0;
+
+  for (let i = 0; i < enabledKeys.length; i++) {
+    const k = enabledKeys[i];
+    const seats = i === enabledKeys.length - 1 ? Math.max(1, internalSeats - allocated) : basePerClass;
+    classes[k].maxSeats = seats;
+    allocated += seats;
+  }
+
+  return {
+    ...existingConfig,
+    participationType,
+    classes,
+    externalQuota: {
+      enabled: isStatewide,
+      maxSeats: externalSeats
+    },
+    waitlistEnabled: existingConfig.waitlistEnabled !== false,
+    reallocationLogs: existingConfig.reallocationLogs || []
+  };
+}
+
 export function calculateQuotaSummary(
   event: any,
   registrations: any[]
