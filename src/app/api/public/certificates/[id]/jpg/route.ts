@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { loadDb, getCertificateTemplates } from '@/lib/serverStore';
-import { generateSingleCertificateJpg, resolveTemplateFile } from '@/lib/certificateGenerator';
+import { generateSingleCertificateJpg, resolveTemplateFile, resolveCertificateSubtitles } from '@/lib/certificateGenerator';
 import { supabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabaseAdmin';
 import { unpackCertificateFromSupabase, unpackEventFromSupabase } from '@/lib/supabaseSync';
 
@@ -21,18 +21,21 @@ export async function GET(
     }
 
     const cleanId = id.trim().toUpperCase();
+    const rawId = id.trim();
 
     // 1. Authoritatively fetch certificate record from local cache or Supabase
     const db = loadDb();
     let cert = (db.certificates || []).find(
-      (c: any) => c.certificateId && c.certificateId.toUpperCase() === cleanId
+      (c: any) =>
+        (c.certificateId && c.certificateId.toUpperCase() === cleanId) ||
+        (c.id && (c.id === rawId || c.id.toUpperCase() === cleanId))
     );
 
     if (!cert && isSupabaseAdminConfigured()) {
       const { data: remoteCert } = await supabaseAdmin
         .from('certificates')
         .select('*')
-        .eq('certificate_id', cleanId)
+        .or(`certificate_id.eq.${cleanId},id.eq.${rawId}`)
         .single();
       if (remoteCert) {
         cert = unpackCertificateFromSupabase(remoteCert);
@@ -42,6 +45,8 @@ export async function GET(
     if (!cert) {
       return new NextResponse('Certificate not found for the given ID.', { status: 404 });
     }
+
+    const actualCertId = cert.certificateId || cleanId;
 
     // 2. Authoritatively fetch event record
     let event = (db.events || []).find((e: any) => e.id === cert.eventId);
@@ -81,22 +86,30 @@ export async function GET(
         : (event?.templateConfig || {}))
     };
 
+    const certType = cert.certificateType || event?.certificateType || 'Participation';
     const formattedSubtitle = isWinner
       ? (event?.winnerCertificateTitle ? `— ${event.winnerCertificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : '— OF ACHIEVEMENT —')
       : (event?.certificateTitle ? `— ${event.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : undefined);
 
+    const { subtitle, intro, isWinnerOrAchievement } = resolveCertificateSubtitles({
+      certificateType: certType,
+      role: cert.certificateType,
+      awardCategory: cert.awardCategory || event?.awardCategory,
+      certificateSubtitle: formattedSubtitle
+    });
+
     const { jpgBytes } = await generateSingleCertificateJpg(
       {
-        certificateId: cleanId,
+        certificateId: actualCertId,
         recipientName: cert.participantName,
         programName: cert.eventName,
         programDate: cert.eventDate || cert.issueDate || new Date().toISOString().split('T')[0],
         organizingBody: event?.organizingBody || undefined,
         role: cert.certificateType,
-        certificateType: isWinner ? 'Achievement' : 'Participation',
+        certificateType: isWinnerOrAchievement ? 'Achievement' : certType,
         awardCategory: isWinner ? (cert.awardCategory || event?.awardCategory || 'Winner') : undefined,
-        certificateSubtitle: formattedSubtitle,
-        recipientIntro: isWinner ? 'THIS CERTIFICATE IS AWARDED TO' : undefined,
+        certificateSubtitle: subtitle,
+        recipientIntro: intro,
         customParagraph,
         customTemplatePath: resolvedTemplatePath
       },
@@ -109,14 +122,17 @@ export async function GET(
       if (!fs.existsSync(publicCertDir)) {
         fs.mkdirSync(publicCertDir, { recursive: true });
       }
-      fs.writeFileSync(path.join(publicCertDir, `${cleanId}.jpg`), jpgBytes);
+      fs.writeFileSync(path.join(publicCertDir, `${actualCertId}.jpg`), jpgBytes);
     } catch {}
+
+    const isInline = req.nextUrl.searchParams.get('inline') === '1' || req.nextUrl.searchParams.get('preview') === '1';
+    const disposition = isInline ? `inline; filename="${actualCertId}.jpg"` : `attachment; filename="${actualCertId}.jpg"`;
 
     return new NextResponse(jpgBytes as any, {
       status: 200,
       headers: {
         'Content-Type': 'image/jpeg',
-        'Content-Disposition': `attachment; filename="${cleanId}.jpg"`,
+        'Content-Disposition': disposition,
         'Cache-Control': 'no-cache, no-store, must-revalidate'
       }
     });

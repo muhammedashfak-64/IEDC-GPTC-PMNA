@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/adminAuthHelper';
-import { generateSingleCertificatePdf, resolveTemplateFile } from '@/lib/certificateGenerator';
+import { generateSingleCertificatePdf, resolveTemplateFile, resolveCertificateSubtitles } from '@/lib/certificateGenerator';
 import path from 'path';
 import fs from 'fs';
 import os from 'os';
@@ -102,14 +102,13 @@ export async function POST(req: NextRequest) {
     }
 
     const previewCertId = `PREVIEW-${Date.now()}`;
-    const isWinner =
-      certificateType.toLowerCase().includes('achievement') ||
-      certificateType.toLowerCase().includes('winner') ||
-      certificateType.toLowerCase().includes('prize');
-
-    const formattedSubtitle = isWinner
-      ? (body.certificateSubtitle || (body.winnerCertificateTitle ? `— ${body.winnerCertificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : (body.certificateTitle ? `— ${body.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : '— OF ACHIEVEMENT —')))
-      : (body.certificateSubtitle || (body.certificateTitle ? `— ${body.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : undefined));
+    const { subtitle, intro, isWinnerOrAchievement } = resolveCertificateSubtitles({
+      certificateType,
+      awardCategory,
+      certificateSubtitle: body.certificateSubtitle || body.certificateTitle || body.winnerCertificateTitle,
+      recipientIntro: body.recipientIntro
+    });
+    const isWinner = isWinnerOrAchievement;
 
     const generated = await generateSingleCertificatePdf(
       {
@@ -118,10 +117,10 @@ export async function POST(req: NextRequest) {
         programName,
         programDate,
         organizingBody,
-        certificateType: isWinner ? 'Achievement' : 'Participation',
-        awardCategory: isWinner ? (awardCategory || 'First Prize Winner') : undefined,
-        certificateSubtitle: formattedSubtitle,
-        recipientIntro: isWinner ? (body.recipientIntro || 'THIS CERTIFICATE IS AWARDED TO') : undefined,
+        certificateType: isWinnerOrAchievement ? 'Achievement' : certificateType,
+        awardCategory: isWinnerOrAchievement ? (awardCategory || 'First Prize Winner') : undefined,
+        certificateSubtitle: subtitle,
+        recipientIntro: intro,
         customParagraph,
         recipientPhotoUrl,
         customTemplatePath: resolvedTemplatePath

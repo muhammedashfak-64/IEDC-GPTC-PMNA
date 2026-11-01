@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs';
 import path from 'path';
 import { loadDb, getCertificateTemplates } from '@/lib/serverStore';
-import { generateSingleCertificatePdf, resolveTemplateFile } from '@/lib/certificateGenerator';
+import { generateSingleCertificatePdf, resolveTemplateFile, resolveCertificateSubtitles } from '@/lib/certificateGenerator';
 import { supabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabaseAdmin';
 import { unpackCertificateFromSupabase, unpackEventFromSupabase } from '@/lib/supabaseSync';
 
@@ -98,9 +98,17 @@ export async function GET(
         : (event?.templateConfig || {}))
     };
 
+    const certType = cert.certificateType || event?.certificateType || 'Participation';
     const formattedSubtitle = isWinner
       ? (event?.winnerCertificateTitle ? `— ${event.winnerCertificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : '— OF ACHIEVEMENT —')
       : (event?.certificateTitle ? `— ${event.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : undefined);
+
+    const { subtitle, intro, isWinnerOrAchievement } = resolveCertificateSubtitles({
+      certificateType: certType,
+      role: cert.certificateType,
+      awardCategory: cert.awardCategory || event?.awardCategory,
+      certificateSubtitle: formattedSubtitle
+    });
 
     // 6. Generate fresh PDF using the exact authoritative assigned template
     const generated = await generateSingleCertificatePdf(
@@ -111,10 +119,10 @@ export async function GET(
         programDate: cert.eventDate || cert.issueDate || new Date().toISOString().split('T')[0],
         organizingBody: event?.organizingBody || undefined,
         role: cert.certificateType,
-        certificateType: isWinner ? 'Achievement' : 'Participation',
+        certificateType: isWinnerOrAchievement ? 'Achievement' : certType,
         awardCategory: isWinner ? (cert.awardCategory || event?.awardCategory || 'Winner') : undefined,
-        certificateSubtitle: formattedSubtitle,
-        recipientIntro: isWinner ? 'THIS CERTIFICATE IS AWARDED TO' : undefined,
+        certificateSubtitle: subtitle,
+        recipientIntro: intro,
         customParagraph,
         customTemplatePath: resolvedTemplatePath
       },

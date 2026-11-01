@@ -24,6 +24,16 @@ export default function CertificateTemplatesPage() {
   const [showModal, setShowModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newTemplateUrl, setNewTemplateUrl] = useState('');
+  const [newCertType, setNewCertType] = useState('Participation');
+  const [newHeading, setNewHeading] = useState('CERTIFICATE');
+  const [newSubtitle, setNewSubtitle] = useState('— OF PARTICIPATION —');
+  const [newIntro, setNewIntro] = useState('THIS CERTIFICATE IS PRESENTED TO');
+
+  const [activeCertType, setActiveCertType] = useState('Participation');
+  const [activeHeading, setActiveHeading] = useState('CERTIFICATE');
+  const [activeSubtitle, setActiveSubtitle] = useState('— OF PARTICIPATION —');
+  const [activeIntro, setActiveIntro] = useState('THIS CERTIFICATE IS PRESENTED TO');
+
   const [generatingPreview, setGeneratingPreview] = useState(false);
   const [savingPresets, setSavingPresets] = useState(false);
   const [livePdfUrl, setLivePdfUrl] = useState('/api/admin/certificates/sample-preview?type=participation');
@@ -31,11 +41,40 @@ export default function CertificateTemplatesPage() {
 
   // Preview Form Controls
   const [previewName, setPreviewName] = useState('MUHAMMED ASHFAK O');
-  const [certType, setCertType] = useState<'Participation' | 'Achievement'>('Participation');
+  const [certType, setCertType] = useState<string>('Participation');
   const [awardCategory, setAwardCategory] = useState('First Prize Winner');
   const [programTitle, setProgramTitle] = useState('State-Wide Drone Innovation Hackathon 2026');
   const [programDate, setProgramDate] = useState('20 October 2026');
   const [customDescription, setCustomDescription] = useState('');
+
+  const handleCertTypeChange = (type: string, isModal = false) => {
+    let sub = '— OF PARTICIPATION —';
+    let intro = 'THIS CERTIFICATE IS PRESENTED TO';
+    if (type === 'Winner') {
+      sub = '— OF ACHIEVEMENT —';
+      intro = 'THIS CERTIFICATE IS AWARDED TO';
+    } else if (type === 'Achievement') {
+      sub = '— OF ACHIEVEMENT —';
+      intro = 'THIS CERTIFICATE IS AWARDED TO';
+    } else if (type === 'Appreciation') {
+      sub = '— OF APPRECIATION —';
+      intro = 'THIS CERTIFICATE IS PRESENTED TO';
+    } else if (type === 'Completion') {
+      sub = '— OF COMPLETION —';
+      intro = 'THIS CERTIFICATE IS PRESENTED TO';
+    }
+
+    if (isModal) {
+      setNewCertType(type);
+      setNewSubtitle(sub);
+      setNewIntro(intro);
+    } else {
+      setActiveCertType(type);
+      setActiveSubtitle(sub);
+      setActiveIntro(intro);
+      setCertType(type);
+    }
+  };
 
   // Master Template Placement Configuration
   const [activeConfig, setActiveConfig] = useState({
@@ -82,6 +121,13 @@ export default function CertificateTemplatesPage() {
         if (activeTpl?.templateConfig) {
           setActiveConfig((prev) => ({ ...prev, ...activeTpl.templateConfig }));
         }
+        if (activeTpl?.certificateType) {
+          setActiveCertType(activeTpl.certificateType);
+          setCertType(activeTpl.certificateType);
+        }
+        if (activeTpl?.certificateHeading) setActiveHeading(activeTpl.certificateHeading);
+        if (activeTpl?.certificateSubtitle) setActiveSubtitle(activeTpl.certificateSubtitle);
+        if (activeTpl?.recipientIntro) setActiveIntro(activeTpl.recipientIntro);
       }
     } catch (e) {
       console.error('Failed to load templates:', e);
@@ -96,6 +142,21 @@ export default function CertificateTemplatesPage() {
 
   const activeTemplate = templates.find((t) => t.id === selectedPreviewId) || templates.find((t) => t.isActive) || templates[0];
 
+  const selectTemplateForPreview = (tpl: any) => {
+    setSelectedPreviewId(tpl.id);
+    if (tpl.templateConfig) {
+      setActiveConfig((prev) => ({ ...prev, ...tpl.templateConfig }));
+    }
+    if (tpl.certificateType) {
+      setActiveCertType(tpl.certificateType);
+      setCertType(tpl.certificateType);
+    }
+    if (tpl.certificateHeading) setActiveHeading(tpl.certificateHeading);
+    if (tpl.certificateSubtitle) setActiveSubtitle(tpl.certificateSubtitle);
+    if (tpl.recipientIntro) setActiveIntro(tpl.recipientIntro);
+    triggerPreviewForTemplate(tpl);
+  };
+
   const handleSetActive = async (id: string) => {
     try {
       const res = await fetch('/api/admin/certificate-templates', {
@@ -108,12 +169,10 @@ export default function CertificateTemplatesPage() {
         setTemplates((prev) => prev.map((t) => ({ ...t, isActive: t.id === id })));
         setSelectedPreviewId(id);
         const target = templates.find((t) => t.id === id);
-        if (target?.templateConfig) {
-          setActiveConfig((prev) => ({ ...prev, ...target.templateConfig }));
+        if (target) {
+          selectTemplateForPreview(target);
         }
         addToast('Active Template Updated & Persisted', 'The selected template is now the master template for all future certificates.', 'success');
-        // Automatically regenerate preview using this template
-        triggerPreviewForTemplate(target || activeTemplate);
       } else {
         throw new Error(json.error || 'Failed to update active template');
       }
@@ -163,6 +222,10 @@ export default function CertificateTemplatesPage() {
         body: JSON.stringify({
           title: newTitle.trim(),
           url: newTemplateUrl,
+          certificateType: newCertType,
+          certificateHeading: newHeading,
+          certificateSubtitle: newSubtitle,
+          recipientIntro: newIntro,
           isActive: true,
           templateConfig: activeConfig
         })
@@ -176,8 +239,7 @@ export default function CertificateTemplatesPage() {
         setNewTemplateUrl('');
         await fetchTemplates();
         if (savedTpl) {
-          setSelectedPreviewId(savedTpl.id);
-          triggerPreviewForTemplate(savedTpl);
+          selectTemplateForPreview(savedTpl);
         }
       } else {
         throw new Error(json.error || 'Failed saving template to database');
@@ -196,6 +258,10 @@ export default function CertificateTemplatesPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: targetId,
+          certificateType: activeCertType,
+          certificateHeading: activeHeading,
+          certificateSubtitle: activeSubtitle,
+          recipientIntro: activeIntro,
           templateConfig: activeConfig
         })
       });
@@ -224,8 +290,11 @@ export default function CertificateTemplatesPage() {
           recipientName: previewName,
           programName: programTitle,
           programDate: programDate,
-          certificateType: certType,
+          certificateType: tpl?.certificateType || activeCertType || certType,
           awardCategory: awardCategory,
+          certificateHeading: tpl?.certificateHeading || activeHeading,
+          certificateSubtitle: tpl?.certificateSubtitle || activeSubtitle,
+          recipientIntro: tpl?.recipientIntro || activeIntro,
           customParagraph: customDescription || undefined,
           templateConfig: activeConfig,
           certificateTemplateUrl: tplUrl
@@ -254,8 +323,11 @@ export default function CertificateTemplatesPage() {
           recipientName: previewName,
           programName: programTitle,
           programDate: programDate,
-          certificateType: certType,
+          certificateType: activeCertType || certType,
           awardCategory: awardCategory,
+          certificateHeading: activeHeading,
+          certificateSubtitle: activeSubtitle,
+          recipientIntro: activeIntro,
           customParagraph: customDescription || undefined,
           templateConfig: activeConfig,
           certificateTemplateUrl: activeTemplate?.cleanUrl || activeTemplate?.pdfUrl || activeTemplate?.url
@@ -335,6 +407,19 @@ export default function CertificateTemplatesPage() {
                               Active Master
                             </span>
                           )}
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                            (tpl.certificateType || 'Participation').toLowerCase().includes('winner')
+                              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                              : (tpl.certificateType || 'Participation').toLowerCase().includes('achievement')
+                              ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                              : (tpl.certificateType || 'Participation').toLowerCase().includes('appreciation')
+                              ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
+                              : (tpl.certificateType || 'Participation').toLowerCase().includes('completion')
+                              ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/40'
+                              : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                          }`}>
+                            {tpl.certificateType || 'Participation'}
+                          </span>
                           {isSelectedForPreview && !tpl.isActive && (
                             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#F98A5B]/20 text-[#F98A5B] border border-[#F98A5B]/40">
                               Currently Previewing
@@ -347,13 +432,7 @@ export default function CertificateTemplatesPage() {
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           type="button"
-                          onClick={() => {
-                            setSelectedPreviewId(tpl.id);
-                            if (tpl.templateConfig) {
-                              setActiveConfig((prev) => ({ ...prev, ...tpl.templateConfig }));
-                            }
-                            triggerPreviewForTemplate(tpl);
-                          }}
+                          onClick={() => selectTemplateForPreview(tpl)}
                           className={`px-2.5 py-1 rounded-lg border text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 ${
                             isSelectedForPreview
                               ? 'bg-[#F98A5B]/20 border-[#F98A5B] text-white'
@@ -395,61 +474,134 @@ export default function CertificateTemplatesPage() {
             </div>
           </div>
 
-          {/* 2. Certificate Type Selector (Type A vs Type B) */}
+          {/* 2. Certificate Type & Wording Settings */}
           <div className="glass-iedc p-5 rounded-2xl border border-white/10 space-y-4">
             <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <Trophy className="w-4 h-4 text-amber-400" /> Certificate Type &amp; Wording Mode
+              <Trophy className="w-4 h-4 text-amber-400" /> Certificate Type &amp; Subtitle Configuration
             </h3>
 
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setCertType('Participation')}
-                className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all text-center flex flex-col items-center gap-1 ${
-                  certType === 'Participation'
-                    ? 'bg-[#F98A5B]/20 border-[#F98A5B] text-white shadow-md'
-                    : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
-                }`}
-              >
-                <Award className="w-4 h-4 text-[#F98A5B]" />
-                <span>Type A: Participation</span>
-                <span className="text-[9px] text-slate-400 font-normal">Present to all attendees</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setCertType('Achievement')}
-                className={`py-2.5 px-3 rounded-xl border text-xs font-bold transition-all text-center flex flex-col items-center gap-1 ${
-                  certType === 'Achievement'
-                    ? 'bg-amber-500/20 border-amber-500 text-white shadow-md'
-                    : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
-                }`}
-              >
-                <Trophy className="w-4 h-4 text-amber-400" />
-                <span>Type B: Achievement / Winner</span>
-                <span className="text-[9px] text-slate-400 font-normal">Award to prize winners</span>
-              </button>
+            {/* Certificate Type Selection Grid */}
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { id: 'Participation', label: 'Participation', icon: Award },
+                { id: 'Winner', label: 'Winner', icon: Trophy },
+                { id: 'Achievement', label: 'Achievement', icon: Sparkles },
+                { id: 'Appreciation', label: 'Appreciation', icon: CheckCircle2 },
+                { id: 'Completion', label: 'Completion', icon: Stamp },
+                { id: 'Custom', label: 'Custom', icon: Sliders }
+              ].map((item) => {
+                const Icon = item.icon;
+                const isSelected = activeCertType === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleCertTypeChange(item.id, false)}
+                    className={`py-2 px-2 rounded-xl border text-xs font-bold transition-all text-center flex flex-col items-center gap-1 cursor-pointer ${
+                      isSelected
+                        ? 'bg-[#F98A5B]/20 border-[#F98A5B] text-white shadow-md'
+                        : 'bg-white/5 border-white/10 text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Icon className={`w-3.5 h-3.5 ${isSelected ? 'text-[#F98A5B]' : 'text-slate-400'}`} />
+                    <span className="text-[11px] truncate w-full">{item.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
-            {certType === 'Achievement' && (
-              <div className="space-y-2 pt-2 border-t border-white/10">
-                <label className="text-xs font-bold text-amber-300 block">
-                  Award Category
-                </label>
-                <select
-                  value={awardCategory}
-                  onChange={(e) => setAwardCategory(e.target.value)}
-                  className="w-full bg-[#0B0B0D] border border-white/15 focus:border-amber-400 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
-                >
-                  <option value="Winner / First Prize">Winner / First Prize</option>
-                  <option value="Second Prize / Runner-up">Second Prize / Runner-up</option>
-                  <option value="Third Prize">Third Prize</option>
-                  <option value="Special Award">Special Award</option>
-                  <option value="Best Technical Innovation">Best Technical Innovation</option>
-                  <option value="Outstanding Contributor">Outstanding Contributor</option>
-                </select>
+            {/* Subtitle & Heading Inputs */}
+            <div className="space-y-3 pt-2 border-t border-white/10">
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="text-[11px] text-slate-300 font-bold block mb-1">
+                    Main Heading
+                  </label>
+                  <input
+                    type="text"
+                    value={activeHeading}
+                    onChange={(e) => setActiveHeading(e.target.value)}
+                    className="w-full bg-[#0B0B0D] border border-white/15 focus:border-[#F98A5B] rounded-xl px-3 py-1.5 text-xs text-white"
+                    placeholder="CERTIFICATE"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-slate-300 font-bold block mb-1">
+                    Subtitle Y (pt)
+                  </label>
+                  <input
+                    type="number"
+                    value={activeConfig.subtitleY}
+                    onChange={(e) => setActiveConfig({ ...activeConfig, subtitleY: Number(e.target.value) })}
+                    className="w-full bg-[#0B0B0D] border border-white/15 focus:border-[#F98A5B] rounded-xl px-3 py-1.5 text-xs text-white"
+                  />
+                </div>
               </div>
-            )}
+
+              <div>
+                <label className="text-[11px] text-slate-300 font-bold block mb-1">
+                  Certificate Type Subtitle (Appears under CERTIFICATE)
+                </label>
+                <input
+                  type="text"
+                  value={activeSubtitle}
+                  onChange={(e) => setActiveSubtitle(e.target.value)}
+                  className="w-full bg-[#0B0B0D] border border-white/15 focus:border-[#F98A5B] rounded-xl px-3 py-1.5 text-xs text-white font-mono"
+                  placeholder="— OF PARTICIPATION —"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 text-xs items-center">
+                <div className="col-span-2">
+                  <label className="text-[11px] text-slate-300 font-bold block mb-1">
+                    Recipient Intro (Above Name)
+                  </label>
+                  <input
+                    type="text"
+                    value={activeIntro}
+                    onChange={(e) => setActiveIntro(e.target.value)}
+                    className="w-full bg-[#0B0B0D] border border-white/15 focus:border-[#F98A5B] rounded-xl px-3 py-1.5 text-xs text-white font-mono text-[10px]"
+                    placeholder="THIS CERTIFICATE IS PRESENTED TO"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-slate-300 font-bold block mb-1">
+                    Intro Y (pt)
+                  </label>
+                  <input
+                    type="number"
+                    value={activeConfig.introY}
+                    onChange={(e) => setActiveConfig({ ...activeConfig, introY: Number(e.target.value) })}
+                    className="w-full bg-[#0B0B0D] border border-white/15 focus:border-[#F98A5B] rounded-xl px-3 py-1.5 text-xs text-white"
+                  />
+                </div>
+              </div>
+
+              {(activeCertType === 'Winner' || activeCertType === 'Achievement') && (
+                <div className="space-y-1 pt-1">
+                  <label className="text-[11px] font-bold text-amber-300 block">
+                    Award Category Sample
+                  </label>
+                  <select
+                    value={awardCategory}
+                    onChange={(e) => {
+                      setAwardCategory(e.target.value);
+                      if (activeCertType === 'Winner') {
+                        setActiveSubtitle(`— ${e.target.value.toUpperCase()} —`);
+                      }
+                    }}
+                    className="w-full bg-[#0B0B0D] border border-white/15 focus:border-amber-400 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none"
+                  >
+                    <option value="First Prize Winner">First Prize Winner</option>
+                    <option value="Second Prize / Runner-up">Second Prize / Runner-up</option>
+                    <option value="Third Prize">Third Prize</option>
+                    <option value="Special Award">Special Award</option>
+                    <option value="Best Technical Innovation">Best Technical Innovation</option>
+                    <option value="Outstanding Contributor">Outstanding Contributor</option>
+                  </select>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* 3. Dynamic Text & Positioning Controls */}
@@ -624,19 +776,63 @@ export default function CertificateTemplatesPage() {
 
             <form onSubmit={handleAddTemplate} className="space-y-4">
               <div>
-                <label className="text-xs text-slate-400 block mb-1">Template Title</label>
+                <label className="text-xs text-slate-300 font-bold block mb-1">Template Title</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. 2026 Bootcamp Participation Certificate"
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
-                  className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
+                  className="w-full bg-[#0B0B0D] border border-white/10 focus:border-[#F98A5B] rounded-xl px-3 py-2 text-xs text-white"
                 />
               </div>
 
               <div>
-                <label className="text-xs text-slate-400 block mb-1">
+                <label className="text-xs text-slate-300 font-bold block mb-1">
+                  Mandatory Certificate Type
+                </label>
+                <select
+                  required
+                  value={newCertType}
+                  onChange={(e) => handleCertTypeChange(e.target.value, true)}
+                  className="w-full bg-[#0B0B0D] border border-white/15 focus:border-[#F98A5B] rounded-xl px-3 py-2 text-xs text-white"
+                >
+                  <option value="Participation">Certificate of Participation</option>
+                  <option value="Winner">Certificate of Winner</option>
+                  <option value="Achievement">Certificate of Achievement</option>
+                  <option value="Appreciation">Certificate of Appreciation</option>
+                  <option value="Completion">Certificate of Completion</option>
+                  <option value="Custom">Custom Certificate Type</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Certificate Subtitle</label>
+                  <input
+                    type="text"
+                    required
+                    value={newSubtitle}
+                    onChange={(e) => setNewSubtitle(e.target.value)}
+                    className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white font-mono"
+                    placeholder="— OF PARTICIPATION —"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] text-slate-400 block mb-1">Recipient Intro</label>
+                  <input
+                    type="text"
+                    required
+                    value={newIntro}
+                    onChange={(e) => setNewIntro(e.target.value)}
+                    className="w-full bg-[#0B0B0D] border border-white/10 rounded-xl px-3 py-1.5 text-xs text-white font-mono text-[10px]"
+                    placeholder="THIS CERTIFICATE IS PRESENTED TO"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-slate-300 font-bold block mb-1">
                   Upload Template File (PDF, PNG, JPG)
                 </label>
                 <FileUpload

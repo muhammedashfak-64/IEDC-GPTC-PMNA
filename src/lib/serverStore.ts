@@ -4,7 +4,13 @@ import os from 'os';
 import crypto from 'crypto';
 import JSZip from 'jszip';
 import { revalidatePath } from 'next/cache';
-import { generateSingleCertificatePdf, generateSingleCertificatePng, resolveTemplateFile } from './certificateGenerator';
+import {
+  generateSingleCertificatePdf,
+  generateSingleCertificatePng,
+  generateSingleCertificateJpg,
+  resolveTemplateFile,
+  resolveCertificateSubtitles
+} from './certificateGenerator';
 import { supabase } from '@/lib/supabase';
 import { supabaseAdmin, isSupabaseAdminConfigured } from '@/lib/supabaseAdmin';
 import {
@@ -1979,15 +1985,23 @@ export async function ensureCertificatePdfExists(cert: any, force = false): Prom
       ? (event?.winnerTemplateConfig || event?.templateConfig || {})
       : (event?.templateConfig || {});
 
-    const formattedSubtitle = isWinner
-      ? (event?.winnerCertificateTitle ? `— ${event.winnerCertificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : '— OF ACHIEVEMENT —')
-      : (event?.certificateTitle ? `— ${event.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : undefined);
-
     const allTemplates = getCertificateTemplates();
     const activeGlobalTemplate = allTemplates.find((t: any) => t.isActive) || allTemplates[0];
     const templateToUse = event?.certificateTemplateUrl || activeGlobalTemplate?.cleanUrl || undefined;
     const resolvedTemplatePath = await resolveTemplateFile(templateToUse);
     const defaultTemplateConfig = activeGlobalTemplate?.templateConfig || undefined;
+
+    const certType = cert.certificateType || event?.certificateType || 'Participation';
+    const formattedSubtitle = isWinner
+      ? (event?.winnerCertificateTitle ? `— ${event.winnerCertificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : '— OF ACHIEVEMENT —')
+      : (event?.certificateTitle ? `— ${event.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : undefined);
+
+    const { subtitle, intro, isWinnerOrAchievement } = resolveCertificateSubtitles({
+      certificateType: certType,
+      role: cert.certificateType,
+      awardCategory: cert.awardCategory || event?.awardCategory,
+      certificateSubtitle: formattedSubtitle
+    });
 
     const finalConfig = {
       ...(defaultTemplateConfig || {}),
@@ -2001,10 +2015,10 @@ export async function ensureCertificatePdfExists(cert: any, force = false): Prom
       programDate: cert.eventDate || cert.issueDate || new Date().toISOString().split('T')[0],
       organizingBody: event?.organizingBody || undefined,
       role: cert.certificateType,
-      certificateType: isWinner ? 'Achievement' : 'Participation',
+      certificateType: isWinnerOrAchievement ? 'Achievement' : certType,
       awardCategory: isWinner ? (cert.awardCategory || event?.awardCategory || 'Winner') : undefined,
-      certificateSubtitle: formattedSubtitle,
-      recipientIntro: isWinner ? 'THIS CERTIFICATE IS AWARDED TO' : undefined,
+      certificateSubtitle: subtitle,
+      recipientIntro: intro,
       customParagraph,
       customTemplatePath: resolvedTemplatePath
     }, targetConfig);
@@ -2050,15 +2064,23 @@ export async function ensureCertificatePngExists(cert: any, force = false): Prom
       ? (event?.winnerTemplateConfig || event?.templateConfig || {})
       : (event?.templateConfig || {});
 
-    const formattedSubtitle = isWinner
-      ? (event?.winnerCertificateTitle ? `— ${event.winnerCertificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : '— OF ACHIEVEMENT —')
-      : (event?.certificateTitle ? `— ${event.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : undefined);
-
     const allTemplates = getCertificateTemplates();
     const activeGlobalTemplate = allTemplates.find((t: any) => t.isActive) || allTemplates[0];
     const templateToUse = event?.certificateTemplateUrl || activeGlobalTemplate?.cleanUrl || undefined;
     const resolvedTemplatePath = await resolveTemplateFile(templateToUse);
     const defaultTemplateConfig = activeGlobalTemplate?.templateConfig || undefined;
+
+    const certType = cert.certificateType || event?.certificateType || 'Participation';
+    const formattedSubtitle = isWinner
+      ? (event?.winnerCertificateTitle ? `— ${event.winnerCertificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : '— OF ACHIEVEMENT —')
+      : (event?.certificateTitle ? `— ${event.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : undefined);
+
+    const { subtitle, intro, isWinnerOrAchievement } = resolveCertificateSubtitles({
+      certificateType: certType,
+      role: cert.certificateType,
+      awardCategory: cert.awardCategory || event?.awardCategory,
+      certificateSubtitle: formattedSubtitle
+    });
 
     const finalConfig = {
       ...(defaultTemplateConfig || {}),
@@ -2072,10 +2094,10 @@ export async function ensureCertificatePngExists(cert: any, force = false): Prom
       programDate: cert.eventDate || cert.issueDate || new Date().toISOString().split('T')[0],
       organizingBody: event?.organizingBody || undefined,
       role: cert.certificateType,
-      certificateType: isWinner ? 'Achievement' : 'Participation',
+      certificateType: isWinnerOrAchievement ? 'Achievement' : certType,
       awardCategory: isWinner ? (cert.awardCategory || event?.awardCategory || 'Winner') : undefined,
-      certificateSubtitle: formattedSubtitle,
-      recipientIntro: isWinner ? 'THIS CERTIFICATE IS AWARDED TO' : undefined,
+      certificateSubtitle: subtitle,
+      recipientIntro: intro,
       customParagraph,
       customTemplatePath: resolvedTemplatePath
     }, finalConfig);
@@ -2639,6 +2661,14 @@ export async function generateProgramCertificates(
         ? (event.winnerCertificateTitle ? `— ${event.winnerCertificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : '— OF ACHIEVEMENT —')
         : (event.certificateTitle ? `— ${event.certificateTitle.replace(/^—\s*|\s*—$/g, '').trim()} —` : undefined);
 
+      const certRoleType = recipient.role || (isWinner ? 'Winner' : (event.certificateType || 'Participation'));
+      const { subtitle, intro, isWinnerOrAchievement } = resolveCertificateSubtitles({
+        certificateType: certRoleType,
+        role: recipient.role,
+        awardCategory: event.awardCategory || recipient.role,
+        certificateSubtitle: formattedSubtitle
+      });
+
       const generated = await generateSingleCertificatePdf(
         {
           certificateId: certId,
@@ -2648,14 +2678,33 @@ export async function generateProgramCertificates(
           organizingBody,
           customParagraph,
           role: recipient.role,
-          certificateType: isWinner ? 'Achievement' : 'Participation',
+          certificateType: isWinnerOrAchievement ? 'Achievement' : certRoleType,
           awardCategory: isWinner ? (event.awardCategory || recipient.role || 'Winner') : undefined,
-          certificateSubtitle: formattedSubtitle,
-          recipientIntro: isWinner ? 'THIS CERTIFICATE IS AWARDED TO' : undefined,
+          certificateSubtitle: subtitle,
+          recipientIntro: intro,
           customTemplatePath: preResolvedTemplatePath
         },
         targetConfig
       );
+
+      // Also ensure companion PNG is prepared in background
+      generateSingleCertificatePng(
+        {
+          certificateId: certId,
+          recipientName: recipient.name,
+          programName,
+          programDate,
+          organizingBody,
+          customParagraph,
+          role: recipient.role,
+          certificateType: isWinnerOrAchievement ? 'Achievement' : certRoleType,
+          awardCategory: isWinner ? (event.awardCategory || recipient.role || 'Winner') : undefined,
+          certificateSubtitle: subtitle,
+          recipientIntro: intro,
+          customTemplatePath: preResolvedTemplatePath
+        },
+        targetConfig
+      ).catch(() => {});
 
       const initialStatus =
         event.certificateStatus === 'Published' ? 'Published' : (existingCert?.status || 'Draft');
@@ -2910,8 +2959,11 @@ export async function retrieveStudentCertificate(eventId: string, fullName: stri
   saveDb(db);
   syncCertificateToSupabase(match, true).catch(() => {});
 
-  // Ensure PDF file physically exists on disk and is fresh before returning response
-  await ensureCertificatePdfExists(match, true);
+  // Ensure both PDF and PNG files physically exist on disk and are fresh before returning response
+  await Promise.all([
+    ensureCertificatePdfExists(match, true),
+    ensureCertificatePngExists(match, true)
+  ]);
 
   return {
     success: true,
@@ -2925,6 +2977,7 @@ export async function retrieveStudentCertificate(eventId: string, fullName: stri
       downloadUrl: `/api/public/certificates/${match.certificateId}/pdf`,
       pdfDownloadUrl: `/api/public/certificates/${match.certificateId}/pdf`,
       pngDownloadUrl: `/api/public/certificates/${match.certificateId}/png`,
+      jpgDownloadUrl: `/api/public/certificates/${match.certificateId}/jpg`,
       status: match.status
     }
   };
@@ -4017,6 +4070,10 @@ export function getCertificateTemplates() {
     db.certificateTemplates.unshift({
       id: 'tpl-master-vector',
       title: 'Official IEDC Master Certificate (Vector Reference)',
+      certificateType: 'Participation',
+      certificateHeading: 'CERTIFICATE',
+      certificateSubtitle: '— OF PARTICIPATION —',
+      recipientIntro: 'THIS CERTIFICATE IS PRESENTED TO',
       type: 'Vector PDF Master',
       pdfUrl: '/templates/reference_certificate.pdf',
       cleanUrl: '/templates/clean_master_template.pdf',
@@ -4029,13 +4086,29 @@ export function getCertificateTemplates() {
     saveDb(db);
   }
 
-  // Sanitize any templates that lack cleanUrl
+  // Sanitize any templates that lack cleanUrl or certificateType
   db.certificateTemplates.forEach((t: any) => {
     if (!t.cleanUrl) {
       t.cleanUrl = t.pdfUrl || t.url || t.backgroundImageUrl || '/templates/clean_master_template.pdf';
     }
     if (!t.pdfUrl) {
       t.pdfUrl = t.cleanUrl;
+    }
+    if (!t.certificateType) {
+      t.certificateType = (t.title?.toLowerCase().includes('winner') || t.description?.toLowerCase().includes('winner'))
+        ? 'Winner'
+        : (t.title?.toLowerCase().includes('achievement') ? 'Achievement' : 'Participation');
+    }
+    if (!t.certificateHeading) t.certificateHeading = 'CERTIFICATE';
+    if (!t.certificateSubtitle) {
+      t.certificateSubtitle = (t.certificateType === 'Winner' || t.certificateType === 'Achievement')
+        ? '— OF ACHIEVEMENT —'
+        : '— OF PARTICIPATION —';
+    }
+    if (!t.recipientIntro) {
+      t.recipientIntro = (t.certificateType === 'Winner' || t.certificateType === 'Achievement')
+        ? 'THIS CERTIFICATE IS AWARDED TO'
+        : 'THIS CERTIFICATE IS PRESENTED TO';
     }
   });
 
@@ -4069,10 +4142,32 @@ export function saveCertificateTemplate(templateData: any, user: AuthUser) {
   const id = templateData.id || `tpl-${Date.now()}`;
   const rawUrl = templateData.cleanUrl || templateData.url || templateData.pdfUrl || '';
   const isImage = !rawUrl.toLowerCase().endsWith('.pdf');
+
+  const certType = templateData.certificateType || templateData.type || 'Participation';
+  const heading = templateData.certificateHeading || 'CERTIFICATE';
+  const subtitle = templateData.certificateSubtitle || (
+    certType.toLowerCase().includes('winner') || certType.toLowerCase().includes('achievement')
+      ? '— OF ACHIEVEMENT —'
+      : (certType.toLowerCase().includes('appreciation')
+        ? '— OF APPRECIATION —'
+        : (certType.toLowerCase().includes('completion')
+          ? '— OF COMPLETION —'
+          : '— OF PARTICIPATION —'))
+  );
+  const intro = templateData.recipientIntro || (
+    certType.toLowerCase().includes('winner') || certType.toLowerCase().includes('achievement')
+      ? 'THIS CERTIFICATE IS AWARDED TO'
+      : 'THIS CERTIFICATE IS PRESENTED TO'
+  );
+
   const newTpl = {
     id,
     title: String(templateData.title || 'Custom Certificate Template').trim(),
-    type: templateData.type || (isImage ? 'Image Master' : 'PDF Master'),
+    certificateType: certType,
+    certificateHeading: heading,
+    certificateSubtitle: subtitle,
+    recipientIntro: intro,
+    type: isImage ? 'Image Master' : 'Vector PDF Master',
     url: rawUrl,
     pdfUrl: templateData.pdfUrl || rawUrl,
     cleanUrl: templateData.cleanUrl || rawUrl,
@@ -4080,7 +4175,7 @@ export function saveCertificateTemplate(templateData: any, user: AuthUser) {
     isActive: Boolean(templateData.isActive),
     templateConfig: templateData.templateConfig || undefined,
     version: (db.certificateTemplates.length || 0) + 1,
-    description: templateData.description || 'Custom uploaded certificate template.',
+    description: templateData.description || `Official ${certType} certificate template.`,
     uploadedBy: user?.full_name || user?.username || 'Admin',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()

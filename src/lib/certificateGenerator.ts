@@ -79,11 +79,76 @@ export interface CertificateGenerateParams {
   recipientIntro?: string; // 'THIS CERTIFICATE IS PRESENTED TO' or 'THIS CERTIFICATE IS AWARDED TO'
   customParagraph?: string;
   role?: string; // 'Participant' | 'Winner' | 'First Prize' | 'Runner-up' | 'Student Lead' | 'Coordinator'
-  certificateType?: 'Participation' | 'Achievement' | 'Winner' | string;
+  certificateType?: 'Participation' | 'Achievement' | 'Winner' | 'Appreciation' | 'Completion' | string;
   awardCategory?: string; // 'Winner' | 'First Prize' | 'Second Prize' | 'Third Prize' | 'Special Award' | 'Custom Achievement'
   achievementDescription?: string;
   recipientPhotoUrl?: string; // optional recipient photo path or URL
   customTemplatePath?: string;
+}
+
+/**
+ * Authoritatively resolves and normalizes certificate type, subtitle, and recipient intro.
+ * Guarantees that EVERY certificate (Participation, Winner, Achievement, Appreciation, Completion, etc.)
+ * possesses a complete, professionally formatted subtitle and recipient introduction.
+ */
+export function resolveCertificateSubtitles(params: {
+  certificateType?: string;
+  role?: string;
+  awardCategory?: string;
+  certificateSubtitle?: string;
+  recipientIntro?: string;
+}): {
+  certificateType: string;
+  subtitle: string;
+  intro: string;
+  isWinnerOrAchievement: boolean;
+} {
+  const rawType = (params.certificateType || params.role || 'Participation').trim();
+  const lowerType = rawType.toLowerCase();
+
+  const isWinner =
+    lowerType.includes('winner') ||
+    lowerType.includes('prize') ||
+    lowerType.includes('rank') ||
+    lowerType.includes('place') ||
+    (params.role && (params.role.toLowerCase().includes('winner') || params.role.toLowerCase().includes('prize')));
+
+  const isAchievement = lowerType.includes('achievement');
+  const isAppreciation = lowerType.includes('appreciation');
+  const isCompletion = lowerType.includes('completion');
+
+  let defaultSubtitle = '— OF PARTICIPATION —';
+  let defaultIntro = 'THIS CERTIFICATE IS PRESENTED TO';
+
+  if (isWinner) {
+    const category = params.awardCategory || params.role || 'Winner';
+    const cleanCat = category.replace(/^—\s*|\s*—$/g, '').trim().toUpperCase();
+    defaultSubtitle = `— ${cleanCat} —`;
+    defaultIntro = 'THIS CERTIFICATE IS AWARDED TO';
+  } else if (isAchievement) {
+    defaultSubtitle = '— OF ACHIEVEMENT —';
+    defaultIntro = 'THIS CERTIFICATE IS AWARDED TO';
+  } else if (isAppreciation) {
+    defaultSubtitle = '— OF APPRECIATION —';
+    defaultIntro = 'THIS CERTIFICATE IS PRESENTED TO';
+  } else if (isCompletion) {
+    defaultSubtitle = '— OF COMPLETION —';
+    defaultIntro = 'THIS CERTIFICATE IS PRESENTED TO';
+  }
+
+  let finalSubtitle = params.certificateSubtitle ? params.certificateSubtitle.trim() : defaultSubtitle;
+  if (finalSubtitle && !finalSubtitle.startsWith('—') && !finalSubtitle.includes('—')) {
+    finalSubtitle = `— ${finalSubtitle.trim()} —`;
+  }
+
+  const finalIntro = params.recipientIntro ? params.recipientIntro.trim().toUpperCase() : defaultIntro;
+
+  return {
+    certificateType: rawType,
+    subtitle: finalSubtitle,
+    intro: finalIntro,
+    isWinnerOrAchievement: isWinner || isAchievement
+  };
 }
 
 export interface CertificateConfig {
@@ -326,12 +391,8 @@ export async function generateSingleCertificatePdf(
     photoHeight: normalizeNumber(config.photoHeight, DEFAULT_CERT_CONFIG.photoHeight || 95)
   };
 
-  // Determine Certificate Type: Type A (Participation) vs Type B (Achievement/Winner)
-  const isTypeB =
-    params.certificateType?.toLowerCase().includes('achievement') ||
-    params.certificateType?.toLowerCase().includes('winner') ||
-    params.certificateType?.toLowerCase().includes('prize') ||
-    (params.role && params.role.toLowerCase().includes('winner'));
+  // Determine Certificate Subtitle, Recipient Intro, and Type
+  const { subtitle, intro, isWinnerOrAchievement } = resolveCertificateSubtitles(params);
 
   // 1. Locate the master template
   const masterCleanPath = path.join(process.cwd(), 'public', 'templates', 'clean_master_template.pdf');
@@ -415,10 +476,49 @@ export async function generateSingleCertificatePdf(
   const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
   const fontRegular = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-  // 2. Type B Header Replacement (if Certificate of Achievement / Winner)
-  if (isTypeB) {
-    // Only cleanly cover the default line if using the vector PDF master where "— OF PARTICIPATION —" is pre-printed
-    if (!isCustomImage && !cleanPathLower.endsWith('.pdf')) {
+  // Check if using the official vector PDF master (which has pre-printed "— OF PARTICIPATION —")
+  const isMasterVectorPdf =
+    !isCustomImage &&
+    (cleanPathLower.includes('reference_certificate') || cleanPathLower.includes('clean_master_template'));
+
+  // 2. Subtitle & Recipient Intro Rendering
+  if (isMasterVectorPdf) {
+    // If Winner, Achievement, Appreciation, Completion, or non-default subtitle: cleanly cover pre-printed text
+    if (
+      isWinnerOrAchievement ||
+      params.certificateType !== 'Participation' ||
+      (params.certificateSubtitle && !params.certificateSubtitle.includes('PARTICIPATION'))
+    ) {
+      page.drawRectangle({
+        x: 180,
+        y: 350,
+        width: width - 360,
+        height: 75,
+        color: safeRgb(1, 1, 1)
+      });
+
+      const subWidth = fontBold.widthOfTextAtSize(subtitle, 13);
+      page.drawText(subtitle, {
+        x: (width - subWidth) / 2,
+        y: cfg.subtitleY || 398,
+        size: 13,
+        font: fontBold,
+        color: safeRgb(26 / 255, 36 / 255, 86 / 255) // Official IEDC Navy Blue
+      });
+
+      const introWidth = fontRegular.widthOfTextAtSize(intro, 11);
+      page.drawText(intro, {
+        x: (width - introWidth) / 2,
+        y: cfg.introY || 363,
+        size: 11,
+        font: fontRegular,
+        color: safeRgb(31 / 255, 41 / 255, 55 / 255)
+      });
+    }
+  } else {
+    // Custom Image Template or Uploaded Template:
+    // If Winner/Achievement on a template that has pre-printed participation, cleanly cover it
+    if (isWinnerOrAchievement && isCustomImage && cleanPathLower.includes('participate')) {
       page.drawRectangle({
         x: 180,
         y: 350,
@@ -428,9 +528,9 @@ export async function generateSingleCertificatePdf(
       });
     }
 
-    const subTitle = params.certificateSubtitle || '— OF ACHIEVEMENT —';
-    const subWidth = fontBold.widthOfTextAtSize(subTitle, 13);
-    page.drawText(subTitle, {
+    // Always draw subtitle and intro on custom/uploaded templates
+    const subWidth = fontBold.widthOfTextAtSize(subtitle, 13);
+    page.drawText(subtitle, {
       x: (width - subWidth) / 2,
       y: cfg.subtitleY || 398,
       size: 13,
@@ -438,7 +538,6 @@ export async function generateSingleCertificatePdf(
       color: safeRgb(26 / 255, 36 / 255, 86 / 255) // Official IEDC Navy Blue
     });
 
-    const intro = params.recipientIntro || 'THIS CERTIFICATE IS AWARDED TO';
     const introWidth = fontRegular.widthOfTextAtSize(intro, 11);
     page.drawText(intro, {
       x: (width - introWidth) / 2,
@@ -457,7 +556,7 @@ export async function generateSingleCertificatePdf(
   // Dynamically shrink font size if name is particularly long
   const maxNameWidth = width - 240;
   if (nameWidth > maxNameWidth) {
-    nameSize = Math.max(20, (maxNameWidth / nameWidth) * nameSize);
+    nameSize = Math.max(18, (maxNameWidth / nameWidth) * nameSize);
     nameWidth = fontBold.widthOfTextAtSize(cleanName, nameSize);
   }
 
@@ -475,7 +574,7 @@ export async function generateSingleCertificatePdf(
   const orgBody = params.organizingBody || 'the IEDC Cell, Government Polytechnic College Perinthalmanna';
 
   if (!paraText) {
-    if (isTypeB) {
+    if (isWinnerOrAchievement) {
       const category = params.awardCategory || params.role || 'Winner';
       paraText = `In recognition of your outstanding achievement as ${category} in the ${params.programName}, organized by ${orgBody}, held on ${params.programDate}.`;
     } else {
@@ -694,60 +793,79 @@ export async function generateSingleCertificatePng(
     }
   }
 
+  // Determine Certificate Subtitle, Recipient Intro, and Type
+  const { subtitle, intro, isWinnerOrAchievement } = resolveCertificateSubtitles(params);
+
   const meta = await sharp(resolvedTemplatePath).metadata();
-  const imgWidth = meta.width || 1920;
-  const imgHeight = meta.height || 1358;
-  const scale = imgWidth / 842.25;
+  const rawWidth = meta.width || 1920;
+  const rawHeight = meta.height || 1358;
+
+  // Preserve native high resolution without memory exhaustion (cap max dimension at 3840px for ultra-sharp 4K)
+  const maxDim = 3840;
+  let imgWidth = rawWidth;
+  let imgHeight = rawHeight;
+  if (imgWidth > maxDim) {
+    imgWidth = maxDim;
+    imgHeight = Math.round(rawHeight * (maxDim / rawWidth));
+  }
+
+  const scaleX = imgWidth / 842.25;
+  const scaleY = imgHeight / 595.5;
 
   // Normalized values
-  const nameY = (595.5 - normalizeNumber(config.nameY, DEFAULT_CERT_CONFIG.nameY)) * scale;
-  const nameFontSize = normalizeNumber(config.nameFontSize, DEFAULT_CERT_CONFIG.nameFontSize, 10, 60) * scale;
+  const nameY = (595.5 - normalizeNumber(config.nameY, DEFAULT_CERT_CONFIG.nameY)) * scaleY;
+  let nameFontSize = normalizeNumber(config.nameFontSize, DEFAULT_CERT_CONFIG.nameFontSize, 10, 60) * scaleY;
   const nameRgb = normalizeColorToRgb(config.nameColor, [139 / 255, 0, 0]);
   const nameHex =
     '#' + nameRgb.map((c) => Math.round(c * 255).toString(16).padStart(2, '0')).join('');
   const nameX =
     config.nameX !== undefined && config.nameX !== null && !isNaN(Number(config.nameX)) && Number(config.nameX) !== 0
-      ? Number(config.nameX) * scale
+      ? Number(config.nameX) * scaleX
       : imgWidth / 2;
   const nameAnchor =
     config.nameX !== undefined && config.nameX !== null && !isNaN(Number(config.nameX)) && Number(config.nameX) !== 0
       ? 'start'
       : 'middle';
 
-  const paraY = (595.5 - normalizeNumber(config.paraY, DEFAULT_CERT_CONFIG.paraY)) * scale;
-  const paraFontSize = normalizeNumber(config.paraFontSize, DEFAULT_CERT_CONFIG.paraFontSize, 8, 30) * scale;
-  const paraLineSpacing = normalizeNumber(config.paraLineSpacing, DEFAULT_CERT_CONFIG.paraLineSpacing, 10, 50) * scale;
+  // Dynamic shrink for long recipient names
+  const cleanName = params.recipientName.trim().toUpperCase();
+  const maxNameWidth = imgWidth - 240 * scaleX;
+  const approxCharWidth = nameFontSize * 0.62;
+  if (cleanName.length * approxCharWidth > maxNameWidth) {
+    nameFontSize = Math.max(16 * scaleY, (maxNameWidth / (cleanName.length * approxCharWidth)) * nameFontSize);
+  }
+
+  const paraY = (595.5 - normalizeNumber(config.paraY, DEFAULT_CERT_CONFIG.paraY)) * scaleY;
+  const paraFontSize = normalizeNumber(config.paraFontSize, DEFAULT_CERT_CONFIG.paraFontSize, 8, 30) * scaleY;
+  const paraLineSpacing = normalizeNumber(config.paraLineSpacing, DEFAULT_CERT_CONFIG.paraLineSpacing, 10, 50) * scaleY;
+  const paraMaxWidth = normalizeNumber(config.paraMaxWidth, DEFAULT_CERT_CONFIG.paraMaxWidth, 200, 800) * scaleX;
   const paraRgb = normalizeColorToRgb(config.paraColor, [31 / 255, 41 / 255, 55 / 255]);
   const paraHex =
     '#' + paraRgb.map((c) => Math.round(c * 255).toString(16).padStart(2, '0')).join('');
   const paraAlign = config.paraAlign || 'center';
   const paraX =
     config.paraX !== undefined && config.paraX !== null && !isNaN(Number(config.paraX)) && Number(config.paraX) !== 0
-      ? Number(config.paraX) * scale
+      ? Number(config.paraX) * scaleX
       : imgWidth / 2;
   const paraAnchor = paraAlign === 'left' ? 'start' : paraAlign === 'right' ? 'end' : 'middle';
 
-  const isTypeB =
-    params.certificateType?.toLowerCase().includes('achievement') ||
-    params.certificateType?.toLowerCase().includes('winner') ||
-    params.certificateType?.toLowerCase().includes('prize') ||
-    (params.role && params.role.toLowerCase().includes('winner'));
+  let paraText = params.customParagraph;
+  const orgBody = params.organizingBody || 'the IEDC Cell, Government Polytechnic College Perinthalmanna';
 
-  let paraText = params.customParagraph || '';
-  if (!paraText.trim()) {
-    const orgBody = params.organizingBody || 'the IEDC Cell, Government Polytechnic College Perinthalmanna';
-    if (isTypeB) {
+  if (!paraText) {
+    if (isWinnerOrAchievement) {
       const awardCat = params.awardCategory || params.role || 'Winner';
       paraText = `In recognition of your outstanding achievement as ${awardCat} in the ${params.programName}, organized by ${orgBody}, held on ${params.programDate}.`;
     } else {
-      paraText = `In recognition of your active participation and valuable contribution to the ${params.programName}, organized by ${orgBody}, held on ${params.programDate}.`;
+      const roleText = params.role && params.role !== 'Participant' ? ` as ${params.role}` : '';
+      paraText = `In recognition of your outstanding participation and dedication${roleText} in the ${params.programName}, organized by ${orgBody}, held on ${params.programDate}.`;
     }
   }
 
   // Soft-wrap text lines for SVG
   const rawLines = paraText.split(/\r?\n/);
   const paraLines: string[] = [];
-  const maxCharsPerLine = Math.floor(normalizeNumber(config.paraMaxWidth, 580) / 7.2);
+  const maxCharsPerLine = Math.max(30, Math.floor(paraMaxWidth / (paraFontSize * 0.52)));
   for (const raw of rawLines) {
     if (!raw.trim()) {
       paraLines.push('');
@@ -766,8 +884,9 @@ export async function generateSingleCertificatePng(
     if (cur) paraLines.push(cur);
   }
 
-  const certIdY = (595.5 - normalizeNumber(config.certIdY, 45)) * scale;
-  const recipientName = params.recipientName.trim().toUpperCase();
+  const certIdY = (595.5 - normalizeNumber(config.certIdY, 45)) * scaleY;
+  const subtitleY = (595.5 - normalizeNumber(config.subtitleY, 398)) * scaleY;
+  const introY = (595.5 - normalizeNumber(config.introY, 363)) * scaleY;
 
   const svgLines = paraLines
     .map((line, idx) => {
@@ -776,31 +895,45 @@ export async function generateSingleCertificatePng(
     })
     .join('\n');
 
-  const subtitleY = (595.5 - normalizeNumber(config.subtitleY, 398)) * scale;
-  const introY = (595.5 - normalizeNumber(config.introY, 363)) * scale;
+  // Check if using master template that already has pre-printed "— OF PARTICIPATION —" & "THIS CERTIFICATE IS PRESENTED TO"
+  const templatePathLower = (resolvedTemplatePath || '').toLowerCase();
+  const isMasterRaster =
+    templatePathLower.includes('iedc_certificate_template') ||
+    templatePathLower.includes('iedc_participate') ||
+    templatePathLower.includes('fubu');
+
+  // Should we draw subtitle & intro?
+  // On master templates, they are already pre-printed for standard Participation.
+  // We only need to cover & draw them if it is Winner, Achievement, Appreciation, Completion, or custom subtitle.
+  const isCustomOrNonParticipation =
+    !isMasterRaster ||
+    isWinnerOrAchievement ||
+    (params.certificateType && params.certificateType !== 'Participation') ||
+    (params.certificateSubtitle && !params.certificateSubtitle.includes('PARTICIPATION'));
+
+  const needsCover = isMasterRaster && (isWinnerOrAchievement || (params.certificateType && params.certificateType !== 'Participation'));
 
   const svgContent = `
     <svg width="${imgWidth}" height="${imgHeight}" xmlns="http://www.w3.org/2000/svg">
       <style>
-        .name { fill: ${nameHex}; font-size: ${nameFontSize}px; font-family: Helvetica, Arial, sans-serif; font-weight: bold; text-anchor: ${nameAnchor}; }
-        .para { fill: ${paraHex}; font-size: ${paraFontSize}px; font-family: Helvetica, Arial, sans-serif; font-weight: ${config.paraBold ? 'bold' : 'normal'}; text-anchor: ${paraAnchor}; }
-        .subtitle { fill: #1A2456; font-size: ${13 * scale}px; font-family: Helvetica, Arial, sans-serif; font-weight: bold; text-anchor: middle; }
-        .intro { fill: #1F2937; font-size: ${11 * scale}px; font-family: Helvetica, Arial, sans-serif; text-anchor: middle; }
-        .cert-id { fill: #9CA3AF; font-size: ${9 * scale}px; font-family: Helvetica, Arial, sans-serif; text-anchor: middle; font-weight: bold; }
+        .name { fill: ${nameHex}; font-size: ${nameFontSize}px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: bold; text-anchor: ${nameAnchor}; }
+        .para { fill: ${paraHex}; font-size: ${paraFontSize}px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: ${config.paraBold ? 'bold' : 'normal'}; text-anchor: ${paraAnchor}; }
+        .subtitle { fill: #1A2456; font-size: ${13 * scaleY}px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: bold; text-anchor: middle; letter-spacing: ${0.5 * scaleX}px; }
+        .intro { fill: #1F2937; font-size: ${11 * scaleY}px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; text-anchor: middle; letter-spacing: ${0.2 * scaleX}px; }
+        .cert-id { fill: #9CA3AF; font-size: ${8.5 * scaleY}px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; text-anchor: middle; font-weight: bold; }
       </style>
       ${
-        isTypeB
-          ? `
-          <text x="${imgWidth / 2}" y="${subtitleY}" class="subtitle">${escapeXml(
-              params.certificateSubtitle || '— OF ACHIEVEMENT —'
-            )}</text>
-          <text x="${imgWidth / 2}" y="${introY}" class="intro">${escapeXml(
-              params.recipientIntro || 'THIS CERTIFICATE IS AWARDED TO'
-            )}</text>
-          `
+        needsCover
+          ? `<rect x="${imgWidth * 0.2}" y="${(595.5 - 425) * scaleY}" width="${imgWidth * 0.6}" height="${75 * scaleY}" fill="#FFFFFF" />`
           : ''
       }
-      <text x="${nameX}" y="${nameY}" class="name">${escapeXml(recipientName)}</text>
+      ${
+        isCustomOrNonParticipation
+          ? `<text x="${imgWidth / 2}" y="${subtitleY}" class="subtitle">${escapeXml(subtitle)}</text>
+             <text x="${imgWidth / 2}" y="${introY}" class="intro">${escapeXml(intro)}</text>`
+          : ''
+      }
+      <text x="${nameX}" y="${nameY}" class="name">${escapeXml(cleanName)}</text>
       ${svgLines}
       ${
         config.showCertId !== false && params.certificateId
@@ -812,10 +945,10 @@ export async function generateSingleCertificatePng(
     </svg>
   `;
 
-  const svgPng = await sharp(Buffer.from(svgContent)).resize(imgWidth, imgHeight).png().toBuffer();
+  const svgPng = await sharp(Buffer.from(svgContent)).png().toBuffer();
   const pngBytes = await sharp(resolvedTemplatePath)
-    .resize(1920, 1358)
-    .composite([{ input: await sharp(svgPng).resize(1920, 1358).png().toBuffer() }])
+    .resize(imgWidth, imgHeight)
+    .composite([{ input: svgPng }])
     .png({ quality: 95, compressionLevel: 8 })
     .toBuffer();
 

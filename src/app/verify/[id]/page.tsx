@@ -104,6 +104,7 @@ export default function CertificateDetailPage() {
 
   const pdfUrl = certificate.pdfUrl || `/api/public/certificates/${certificate.certificateId}/pdf`;
   const pngUrl = certificate.pngUrl || `/api/public/certificates/${certificate.certificateId}/png`;
+  const jpgUrl = certificate.jpgUrl || `/api/public/certificates/${certificate.certificateId}/jpg`;
 
   return (
     <div className="py-12 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto space-y-8 relative z-10">
@@ -181,9 +182,17 @@ export default function CertificateDetailPage() {
           <a
             href={pngUrl}
             download={`${certificate.participantName}_${certificate.certificateId}.png`}
-            className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-extrabold text-xs flex items-center gap-2 border border-white/15 transition-all cursor-pointer"
+            className="px-5 py-2.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 font-extrabold text-xs flex items-center gap-2 border border-purple-500/30 transition-all cursor-pointer"
           >
             <Download className="w-4 h-4" /> Download PNG
+          </a>
+
+          <a
+            href={jpgUrl}
+            download={`${certificate.participantName}_${certificate.certificateId}.jpg`}
+            className="px-5 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-extrabold text-xs flex items-center gap-2 border border-amber-500/30 transition-all cursor-pointer"
+          >
+            <Download className="w-4 h-4" /> Download JPG
           </a>
 
           <a

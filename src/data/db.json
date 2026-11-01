@@ -206,7 +206,7 @@
       "status": "Published",
       "facultyCoordinator": "Prof. Muhammed Rashid",
       "studentCoordinator": "Rahul V",
-      "certificateTitle": "",
+      "certificateTitle": "— OF PARTICIPATION —",
       "certificateParagraph": "In recognition of your outstanding participation and dedication in the State-Wide Design Thinking Workshop\n2026, organized by the IEDC Cell, Government Polytechnic College Perinthalmanna, held on 20 October\n2026.",
       "certificateStatus": "Published",
       "certificateTemplateUrl": "https://nxlaazpcbvzxmdboqlxe.supabase.co/storage/v1/object/public/website-assets/certificate-templates/FUBU_1792507194173.jpg",
@@ -328,7 +328,8 @@
         ]
       },
       "createdAt": "2026-10-20T14:37:36.619533+00:00",
-      "updatedAt": "2026-10-30T06:06:22.838+00:00"
+      "updatedAt": "2026-10-30T06:06:22.838+00:00",
+      "certificateType": "Participation"
     },
     {
       "id": "evt-1793248985249-vblyjs",

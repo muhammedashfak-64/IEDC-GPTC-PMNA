@@ -525,8 +525,11 @@ Muhammed Shafi, 21051237, 9847222333, shafi.m@gptcpmna.edu.in, Speaker`
                     onChange={(e) => setSingleForm({ ...singleForm, certificateType: e.target.value })}
                     className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2 text-xs text-white"
                   >
-                    <option value="Winner">Winner</option>
                     <option value="Participation">Participation</option>
+                    <option value="Winner">Winner</option>
+                    <option value="Achievement">Achievement</option>
+                    <option value="Appreciation">Appreciation</option>
+                    <option value="Completion">Completion</option>
                     <option value="Organizer">Organizer</option>
                     <option value="Speaker">Speaker</option>
                     <option value="Judge">Judge</option>
