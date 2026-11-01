@@ -203,7 +203,63 @@ export function resolveOperatorAvatar(user: any, db?: any): string {
   return user.avatar || '';
 }
 
-export function authenticateAdmin(identifier: string, password: string): { user: AuthUser; token: string } | null {
+// -------------------------------------------------------------
+// SECURE PASSWORD & SESSION CRYPTOGRAPHY
+// -------------------------------------------------------------
+const SESSION_SECRET =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SESSION_SECRET ||
+  'iedc_gptc_pmna_secure_admin_session_salt_2026';
+
+export function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha512').toString('hex');
+  return `pbkdf2$100000$${salt}$${hash}`;
+}
+
+export function verifyPassword(password: string, storedHash: string): boolean {
+  if (!storedHash || !password) return false;
+
+  if (storedHash.startsWith('pbkdf2$')) {
+    const parts = storedHash.split('$');
+    if (parts.length !== 4) return false;
+    const iterations = parseInt(parts[1], 10);
+    const salt = parts[2];
+    const originalHash = parts[3];
+    const derived = crypto.pbkdf2Sync(password, salt, iterations, 64, 'sha512').toString('hex');
+    try {
+      return crypto.timingSafeEqual(Buffer.from(derived, 'hex'), Buffer.from(originalHash, 'hex'));
+    } catch {
+      return false;
+    }
+  }
+
+  // Legacy plaintext match during one-time migration
+  if (storedHash === password) {
+    return true;
+  }
+
+  return false;
+}
+
+export function createSessionToken(user: any): string {
+  const payload = {
+    userId: user.id,
+    role: user.role,
+    name: user.full_name,
+    email: user.email,
+    username: user.username,
+    exp: Date.now() + 7 * 24 * 60 * 60 * 1000 // 7 days session
+  };
+  const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const sig = crypto.createHmac('sha256', SESSION_SECRET).update(body).digest('base64url');
+  return `${body}.${sig}`;
+}
+
+export async function authenticateAdmin(
+  identifier: string,
+  password: string
+): Promise<{ user: AuthUser; token: string } | null> {
   const db = loadDb();
   const cleanId = identifier.trim().toLowerCase();
   
@@ -217,27 +273,44 @@ export function authenticateAdmin(identifier: string, password: string): { user:
     return null;
   }
 
-  // Verify password:
-  // Strictly enforce user.passwordHash so updated passwords cannot be bypassed.
   let isMatch = false;
-  if (user.passwordHash) {
-    isMatch = user.passwordHash === password;
-  } else {
-    // Legacy fallback before first password set
-    const defaultPass =
-      user.role === 'admin' || user.role === 'main_admin'
-        ? 'Admin@123'
-        : user.role === 'faculty' || user.role === 'faculty_coordinator'
-        ? 'Faculty@123'
-        : user.role === 'designer' || user.role === 'media_lead'
-        ? 'Designer@123'
-        : 'Student@123';
-    isMatch = password === defaultPass;
-    if (isMatch) {
-      user.passwordHash = password;
+
+  // 1. Primary: Verify against Supabase Auth if online/configured
+  if (isSupabaseAdminConfigured() && user.email) {
+    try {
+      const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password
+      });
+
+      if (!signInErr && signInData?.user) {
+        isMatch = true;
+        if (user.supabaseAuthId !== signInData.user.id) {
+          user.supabaseAuthId = signInData.user.id;
+          saveDb(db);
+        }
+        // Upgrade local hash to salted PBKDF2 if missing
+        if (!user.passwordHash || !user.passwordHash.startsWith('pbkdf2$')) {
+          user.passwordHash = hashPassword(password);
+          saveDb(db);
+        }
+      }
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase Auth signInWithPassword warning:', sbErr);
+    }
+  }
+
+  // 2. Secondary / Resilient Fallback: Verify against cryptographically secure salted PBKDF2 hash
+  if (!isMatch && user.passwordHash) {
+    isMatch = verifyPassword(password, user.passwordHash);
+    if (isMatch && !user.passwordHash.startsWith('pbkdf2$')) {
+      // Upgrade plaintext legacy password to PBKDF2 hash
+      user.passwordHash = hashPassword(password);
       saveDb(db);
     }
   }
+
+  // Reject strictly if password didn't match (NO hardcoded fallback)
   if (!isMatch) {
     return null;
   }
@@ -245,15 +318,8 @@ export function authenticateAdmin(identifier: string, password: string): { user:
   // Resolve dynamic avatar from linked profile
   const dynamicAvatar = resolveOperatorAvatar(user, db);
 
-  // Create lightweight tamper-evident token with role and expiry
-  const payload = {
-    userId: user.id,
-    role: user.role,
-    name: user.full_name,
-    email: user.email,
-    exp: Date.now() + 24 * 60 * 60 * 1000 // 24 hours
-  };
-  const token = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  // Create HMAC-signed session token (7 days)
+  const token = createSessionToken(user);
 
   // Update last login timestamp
   user.lastLoginAt = new Date().toISOString();
@@ -284,8 +350,21 @@ export function authenticateAdmin(identifier: string, password: string): { user:
 export function verifySessionToken(token: string): AuthUser | null {
   if (!token) return null;
   try {
-    const raw = Buffer.from(token, 'base64url').toString('utf-8');
-    const data = JSON.parse(raw);
+    let rawJson: string;
+
+    if (token.includes('.')) {
+      const [body, sig] = token.split('.');
+      if (!body || !sig) return null;
+      const expectedSig = crypto.createHmac('sha256', SESSION_SECRET).update(body).digest('base64url');
+      if (sig !== expectedSig) {
+        return null; // Tampered or invalid signature
+      }
+      rawJson = Buffer.from(body, 'base64url').toString('utf-8');
+    } else {
+      rawJson = Buffer.from(token, 'base64url').toString('utf-8');
+    }
+
+    const data = JSON.parse(rawJson);
     if (!data.exp || data.exp < Date.now()) {
       return null;
     }
@@ -3585,13 +3664,16 @@ export function getUsers() {
   });
 }
 
-export function createUser(userData: any, user: AuthUser) {
+export async function createUser(userData: any, user: AuthUser) {
   const db = loadDb();
   if (!db.profiles) db.profiles = [];
 
   const cleanUsername = String(userData.username || '').trim().toLowerCase();
   if (!cleanUsername) {
     throw new Error('Username is required.');
+  }
+  if (!/^[a-z0-9_.]+$/.test(cleanUsername)) {
+    throw new Error('Username may only contain lowercase letters, numbers, underscores, and dots.');
   }
 
   // Check username uniqueness
@@ -3608,12 +3690,41 @@ export function createUser(userData: any, user: AuthUser) {
   }
 
   const role: OperatorRole = userData.role || 'student_operator';
+  const rawPassword = String(userData.password || '').trim();
+  if (!rawPassword || rawPassword.length < 6) {
+    throw new Error('Password must be at least 6 characters long.');
+  }
+
+  const cleanEmail = userData.email?.trim().toLowerCase() || `${cleanUsername}@gptcpmna.edu.in`;
+
+  // Provision in Supabase Auth if configured
+  let supabaseAuthId: string | null = null;
+  if (isSupabaseAdminConfigured()) {
+    try {
+      const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+        email: cleanEmail,
+        password: rawPassword,
+        email_confirm: true,
+        user_metadata: {
+          username: cleanUsername,
+          role,
+          full_name: userData.full_name || userData.name || cleanUsername
+        }
+      });
+      if (!createErr && created?.user) {
+        supabaseAuthId = created.user.id;
+      }
+    } catch (e) {
+      console.warn('[serverStore] Supabase Auth createUser warning:', e);
+    }
+  }
 
   const newUser = {
     id: `usr-${Date.now()}`,
+    supabaseAuthId,
     username: cleanUsername,
-    email: userData.email?.trim().toLowerCase() || `${cleanUsername}@gptcpmna.edu.in`,
-    passwordHash: userData.password || (role === 'main_admin' ? 'Admin@123' : role === 'faculty_coordinator' ? 'Faculty@123' : 'Student@123'),
+    email: cleanEmail,
+    passwordHash: hashPassword(rawPassword),
     full_name: userData.full_name || userData.name || cleanUsername,
     role,
     phone: userData.phone || '',
@@ -3634,7 +3745,7 @@ export function createUser(userData: any, user: AuthUser) {
   return newUser;
 }
 
-export function updateUser(id: string, updates: any, user: AuthUser) {
+export async function updateUser(id: string, updates: any, user: AuthUser) {
   const db = loadDb();
   const idx = (db.profiles || []).findIndex((p: any) => p.id === id);
   if (idx === -1) throw new Error('Operator account not found.');
@@ -3658,20 +3769,69 @@ export function updateUser(id: string, updates: any, user: AuthUser) {
     throw new Error('Only the Main Administrator can promote an account to Main Administrator.');
   }
 
+  let newUsername = target.username;
+  if (updates.username) {
+    const cleanUsername = String(updates.username).trim().toLowerCase();
+    if (!cleanUsername) {
+      throw new Error('Username cannot be empty.');
+    }
+    if (!/^[a-z0-9_.]+$/.test(cleanUsername)) {
+      throw new Error('Username may only contain lowercase letters, numbers, underscores, and dots.');
+    }
+    const duplicate = db.profiles.some(
+      (p: any) => p.id !== id && p.username?.trim().toLowerCase() === cleanUsername
+    );
+    if (duplicate) {
+      throw new Error(`Username "@${cleanUsername}" is already assigned to another account.`);
+    }
+    newUsername = cleanUsername;
+  }
+
   db.profiles[idx] = {
     ...target,
     ...updates,
     id: target.id, // Immutable ID
-    username: updates.username ? updates.username.trim().toLowerCase() : target.username,
+    username: newUsername,
     updatedAt: new Date().toISOString()
   };
 
   saveDb(db);
-  addAuditLog('USER_UPDATE', user, `Updated operator profile @${target.username} (${target.role})`);
+
+  // Sync username and profile metadata to Supabase Auth if configured
+  if (isSupabaseAdminConfigured()) {
+    try {
+      let authUserId = target.supabaseAuthId;
+      if (!authUserId) {
+        const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
+        const existing = listData?.users?.find(
+          (u) => u.email?.toLowerCase() === target.email.toLowerCase()
+        );
+        if (existing) {
+          authUserId = existing.id;
+          db.profiles[idx].supabaseAuthId = existing.id;
+          saveDb(db);
+        }
+      }
+
+      if (authUserId) {
+        await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+          user_metadata: {
+            username: newUsername,
+            role: updates.role || target.role,
+            full_name: updates.full_name || target.full_name
+          }
+        });
+      }
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase Auth updateUser metadata sync warning:', sbErr);
+    }
+  }
+
+  addAuditLog('USER_UPDATE', user, `Updated operator profile @${newUsername} (${db.profiles[idx].role})`);
   return db.profiles[idx];
 }
 
-export function resetUserPassword(id: string, newPassword: string, user: AuthUser) {
+export async function resetUserPassword(id: string, newPassword: string, user: AuthUser) {
   const db = loadDb();
   const target = (db.profiles || []).find((p: any) => p.id === id);
   if (!target) throw new Error('Operator account not found.');
@@ -3684,11 +3844,57 @@ export function resetUserPassword(id: string, newPassword: string, user: AuthUse
     throw new Error('Password must be at least 6 characters long.');
   }
 
-  target.passwordHash = newPassword;
+  // 1. Authoritative update in Supabase Auth
+  if (isSupabaseAdminConfigured()) {
+    let authUserId = target.supabaseAuthId;
+    if (!authUserId) {
+      const { data: listData } = await supabaseAdmin.auth.admin.listUsers();
+      const existing = listData?.users?.find(
+        (u) => u.email?.toLowerCase() === target.email.toLowerCase()
+      );
+      if (existing) {
+        authUserId = existing.id;
+        target.supabaseAuthId = existing.id;
+      } else {
+        const { data: created, error: createErr } = await supabaseAdmin.auth.admin.createUser({
+          email: target.email,
+          password: newPassword,
+          email_confirm: true,
+          user_metadata: {
+            username: target.username,
+            role: target.role,
+            full_name: target.full_name
+          }
+        });
+        if (!createErr && created?.user) {
+          authUserId = created.user.id;
+          target.supabaseAuthId = created.user.id;
+        }
+      }
+    }
+
+    if (authUserId) {
+      const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(authUserId, {
+        password: newPassword,
+        user_metadata: {
+          username: target.username,
+          role: target.role,
+          full_name: target.full_name
+        }
+      });
+      if (updateErr) {
+        console.error('[serverStore] Supabase Auth password update error:', updateErr);
+        throw new Error(`Authentication provider error: ${updateErr.message}`);
+      }
+    }
+  }
+
+  // 2. Authoritative update of local salted PBKDF2 hash (NEVER plaintext)
+  target.passwordHash = hashPassword(newPassword);
   target.updatedAt = new Date().toISOString();
   saveDb(db);
 
-  addAuditLog('USER_PASSWORD_RESET', user, `Password reset initiated for operator @${target.username}`);
+  addAuditLog('USER_PASSWORD_RESET', user, `Password reset successfully completed for operator @${target.username}`);
   return { success: true, message: `Password reset successfully for @${target.username}` };
 }
 

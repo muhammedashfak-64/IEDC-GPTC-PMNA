@@ -89,7 +89,10 @@ export default function OperatorManagementPage() {
 
   // Reset Password State
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [resetError, setResetError] = useState('');
   const [showPasswordText, setShowPasswordText] = useState(false);
+  const [showConfirmPasswordText, setShowConfirmPasswordText] = useState(false);
 
   const isMainAdmin = currentAdmin?.role === 'main_admin';
 
@@ -145,11 +148,16 @@ export default function OperatorManagementPage() {
 
   // Open Create Modal
   const handleOpenCreate = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
+    let initPwd = 'IEDC@';
+    for (let i = 0; i < 6; i++) {
+      initPwd += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
     setFormData({
       id: '',
       username: '',
       email: '',
-      password: 'Student@123',
+      password: initPwd,
       full_name: '',
       role: 'student_operator',
       department: 'Electronics Engineering',
@@ -184,12 +192,24 @@ export default function OperatorManagementPage() {
   const handleOpenReset = (op: OperatorUser) => {
     setActiveTargetUser(op);
     setNewPassword('');
+    setConfirmPassword('');
+    setResetError('');
+    setShowPasswordText(false);
+    setShowConfirmPasswordText(false);
     setShowResetModal(true);
   };
 
   // Submit Create Operator
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.username.trim()) {
+      addToast('Validation', 'Username is required.', 'error');
+      return;
+    }
+    if (!formData.password || formData.password.length < 6) {
+      addToast('Validation', 'Password must be at least 6 characters long.', 'error');
+      return;
+    }
     try {
       const res = await fetch('/api/admin/users', {
         method: 'POST',
@@ -213,6 +233,10 @@ export default function OperatorManagementPage() {
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeTargetUser) return;
+    if (!formData.username.trim()) {
+      addToast('Validation', 'Username cannot be empty.', 'error');
+      return;
+    }
     try {
       const res = await fetch('/api/admin/users', {
         method: 'PUT',
@@ -220,7 +244,7 @@ export default function OperatorManagementPage() {
         body: JSON.stringify({
           id: activeTargetUser.id,
           updates: {
-            username: formData.username,
+            username: formData.username.trim().toLowerCase(),
             full_name: formData.full_name,
             email: formData.email,
             role: formData.role,
@@ -249,10 +273,22 @@ export default function OperatorManagementPage() {
   const handleResetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeTargetUser) return;
+    setResetError('');
+
     if (!newPassword || newPassword.length < 6) {
-      addToast('Validation', 'Password must be at least 6 characters long.', 'error');
+      const msg = 'Password must be at least 6 characters long.';
+      setResetError(msg);
+      addToast('Validation', msg, 'error');
       return;
     }
+
+    if (newPassword !== confirmPassword) {
+      const msg = 'New password and confirm password do not match.';
+      setResetError(msg);
+      addToast('Validation', msg, 'error');
+      return;
+    }
+
     try {
       const res = await fetch('/api/admin/users', {
         method: 'PUT',
@@ -267,12 +303,19 @@ export default function OperatorManagementPage() {
       if (res.ok && data.success) {
         addToast('Password Reset Complete', `New credential activated for @${activeTargetUser.username}`, 'success');
         setShowResetModal(false);
+        setNewPassword('');
+        setConfirmPassword('');
+        setResetError('');
         loadData();
       } else {
-        addToast('Reset Error', data.error || 'Failed to reset password', 'error');
+        const msg = data.error || 'Failed to reset password';
+        setResetError(msg);
+        addToast('Reset Error', msg, 'error');
       }
     } catch (err: any) {
-      addToast('Error', err.message, 'error');
+      const msg = err.message || 'Network error updating password';
+      setResetError(msg);
+      addToast('Error', msg, 'error');
     }
   };
 
@@ -304,14 +347,16 @@ export default function OperatorManagementPage() {
     }
   };
 
-  // Generate secure password suggestion
+  // Generate secure password suggestion (fills both new and confirm fields)
   const generatePassword = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%';
     let pwd = 'IEDC@';
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 6; i++) {
       pwd += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     setNewPassword(pwd);
+    setConfirmPassword(pwd);
+    setResetError('');
   };
 
   const togglePermission = (permId: string) => {
@@ -976,9 +1021,16 @@ export default function OperatorManagementPage() {
               <div className="font-bold text-white">Operator: {activeTargetUser.full_name}</div>
               <div className="font-mono text-[11px] text-[#F98A5B]">Username: @{activeTargetUser.username}</div>
               <p className="text-[10px] text-slate-400 pt-1">
-                This reset updates the login credential immediately. Existing passwords are never exposed in audit logs.
+                This reset updates the login credential immediately in both Supabase Auth and authoritative access records. Existing passwords are never exposed.
               </p>
             </div>
+
+            {resetError && (
+              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-semibold flex items-start gap-2">
+                <span>⚠️</span>
+                <span>{resetError}</span>
+              </div>
+            )}
 
             <form onSubmit={handleResetSubmit} className="space-y-4 text-xs">
               <div>
@@ -1001,7 +1053,10 @@ export default function OperatorManagementPage() {
                     required
                     placeholder="Enter at least 6 characters"
                     value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
+                    onChange={(e) => {
+                      setNewPassword(e.target.value);
+                      if (resetError) setResetError('');
+                    }}
                     className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-mono pr-10 focus:outline-none focus:border-amber-400/50"
                   />
                   <button
@@ -1014,17 +1069,43 @@ export default function OperatorManagementPage() {
                 </div>
               </div>
 
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 uppercase block mb-1.5">
+                  Confirm New Password
+                </label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPasswordText ? 'text' : 'password'}
+                    required
+                    placeholder="Re-enter the new password"
+                    value={confirmPassword}
+                    onChange={(e) => {
+                      setConfirmPassword(e.target.value);
+                      if (resetError) setResetError('');
+                    }}
+                    className="w-full bg-[#18181D] border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white font-mono pr-10 focus:outline-none focus:border-amber-400/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPasswordText(!showConfirmPasswordText)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                  >
+                    {showConfirmPasswordText ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
               <div className="flex gap-2 pt-2 border-t border-white/10">
                 <button
                   type="button"
                   onClick={() => setShowResetModal(false)}
-                  className="flex-1 py-2.5 rounded-xl bg-white/5 text-white font-bold"
+                  className="flex-1 py-2.5 rounded-xl bg-white/5 text-white font-bold cursor-pointer hover:bg-white/10"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-extrabold transition-all"
+                  className="flex-1 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-extrabold transition-all cursor-pointer"
                 >
                   Activate New Password
                 </button>

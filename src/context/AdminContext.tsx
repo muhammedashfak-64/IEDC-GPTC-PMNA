@@ -111,6 +111,16 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         setIsAuthenticated(false);
       }
     } catch {
+      // Retry once on transient network glitch before dropping state
+      try {
+        const retryRes = await fetch('/api/admin/auth/session', { cache: 'no-store' });
+        const retryData = await retryRes.json();
+        if (retryData.authenticated && retryData.user) {
+          setUser(retryData.user);
+          setIsAuthenticated(true);
+          return;
+        }
+      } catch {}
       setUser(null);
       setIsAuthenticated(false);
     } finally {
@@ -133,7 +143,15 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (data.success && data.user) {
         setUser(data.user);
         setIsAuthenticated(true);
-        addToast('Authentication Verified', `Logged in as ${data.user.full_name} (${data.user.role === 'faculty_coordinator' ? 'Faculty Coordinator' : 'Student Lead'})`, 'success');
+        const roleLabel =
+          data.user.role === 'main_admin'
+            ? 'Main Administrator'
+            : data.user.role === 'faculty_coordinator'
+            ? 'Faculty Coordinator'
+            : data.user.role === 'designer'
+            ? 'Media Designer'
+            : 'Student Lead';
+        addToast('Authentication Verified', `Logged in as ${data.user.full_name} (${roleLabel})`, 'success');
         return { success: true };
       } else {
         return { success: false, error: data.error || 'Invalid credentials' };

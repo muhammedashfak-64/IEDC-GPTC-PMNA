@@ -8,7 +8,7 @@ export function getAdminUserFromRequest(req: NextRequest | Request): AuthUser | 
     
     if ('cookies' in req && typeof (req as any).cookies?.get === 'function') {
       const cookie = (req as any).cookies.get('iedc_admin_session');
-      if (cookie) token = cookie.value;
+      if (cookie) token = typeof cookie === 'object' && 'value' in cookie ? cookie.value : String(cookie);
     } else {
       const cookieHeader = req.headers.get('cookie') || '';
       const match = cookieHeader.match(/iedc_admin_session=([^;]+)/);

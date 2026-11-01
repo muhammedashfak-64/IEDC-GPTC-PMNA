@@ -10,8 +10,8 @@ export default function AdminLoginPage() {
   const router = useRouter();
   const { login, isAuthenticated, isLoading } = useAdmin();
 
-  const [identifier, setIdentifier] = useState('iedc.faculty');
-  const [password, setPassword] = useState('Faculty@123');
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -20,6 +20,17 @@ export default function AdminLoginPage() {
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotMessage, setForgotMessage] = useState('');
   const [forgotError, setForgotError] = useState('');
+
+  // Autofill remembered username from non-sensitive browser storage; password ALWAYS initializes empty
+  useEffect(() => {
+    try {
+      const remembered = localStorage.getItem('iedc_last_admin_username');
+      if (remembered) {
+        setIdentifier(remembered);
+      }
+    } catch {}
+    setPassword('');
+  }, []);
 
   // If already authenticated, redirect to dashboard
   useEffect(() => {
@@ -33,38 +44,20 @@ export default function AdminLoginPage() {
     setErrorMessage('');
     setSubmitting(true);
 
-    const res = await login(identifier, password);
+    const cleanIdentifier = identifier.trim();
+    const res = await login(cleanIdentifier, password);
     setSubmitting(false);
 
     if (res.success) {
+      // Remember username only upon successful authentication
+      try {
+        localStorage.setItem('iedc_last_admin_username', cleanIdentifier);
+      } catch {}
       router.push('/admin/dashboard');
     } else {
       setErrorMessage(res.error || 'Authentication failed. Please verify your username and password.');
+      setPassword(''); // Clear password on failure for security
     }
-  };
-
-  const autofillMainAdmin = () => {
-    setIdentifier('iedc.admin');
-    setPassword('Admin@123');
-    setErrorMessage('');
-  };
-
-  const autofillFaculty = () => {
-    setIdentifier('iedc.faculty');
-    setPassword('Faculty@123');
-    setErrorMessage('');
-  };
-
-  const autofillStudentLead = () => {
-    setIdentifier('iedc.studentlead');
-    setPassword('Student@123');
-    setErrorMessage('');
-  };
-
-  const autofillDesigner = () => {
-    setIdentifier('iedc.designer');
-    setPassword('Designer@123');
-    setErrorMessage('');
   };
 
   const handleForgotSubmit = async (e: React.FormEvent) => {
@@ -129,68 +122,55 @@ export default function AdminLoginPage() {
         {/* Login Card */}
         <div className="bg-[#0E0E12] border border-white/12 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6 backdrop-blur-2xl">
           
-          {/* Quick Credential Test Switcher Chips */}
+          {/* Authorized Roles Badges */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-              <span>OPERATOR ROLES:</span>
-              <span className="text-[10px] text-slate-400">1-Click Autofill</span>
+              <span>SECURITY LEVEL:</span>
+              <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                Verified Access
+              </span>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={autofillMainAdmin}
-                className="p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-left transition-all cursor-pointer group"
-              >
+            <div className="grid grid-cols-2 gap-2 text-left">
+              <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-rose-300">
                   <Shield className="w-3.5 h-3.5" />
                   <span>Main Admin</span>
                 </div>
                 <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
-                  @iedc.admin
+                  Owner Level
                 </div>
-              </button>
+              </div>
 
-              <button
-                type="button"
-                onClick={autofillFaculty}
-                className="p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-left transition-all cursor-pointer group"
-              >
+              <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-amber-300">
                   <ShieldCheck className="w-3.5 h-3.5" />
                   <span>Faculty Nodal</span>
                 </div>
                 <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
-                  @iedc.faculty
+                  Institutional
                 </div>
-              </button>
+              </div>
 
-              <button
-                type="button"
-                onClick={autofillStudentLead}
-                className="p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-left transition-all cursor-pointer group"
-              >
+              <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-cyan-300">
                   <User className="w-3.5 h-3.5" />
                   <span>Student Lead</span>
                 </div>
                 <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
-                  @iedc.studentlead
+                  Executive Operations
                 </div>
-              </button>
+              </div>
 
-              <button
-                type="button"
-                onClick={autofillDesigner}
-                className="p-2.5 rounded-xl bg-white/[0.04] hover:bg-white/[0.08] border border-white/10 text-left transition-all cursor-pointer group"
-              >
+              <div className="p-2.5 rounded-xl bg-white/[0.03] border border-white/10">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-purple-300">
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>Media Designer</span>
                 </div>
                 <div className="text-[10px] text-slate-400 font-mono mt-0.5 truncate">
-                  @iedc.designer
+                  Design & Branding
                 </div>
-              </button>
+              </div>
             </div>
           </div>
 
@@ -213,7 +193,8 @@ export default function AdminLoginPage() {
                 <input
                   type="text"
                   required
-                  placeholder="e.g. iedc.faculty or iedc.designer"
+                  autoComplete="username"
+                  placeholder="e.g. iedc.admin or iedc.faculty"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
                   className="w-full bg-[#16161B] border border-white/10 focus:border-white/30 rounded-xl pl-10 pr-4 py-3 text-xs text-white placeholder-slate-500 focus:outline-none transition-all font-mono"
@@ -240,6 +221,7 @@ export default function AdminLoginPage() {
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
+                  autoComplete="current-password"
                   placeholder="••••••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

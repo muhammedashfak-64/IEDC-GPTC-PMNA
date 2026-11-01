@@ -9,6 +9,9 @@ import {
   deleteUser
 } from '@/lib/serverStore';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(req: NextRequest) {
   // Main Administrator or Faculty Coordinator can view and manage operators
   const { errorResponse } = requireAdminAuth(req, true);
@@ -24,7 +27,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const created = createUser(body, user!);
+    const created = await createUser(body, user!);
     return NextResponse.json({ success: true, data: created }, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 400 });
@@ -43,7 +46,7 @@ export async function PUT(req: NextRequest) {
     }
 
     if (action === 'reset_password' || newPassword) {
-      const result = resetUserPassword(id, newPassword, user!);
+      const result = await resetUserPassword(id, newPassword, user!);
       return NextResponse.json({ ...result });
     }
 
@@ -53,7 +56,7 @@ export async function PUT(req: NextRequest) {
     }
 
     if (updates) {
-      const updated = updateUser(id, updates, user!);
+      const updated = await updateUser(id, updates, user!);
       return NextResponse.json({ success: true, data: updated });
     }
 

@@ -72,7 +72,7 @@
       "id": "usr-mainadmin-01",
       "username": "iedc.admin",
       "email": "admin@iedcgptcpmna.in",
-      "passwordHash": "Admin@123",
+      "passwordHash": "pbkdf2$e290944a3a1484b14f17aaaf6f4a4e67$b856fb715487839e7670dad30ac4b730fd07076adbe63e7a347b7713a687db80558d2a6814b97728f645fceb5ee5a65c8cad8991d892b4a4f313d537891d2c3c",
       "full_name": "Muhammed Ashfak O",
       "role": "main_admin",
       "phone": "9847000000",
@@ -95,16 +95,17 @@
       ],
       "isActive": true,
       "createdAt": "2026-10-20T16:51:37.746Z",
-      "lastLoginAt": "2026-10-28T06:43:31.886Z",
+      "lastLoginAt": "2026-11-01T02:15:25.547Z",
       "linkedProfileId": null,
       "linkedProfileType": null,
-      "updatedAt": "2026-10-21T06:58:23.108Z"
+      "updatedAt": "2026-10-21T06:58:23.108Z",
+      "supabaseAuthId": "6d095d05-b5fe-48c3-a2fb-e4f6621a0a6d"
     },
     {
       "id": "usr-faculty-01",
       "username": "iedc.faculty",
       "email": "faculty@iedcgptcpmna.in",
-      "passwordHash": "Faculty@123",
+      "passwordHash": "pbkdf2$f73d5a577a92722a8f867090836cc16b$6a331d714419adc5235993f64fc0340be0305bc65741e29e8d5923449fa5d5880e5fea4a32164a391c1d569429879be6da4f529276fbb8757190994e26e9ec5b",
       "full_name": "Anuroop",
       "role": "faculty_coordinator",
       "phone": "9447123456",
@@ -114,7 +115,7 @@
       "staffId": "IEDC001",
       "isActive": true,
       "createdAt": "2026-01-10T10:00:00Z",
-      "lastLoginAt": "2026-10-29T10:43:32.951Z",
+      "lastLoginAt": "2026-11-01T02:15:26.447Z",
       "linkedProfileId": "fac-002",
       "linkedProfileType": "faculty",
       "permissions": [
@@ -126,13 +127,14 @@
         "projects",
         "gallery"
       ],
-      "updatedAt": "2026-10-29T10:43:32.956Z"
+      "updatedAt": "2026-10-29T10:43:32.956Z",
+      "supabaseAuthId": "84db90aa-1a5d-4750-9003-30e6071d7800"
     },
     {
       "id": "usr-studentlead-01",
       "username": "iedc.studentlead",
       "email": "studentlead@iedcgptcpmna.in",
-      "passwordHash": "Student@123",
+      "passwordHash": "pbkdf2$2b2699aa137c996638cbb57d0cb33a91$2e19b4aa27ac700f60f9fa8961a79e2fc03b5639ee422bd65fe03bb751571ee2ab4f3e3b6b2b38018dd59f5bca46da5d6479f51c355739af0354e8ba4c81e938",
       "full_name": "Anshadh pk",
       "role": "student_operator",
       "phone": "9847123456",
@@ -142,7 +144,7 @@
       "staffId": "SL001",
       "isActive": true,
       "createdAt": "2026-01-15T10:00:00Z",
-      "lastLoginAt": "2026-10-20T17:42:29.801Z",
+      "lastLoginAt": "2026-11-01T02:15:26.854Z",
       "linkedProfileId": "lead-01",
       "linkedProfileType": "team",
       "permissions": [
@@ -153,13 +155,14 @@
         "announcements",
         "projects"
       ],
-      "updatedAt": "2026-10-20T17:46:11.166Z"
+      "updatedAt": "2026-10-20T17:46:11.166Z",
+      "supabaseAuthId": "6e34fc13-5d72-44ba-a926-4e22cc18f333"
     },
     {
       "id": "usr-designer-01",
       "username": "iedc.designer",
       "email": "designer@iedcgptcpmna.in",
-      "passwordHash": "Designer@123",
+      "passwordHash": "pbkdf2$d58d74ed6de9d117e6485ddb14654cfc$203ecb5d9977e2aae6594d6e2cbf4fd4092f0593d34097c6c95610c3c9ef0422dc4be0e5721dd6fdd7bdebad78f70fd2d1c4f7e6198195b13ac5c5ea5479e1fe",
       "full_name": "Nithya K (Media Lead)",
       "role": "student_operator",
       "phone": "8921242179",
@@ -175,10 +178,11 @@
         "announcements",
         "projects"
       ],
-      "isActive": false,
+      "isActive": true,
       "createdAt": "2026-10-20T16:51:37.747Z",
-      "lastLoginAt": "2026-10-20T17:42:29.817Z",
-      "updatedAt": "2026-10-20T17:46:28.710Z"
+      "lastLoginAt": "2026-11-01T02:15:27.783Z",
+      "updatedAt": "2026-10-20T17:46:28.710Z",
+      "supabaseAuthId": "359bba50-7ff9-4a39-8bcb-bdc4ea17df6f"
     }
   ],
   "events": [
@@ -3954,6 +3958,116 @@
     }
   ],
   "auditLogs": [
+    {
+      "id": "log-1793499332014-662a",
+      "userId": "usr-1793499328676",
+      "userName": "System / Anonymous",
+      "userRole": "student_operator",
+      "action": "ADMIN_LOGIN_SUCCESS",
+      "details": "User Temporary Test Admin (@test_admin_renamed) logged in via student_operator",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-11-01T02:15:32.014Z"
+    },
+    {
+      "id": "log-1793499331612-y727",
+      "userId": "usr-mainadmin-01",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "USER_UPDATE",
+      "details": "Updated operator profile @test_admin_renamed (student_operator)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-11-01T02:15:31.612Z"
+    },
+    {
+      "id": "log-1793499331290-m6ji",
+      "userId": "usr-1793499328676",
+      "userName": "System / Anonymous",
+      "userRole": "student_operator",
+      "action": "ADMIN_LOGIN_SUCCESS",
+      "details": "User Temporary Test Admin (@test_admin_temp) logged in via student_operator",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-11-01T02:15:31.290Z"
+    },
+    {
+      "id": "log-1793499330892-yoao",
+      "userId": "usr-1793499328676",
+      "userName": "System / Anonymous",
+      "userRole": "student_operator",
+      "action": "ADMIN_LOGIN_SUCCESS",
+      "details": "User Temporary Test Admin (@test_admin_temp) logged in via student_operator",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-11-01T02:15:30.892Z"
+    },
+    {
+      "id": "log-1793499329659-xq4v",
+      "userId": "usr-mainadmin-01",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "USER_PASSWORD_RESET",
+      "details": "Password reset successfully completed for operator @test_admin_temp",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-11-01T02:15:29.659Z"
+    },
+    {
+      "id": "log-1793499329172-u2je",
+      "userId": "usr-1793499328676",
+      "userName": "System / Anonymous",
+      "userRole": "student_operator",
+      "action": "ADMIN_LOGIN_SUCCESS",
+      "details": "User Temporary Test Admin (@test_admin_temp) logged in via student_operator",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-11-01T02:15:29.172Z"
+    },
+    {
+      "id": "log-1793499328769-64iw",
+      "userId": "usr-mainadmin-01",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "USER_PROVISION",
+      "details": "Provisioned operator account @test_admin_temp (student_operator)",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-11-01T02:15:28.769Z"
+    },
+    {
+      "id": "log-1793499327788-u84x",
+      "userId": "usr-designer-01",
+      "userName": "System / Anonymous",
+      "userRole": "student_operator",
+      "action": "ADMIN_LOGIN_SUCCESS",
+      "details": "User Nithya K (Media Lead) (@iedc.designer) logged in via student_operator",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-11-01T02:15:27.788Z"
+    },
+    {
+      "id": "log-1793499326863-9j4e",
+      "userId": "usr-studentlead-01",
+      "userName": "System / Anonymous",
+      "userRole": "student_operator",
+      "action": "ADMIN_LOGIN_SUCCESS",
+      "details": "User Anshadh pk (@iedc.studentlead) logged in via student_operator",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-11-01T02:15:26.863Z"
+    },
+    {
+      "id": "log-1793499326453-fxxz",
+      "userId": "usr-faculty-01",
+      "userName": "System / Anonymous",
+      "userRole": "faculty_coordinator",
+      "action": "ADMIN_LOGIN_SUCCESS",
+      "details": "User Anuroop (@iedc.faculty) logged in via faculty_coordinator",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-11-01T02:15:26.453Z"
+    },
+    {
+      "id": "log-1793499325550-uc7w",
+      "userId": "usr-mainadmin-01",
+      "userName": "System / Anonymous",
+      "userRole": "main_admin",
+      "action": "ADMIN_LOGIN_SUCCESS",
+      "details": "User Muhammed Ashfak O (@iedc.admin) logged in via main_admin",
+      "ipAddress": "127.0.0.1",
+      "createdAt": "2026-11-01T02:15:25.550Z"
+    },
     {
       "id": "log-1793340383551-1mt7",
       "userId": "admin",
