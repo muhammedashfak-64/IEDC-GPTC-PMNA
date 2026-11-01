@@ -71,8 +71,8 @@ export function EventPass({
   const eventTitle = (event?.title || registration.eventTitle || 'Campus Innovation Event').trim();
   const eventDate = event?.date || registration.eventDate || 'Date Announced Soon';
   const eventTime = event?.time || registration.eventTime || '10:00 AM - 04:00 PM';
-  const eventVenue = event?.venue || registration.eventVenue || 'IEDC Hall, GPTC PMNA';
-  const eventCategory = event?.category || 'Official Program';
+  const eventVenue = event?.venue || registration.eventVenue || 'IEDC Innovation Lab, GPTC PMNA';
+  const eventCategory = event?.category || registration.participationCategory || 'Official Program';
 
   // Derived participant fields
   const studentName = (registration.studentName || 'Student Participant').trim();
@@ -90,7 +90,7 @@ export function EventPass({
   const semester = registration.semester ? `Sem ${registration.semester}` : null;
   const collegeName = registration.collegeName || 'Govt Polytechnic College Perinthalmanna';
 
-  // Secure QR payload: IEDCPASS:{eventId}:{regCode}:{token}
+  // Authoritative QR payload: IEDCPASS:{eventId}:{regCode}:{token}
   const qrPayload =
     registration.qrPayload ||
     `IEDCPASS:${registration.eventId || event?.id || 'evt'}:${regCode}:${
@@ -157,7 +157,6 @@ export function EventPass({
 
       let dataUrl = '';
       try {
-        // High fidelity 3x pixel ratio via html-to-image
         const options = {
           quality: 0.98,
           pixelRatio: 3,
@@ -177,7 +176,6 @@ export function EventPass({
         }
       } catch (htmlToImageErr) {
         console.warn('html-to-image notice, falling back to html2canvas:', htmlToImageErr);
-        // Fallback to html2canvas if html-to-image encounters environment restrictions
         const canvas = await html2canvas(passRef.current, {
           scale: 3,
           backgroundColor: '#0B0B0F',
@@ -191,7 +189,6 @@ export function EventPass({
         throw new Error('Image canvas generation returned an incomplete buffer.');
       }
 
-      // Trigger instant download
       const link = document.createElement('a');
       link.href = dataUrl;
       link.download = filename;
@@ -239,32 +236,31 @@ export function EventPass({
           color: '#ECECEC'
         }}
       >
-        {/* Decorative Top Accent Stripe */}
+        {/* Decorative Top Accent Stripe: Official IEDC Brand Gradient */}
         <div
           className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#F98A5B] via-[#EC3A74] to-[#6249A3]"
           aria-hidden="true"
         />
 
         {/* 1. INSTITUTIONAL HEADER & BRANDING */}
-        <div className="flex items-center justify-between gap-3 pt-2 pb-4 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <img
-              src="/college-logo.png"
-              alt="GPTC PMNA Crest"
-              className="w-12 h-12 object-contain shrink-0"
-              crossOrigin="anonymous"
-            />
-            <div className="leading-tight">
-              <span className="text-[11px] sm:text-xs font-black tracking-wide text-white block uppercase">
-                Govt Polytechnic College Perinthalmanna
-              </span>
-              <span className="text-[9px] sm:text-[10px] text-neutral-400 font-medium block">
-                Innovation &amp; Entrepreneurship Development Centre
-              </span>
-              <span className="text-[10px] font-mono font-bold tracking-widest text-[#F98A5B] uppercase block mt-0.5">
-                Official Event Entry Pass
-              </span>
-            </div>
+        <div className="flex items-center justify-between gap-4 pt-1 pb-4 border-b border-white/10">
+          <img
+            src="/college-logo.png"
+            alt="GPTC PMNA Crest"
+            className="w-12 h-12 object-contain shrink-0"
+            crossOrigin="anonymous"
+          />
+
+          <div className="text-center flex-1 leading-tight px-1">
+            <span className="text-[11px] sm:text-xs font-black tracking-wide text-white block uppercase">
+              Govt Polytechnic College Perinthalmanna
+            </span>
+            <span className="text-[9px] sm:text-[10px] text-neutral-400 font-medium block mt-0.5">
+              Innovation &amp; Entrepreneurship Development Centre
+            </span>
+            <span className="text-[10px] font-mono font-bold tracking-widest text-[#F98A5B] uppercase block mt-1">
+              Official Event Entry Pass
+            </span>
           </div>
 
           <img
@@ -275,7 +271,7 @@ export function EventPass({
           />
         </div>
 
-        {/* 2. EVENT INFORMATION BANNER */}
+        {/* 2. EVENT INFORMATION BANNER (#14141D) */}
         <div className="p-4 rounded-2xl bg-[#14141D] border border-white/10 space-y-2.5">
           <div className="flex items-start justify-between gap-2">
             <div>
@@ -293,7 +289,7 @@ export function EventPass({
                 WAITLIST #{registration.waitlistPosition || 1}
               </span>
             ) : (
-              <span className="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono text-[11px] font-bold flex items-center gap-1 shrink-0">
+              <span className="px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-mono text-[11px] font-bold flex items-center gap-1.5 shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                 CONFIRMED
               </span>
@@ -301,7 +297,7 @@ export function EventPass({
           </div>
 
           {/* Event Metadata Rows */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-neutral-300 pt-1 border-t border-white/5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px] text-neutral-300 pt-1.5 border-t border-white/5">
             <div className="flex items-center gap-2">
               <Calendar className="w-3.5 h-3.5 text-[#F98A5B] shrink-0" />
               <span>{eventDate}</span>
@@ -317,42 +313,25 @@ export function EventPass({
           </div>
         </div>
 
-        {/* 3. PARTICIPANT INFORMATION CARD & QR CODE */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 items-center">
-          {/* High-Contrast Crisp White QR Card */}
-          <div className="p-3.5 rounded-2xl bg-white flex flex-col items-center justify-center shrink-0 w-fit mx-auto shadow-lg border-2 border-[#F98A5B]/40">
-            <div className="p-1 bg-white">
-              <QRCode
-                value={qrPayload}
-                size={136}
-                level="M"
-                fgColor="#0B0B0D"
-                bgColor="#FFFFFF"
-              />
-            </div>
-            <span className="text-[9px] font-mono font-black text-[#0B0B0D] tracking-widest mt-2 uppercase">
-              Entry Verification
-            </span>
-          </div>
-
-          {/* Participant Details Column */}
-          <div className="sm:col-span-2 space-y-2 text-xs">
+        {/* 3. COMPACT PARTICIPANT DETAILS CARD (#14141D) */}
+        <div className="p-4 rounded-2xl bg-[#14141D] border border-white/10 space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
             {/* Participant Name */}
             <div>
-              <span className="text-[10px] font-mono tracking-wider text-neutral-400 uppercase block">
+              <span className="text-[10px] font-mono tracking-wider text-neutral-400 uppercase block font-bold">
                 Participant Name
               </span>
-              <h3 className="text-base sm:text-lg font-black text-white tracking-wide uppercase leading-tight">
+              <h3 className="text-base sm:text-lg font-black text-white tracking-wide uppercase leading-tight mt-0.5">
                 {studentName}
               </h3>
             </div>
 
             {/* Pass ID / Reg Code */}
             <div>
-              <span className="text-[10px] font-mono tracking-wider text-neutral-400 uppercase block">
-                Pass ID / Registration Code
+              <span className="text-[10px] font-mono tracking-wider text-neutral-400 uppercase block font-bold">
+                Pass ID / Registration No
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 mt-0.5">
                 <span className="text-base sm:text-lg font-mono font-black text-[#F98A5B] tracking-wider">
                   {regCode}
                 </span>
@@ -366,51 +345,117 @@ export function EventPass({
                 </button>
               </div>
             </div>
+          </div>
 
-            {/* Department & Batch */}
-            <div className="pt-1 border-t border-white/10 text-neutral-300 space-y-1 text-[11px]">
-              {regNo && (
-                <div className="flex justify-between">
-                  <span className="text-neutral-500 font-mono">Reg No:</span>
-                  <span className="font-mono text-white font-bold">{regNo}</span>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <span className="text-neutral-500">Branch:</span>
-                <span className="text-white font-medium truncate max-w-[170px]">{department}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-neutral-500">Year / Batch:</span>
-                <span className="text-white font-medium">
-                  {academicYear} {semester ? `• ${semester}` : ''}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-neutral-500">College:</span>
-                <span className="text-white font-medium truncate max-w-[170px]">{collegeName}</span>
-              </div>
+          {/* Department, Batch, Institution Grid */}
+          <div className="pt-2 border-t border-white/10 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-[11px] text-neutral-300">
+            <div className="flex justify-between sm:justify-start sm:gap-2">
+              <span className="text-neutral-500 shrink-0">Branch:</span>
+              <span className="text-white font-medium truncate">{department}</span>
             </div>
+            <div className="flex justify-between sm:justify-start sm:gap-2">
+              <span className="text-neutral-500 shrink-0">Batch / Year:</span>
+              <span className="text-white font-medium">
+                {academicYear} {semester ? `• ${semester}` : ''}
+              </span>
+            </div>
+            <div className="sm:col-span-2 flex justify-between sm:justify-start sm:gap-2">
+              <span className="text-neutral-500 shrink-0">Institution:</span>
+              <span className="text-white font-medium truncate">{collegeName}</span>
+            </div>
+            {regNo && (
+              <div className="flex justify-between sm:justify-start sm:gap-2">
+                <span className="text-neutral-500 shrink-0">Reg No:</span>
+                <span className="font-mono text-white font-bold">{regNo}</span>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* 4. RECEPTION INSTRUCTIONS & VERIFICATION BADGE */}
-        <div className="p-3 rounded-xl bg-white/[0.04] border border-white/10 flex items-start gap-2.5 text-[11px] text-neutral-300">
-          <ShieldCheck className="w-4 h-4 text-[#F98A5B] shrink-0 mt-0.5" />
+        {/* 4. DEDICATED CENTERED QR CODE CARD WITH CLEAR BUFFER */}
+        {/* Generous visual buffer between participant info and QR container */}
+        <div className="pt-2 pb-1 flex flex-col items-center justify-center">
+          <div className="p-4 rounded-2xl bg-white shadow-xl border-2 border-[#F98A5B] flex flex-col items-center justify-center w-fit mx-auto transition-transform">
+            <div className="p-1 bg-white">
+              <QRCode
+                value={qrPayload}
+                size={168}
+                level="M"
+                fgColor="#0B0B0D"
+                bgColor="#FFFFFF"
+              />
+            </div>
+          </div>
+
+          {/* QR Verification Labels */}
+          <div className="text-center mt-3 space-y-0.5">
+            <span className="text-xs font-mono font-black text-white tracking-widest uppercase block">
+              Scan for Entry Verification
+            </span>
+            <span className="text-[11px] text-neutral-400 block">
+              Present this pass at reception for automated attendance verification
+            </span>
+          </div>
+        </div>
+
+        {/* 5. RECEPTION DESK VERIFICATION NOTICE CARD */}
+        <div className="p-3.5 rounded-xl bg-[#14141D] border border-white/10 flex items-start gap-3 text-[11px] text-neutral-300 relative overflow-hidden">
+          <div className="w-1 bg-gradient-to-b from-[#F98A5B] via-[#EC3A74] to-[#6249A3] absolute left-0 top-0 bottom-0" />
+          <ShieldCheck className="w-4 h-4 text-[#F98A5B] shrink-0 mt-0.5 ml-1" />
           <div className="leading-relaxed">
             <span className="font-bold text-white block">Reception Desk Verification Notice</span>
             <span>
-              Please present this verified pass (digital screen or printout) at the reception counter. Your attendance
+              Please present this verified pass (digital screen or printout) upon arrival. Your attendance
               will be authenticated in the official event registry upon scanning.
             </span>
           </div>
         </div>
 
-        {/* 5. FOOTER & SECURITY AUTHENTICATION */}
-        <div className="pt-3 border-t border-white/10 flex flex-wrap items-center justify-between text-[10px] font-mono text-neutral-500 gap-2">
+        {/* 6. FOOTER & SECURITY AUTHENTICATION */}
+        <div className="pt-2 border-t border-white/10 flex flex-wrap items-center justify-between text-[10px] font-mono text-neutral-500 gap-2">
           <span>IEDC GPTC PMNA • INNOVATION CELL VERIFIED PASS</span>
-          <span>Issued: {registration.registeredAt?.split('T')[0] || new Date().toISOString().split('T')[0]}</span>
+          <span>Issued: {registration.registeredAt?.split('T')[0] || new Date().toISOString().split('T')[0]} • Official Admission Token</span>
         </div>
       </div>
+
+      {/* Global CSS for Print Optimization */}
+      <style jsx global>{`
+        @media print {
+          @page {
+            size: portrait;
+            margin: 10mm;
+          }
+          body {
+            background-color: #0B0B0F !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          body * {
+            visibility: hidden !important;
+          }
+          #official-event-pass,
+          #official-event-pass * {
+            visibility: visible !important;
+          }
+          #official-event-pass {
+            position: absolute !important;
+            left: 50% !important;
+            top: 0 !important;
+            transform: translateX(-50%) !important;
+            width: 380px !important;
+            max-width: 380px !important;
+            margin: 0 auto !important;
+            padding: 24px !important;
+            box-shadow: none !important;
+            border: 2px solid rgba(255, 255, 255, 0.25) !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+        }
+      `}</style>
 
       {/* Export Error Alert (if any) */}
       {exportError && (
@@ -426,7 +471,7 @@ export function EventPass({
       {showActions && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-center gap-3">
-            {/* Download PNG (High-Res Client Capture) */}
+            {/* Download PNG (High-Res Client Capture / Server Fallback) */}
             <button
               type="button"
               onClick={() => handleExportImage('png')}
@@ -466,7 +511,7 @@ export function EventPass({
               )}
             </button>
 
-            {/* Download PDF (Server Vector Pipeline) */}
+            {/* Download PDF (Authoritative 300+ DPI Pipeline) */}
             <a
               href={`/api/public/registrations/${registration.id}/pass/pdf`}
               download={`IEDC_Pass_${studentName.replace(/\s+/g, '_')}_${regCode}.pdf`}
