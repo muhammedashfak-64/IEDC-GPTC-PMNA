@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getStartups } from '@/lib/serverStore';
+import { getStartupsAsync } from '@/lib/serverStore';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET() {
   try {
-    const list = getStartups();
-    const published = list.filter((s: any) => s.status === 'Published' || !s.status);
+    const published = await getStartupsAsync(true);
     return NextResponse.json({
       success: true,
       count: published.length,

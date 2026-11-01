@@ -71,17 +71,16 @@ const DB_FILE = path.join(process.cwd(), 'src', 'data', 'db.json');
 let memoryDb: any = null;
 let lastDbMtime = 0;
 
-export function loadDb(): any {
-  if (memoryDb) return memoryDb;
-
+export function loadDb(forceFresh = false): any {
   try {
     if (fs.existsSync(DB_FILE)) {
+      const stat = fs.statSync(DB_FILE);
+      if (!forceFresh && memoryDb && stat.mtimeMs <= lastDbMtime) {
+        return memoryDb;
+      }
       const raw = fs.readFileSync(DB_FILE, 'utf-8');
       memoryDb = JSON.parse(raw);
-      try {
-        const stat = fs.statSync(DB_FILE);
-        lastDbMtime = stat.mtimeMs;
-      } catch {}
+      lastDbMtime = stat.mtimeMs;
       return memoryDb;
     }
   } catch (err) {
@@ -91,8 +90,13 @@ export function loadDb(): any {
   try {
     const tmpFile = path.join(os.tmpdir(), 'iedc_db.json');
     if (fs.existsSync(tmpFile)) {
+      const stat = fs.statSync(tmpFile);
+      if (!forceFresh && memoryDb && stat.mtimeMs <= lastDbMtime) {
+        return memoryDb;
+      }
       const raw = fs.readFileSync(tmpFile, 'utf-8');
       memoryDb = JSON.parse(raw);
+      lastDbMtime = stat.mtimeMs;
       return memoryDb;
     }
   } catch {}
@@ -107,17 +111,25 @@ export function saveDb(db: any) {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf-8');
+    const tmpPath = `${DB_FILE}.${Date.now()}.${Math.random().toString(36).substring(2, 6)}.tmp`;
+    fs.writeFileSync(tmpPath, JSON.stringify(db, null, 2), 'utf-8');
+    fs.renameSync(tmpPath, DB_FILE);
     try {
       const stat = fs.statSync(DB_FILE);
       lastDbMtime = stat.mtimeMs;
     } catch {
-      // ignore
+      lastDbMtime = Date.now();
     }
   } catch (err) {
     try {
       const tmpFile = path.join(os.tmpdir(), 'iedc_db.json');
       fs.writeFileSync(tmpFile, JSON.stringify(db, null, 2), 'utf-8');
+      try {
+        const stat = fs.statSync(tmpFile);
+        lastDbMtime = stat.mtimeMs;
+      } catch {
+        lastDbMtime = Date.now();
+      }
     } catch {}
   }
 }
@@ -173,40 +185,31 @@ export function resolveOperatorAvatar(user: any, db?: any): string {
   if (!user) return '';
   if (!db) db = loadDb();
 
-  // 1. Explicit user avatar (takes precedence for main administrator and direct uploads)
-  if (user.avatar) return user.avatar;
+  // 1. Direct user avatar is authoritative and unique to the authenticated user ID
+  if (user.avatar && typeof user.avatar === 'string' && user.avatar.trim()) {
+    return user.avatar.trim();
+  }
 
-  // 2. Linked profile resolution
-  if (user.linkedProfileId) {
-    if (user.linkedProfileType === 'faculty') {
-      const fac = (db.facultyCoordinators || []).find((f: any) => f.id === user.linkedProfileId);
+  // 2. Look up the persistent profile by immutable account ID
+  const profile = (db.profiles || []).find((p: any) => p.id === user.id || (user.supabaseAuthId && p.supabaseAuthId === user.supabaseAuthId));
+  if (profile?.avatar && typeof profile.avatar === 'string' && profile.avatar.trim()) {
+    return profile.avatar.trim();
+  }
+
+  // 3. Explicit linked profile resolution (only when explicitly configured for this user ID)
+  if (profile?.linkedProfileId) {
+    if (profile.linkedProfileType === 'faculty') {
+      const fac = (db.facultyCoordinators || []).find((f: any) => f.id === profile.linkedProfileId);
       if (fac?.photoUrl) return fac.photoUrl;
     } else {
-      const tm = (db.teamMembers || []).find((t: any) => t.id === user.linkedProfileId);
+      const tm = (db.teamMembers || []).find((t: any) => t.id === profile.linkedProfileId);
       if (tm?.finalTransparentPhotoUrl || tm?.photoUrl) {
         return tm.finalTransparentPhotoUrl || tm.photoUrl;
       }
     }
   }
 
-  // 2. Email matching fallback to team/faculty record
-  if (user.email) {
-    const cleanEmail = user.email.trim().toLowerCase();
-    const fac = (db.facultyCoordinators || []).find(
-      (f: any) => f.email?.trim().toLowerCase() === cleanEmail
-    );
-    if (fac?.photoUrl) return fac.photoUrl;
-
-    const tm = (db.teamMembers || []).find(
-      (t: any) => t.email?.trim().toLowerCase() === cleanEmail
-    );
-    if (tm?.finalTransparentPhotoUrl || tm?.photoUrl) {
-      return tm.finalTransparentPhotoUrl || tm.photoUrl;
-    }
-  }
-
-  // 3. Fallback to user avatar or placeholder
-  return user.avatar || '';
+  return '';
 }
 
 // -------------------------------------------------------------
@@ -291,13 +294,21 @@ export async function authenticateAdmin(
 
       if (!signInErr && signInData?.user) {
         isMatch = true;
+        let profileChanged = false;
         if (user.supabaseAuthId !== signInData.user.id) {
           user.supabaseAuthId = signInData.user.id;
-          saveDb(db);
+          profileChanged = true;
+        }
+        if (signInData.user.user_metadata?.avatar && signInData.user.user_metadata.avatar !== user.avatar) {
+          user.avatar = signInData.user.user_metadata.avatar;
+          profileChanged = true;
         }
         // Upgrade local hash to salted PBKDF2 if missing
         if (!user.passwordHash || !user.passwordHash.startsWith('pbkdf2$')) {
           user.passwordHash = hashPassword(password);
+          profileChanged = true;
+        }
+        if (profileChanged) {
           saveDb(db);
         }
       }
@@ -411,12 +422,46 @@ export function getSettings() {
   return db.settings || {};
 }
 
-export function updateSettings(newSettings: any, user: AuthUser) {
+export async function getSettingsAsync() {
+  const db = loadDb();
+  if (isSupabaseAdminConfigured()) {
+    try {
+      const { data } = await supabaseAdmin.from('website_settings').select('*').eq('id', 'current_settings').single();
+      if (data) {
+        db.settings = {
+          ...db.settings,
+          siteTitle: data.site_title || db.settings?.siteTitle,
+          collegeName: data.college_name || db.settings?.collegeName,
+          heroHeading: data.hero_heading || db.settings?.heroHeading,
+          campusPhotoUrl: data.campus_photo_url || db.settings?.campusPhotoUrl,
+          iedcGptcPmnaLogoUrl: data.iedc_gptc_pmna_logo_url || db.settings?.iedcGptcPmnaLogoUrl,
+          collegeLogoUrl: data.college_logo_url || db.settings?.collegeLogoUrl,
+          iedcLogoUrl: data.iedc_logo_url || db.settings?.iedcLogoUrl,
+          contact: {
+            email: data.contact_email || db.settings?.contact?.email,
+            phone: data.contact_phone || db.settings?.contact?.phone,
+            address: data.address || db.settings?.contact?.address
+          },
+          social: data.social_links || db.settings?.social || {}
+        };
+        saveDb(db);
+      }
+    } catch {}
+  }
+  return getSettings();
+}
+
+export async function updateSettings(newSettings: any, user: AuthUser) {
   const db = loadDb();
   db.settings = { ...db.settings, ...newSettings };
   saveDb(db);
-  syncSettingsToSupabase(db.settings).catch(() => {});
+  await syncSettingsToSupabase(db.settings).catch(() => {});
+  await syncModuleToRemoteStorage('settings', db.settings).catch(() => {});
   addAuditLog('SETTINGS_UPDATE', user, 'Updated site CMS and Homepage settings');
+  try {
+    revalidatePath('/');
+    revalidatePath('/admin/settings');
+  } catch {}
   return db.settings;
 }
 
@@ -2984,6 +3029,47 @@ export async function retrieveStudentCertificate(eventId: string, fullName: stri
 }
 
 // -------------------------------------------------------------
+// CLOUD CMS REPOSITORY HELPERS (Supabase Storage Sync)
+// -------------------------------------------------------------
+export async function syncModuleToRemoteStorage(moduleName: string, items: any[]): Promise<boolean> {
+  if (!isSupabaseAdminConfigured()) return false;
+  try {
+    const raw = Buffer.from(JSON.stringify(items, null, 2), 'utf-8');
+    const { error } = await supabaseAdmin.storage
+      .from('website-assets')
+      .upload(`cms_store/${moduleName}.json`, raw, {
+        contentType: 'application/json',
+        upsert: true
+      });
+    if (error) {
+      console.warn(`[serverStore] syncModuleToRemoteStorage ${moduleName} warning:`, error.message);
+      return false;
+    }
+    return true;
+  } catch (err: any) {
+    console.warn(`[serverStore] syncModuleToRemoteStorage ${moduleName} exception:`, err?.message || err);
+    return false;
+  }
+}
+
+export async function fetchModuleFromRemoteStorage(moduleName: string): Promise<any[] | null> {
+  if (!isSupabaseAdminConfigured()) return null;
+  try {
+    const { data, error } = await supabaseAdmin.storage
+      .from('website-assets')
+      .download(`cms_store/${moduleName}.json`);
+    if (!error && data) {
+      const text = await data.text();
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// -------------------------------------------------------------
 // GALLERY MODULE
 // -------------------------------------------------------------
 export function getGallery(publishedOnly = false) {
@@ -2995,7 +3081,17 @@ export function getGallery(publishedOnly = false) {
   return list;
 }
 
-export function createGalleryItem(data: any, user: AuthUser) {
+export async function getGalleryAsync(publishedOnly = false) {
+  const remote = await fetchModuleFromRemoteStorage('gallery');
+  const db = loadDb();
+  if (remote && Array.isArray(remote)) {
+    db.gallery = remote;
+    saveDb(db);
+  }
+  return getGallery(publishedOnly);
+}
+
+export async function createGalleryItem(data: any, user: AuthUser) {
   const db = loadDb();
   if (!db.gallery) db.gallery = [];
   const newItem = {
@@ -3012,28 +3108,43 @@ export function createGalleryItem(data: any, user: AuthUser) {
   };
   db.gallery.unshift(newItem);
   saveDb(db);
+  await syncModuleToRemoteStorage('gallery', db.gallery);
   syncGalleryToSupabase(newItem, false).catch(() => {});
   addAuditLog('GALLERY_UPLOAD', user, `Uploaded gallery item: ${newItem.title}`);
+  try {
+    revalidatePath('/gallery');
+    revalidatePath('/admin/gallery');
+  } catch {}
   return newItem;
 }
 
-export function updateGalleryItem(id: string, updates: any, user: AuthUser) {
+export async function updateGalleryItem(id: string, updates: any, user: AuthUser) {
   const db = loadDb();
   const idx = (db.gallery || []).findIndex((g: any) => g.id === id);
   if (idx === -1) return null;
-  db.gallery[idx] = { ...db.gallery[idx], ...updates };
+  db.gallery[idx] = { ...db.gallery[idx], ...updates, updatedAt: new Date().toISOString() };
   saveDb(db);
+  await syncModuleToRemoteStorage('gallery', db.gallery);
   syncGalleryToSupabase(db.gallery[idx], true).catch(() => {});
   addAuditLog('GALLERY_UPDATE', user, `Updated gallery item: ${db.gallery[idx].title}`);
+  try {
+    revalidatePath('/gallery');
+    revalidatePath('/admin/gallery');
+  } catch {}
   return db.gallery[idx];
 }
 
-export function deleteGalleryItem(id: string, user: AuthUser) {
+export async function deleteGalleryItem(id: string, user: AuthUser) {
   const db = loadDb();
   db.gallery = (db.gallery || []).filter((g: any) => g.id !== id);
   saveDb(db);
+  await syncModuleToRemoteStorage('gallery', db.gallery);
   deleteGalleryFromSupabase(id).catch(() => {});
   addAuditLog('GALLERY_DELETE', user, `Deleted gallery item ${id}`);
+  try {
+    revalidatePath('/gallery');
+    revalidatePath('/admin/gallery');
+  } catch {}
   return true;
 }
 
@@ -3049,15 +3160,60 @@ export function getProjects(publishedOnly = false) {
   return list;
 }
 
-export function createProject(data: any, user: AuthUser) {
+export async function getProjectsAsync(publishedOnly = false) {
+  if (isSupabaseAdminConfigured()) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('projects')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && Array.isArray(data)) {
+        const unpacked = data.map((row: any) => ({
+          id: row.id,
+          title: row.title,
+          description: row.description,
+          department: row.department,
+          technology: Array.isArray(row.technologies) ? row.technologies : (row.technologies ? [row.technologies] : []),
+          year: row.year,
+          status: row.status,
+          author: row.author,
+          mentor: row.mentor,
+          likes: row.likes || 0,
+          bookmarks: row.bookmarks || 0,
+          githubUrl: row.github_url || '',
+          demoUrl: row.demo_url || '',
+          imageUrl: row.image_url,
+          teamMembers: Array.isArray(row.team_members) ? row.team_members : [],
+          publicationStatus: row.publication_status || 'Published',
+          createdAt: row.created_at
+        }));
+        const db = loadDb();
+        db.projects = unpacked;
+        saveDb(db);
+        if (publishedOnly) {
+          return unpacked.filter((p: any) => p.publicationStatus === 'Published' || !p.publicationStatus);
+        }
+        return unpacked;
+      }
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase query projects warning:', sbErr);
+    }
+  }
+  return getProjects(publishedOnly);
+}
+
+export async function createProject(data: any, user: AuthUser) {
   const db = loadDb();
   if (!db.projects) db.projects = [];
+  const techArray = Array.isArray(data.technology) ? data.technology : (data.technology || '').split(',').map((t: string) => t.trim()).filter(Boolean);
+  const teamArray = Array.isArray(data.teamMembers) ? data.teamMembers : (data.teamMembers || '').split(',').map((m: string) => m.trim()).filter(Boolean);
   const newProj = {
     id: `proj-${Date.now()}`,
     title: data.title,
     description: data.description,
     department: data.department || 'Electronics Engineering',
-    technology: Array.isArray(data.technology) ? data.technology : (data.technology || '').split(',').map((t: string) => t.trim()),
+    technology: techArray,
     year: data.year || '2026',
     status: data.status || 'Prototype',
     author: data.author || user.full_name,
@@ -3067,34 +3223,117 @@ export function createProject(data: any, user: AuthUser) {
     githubUrl: data.githubUrl || '',
     demoUrl: data.demoUrl || '',
     imageUrl: data.imageUrl || 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&auto=format&fit=crop&q=80',
-    teamMembers: Array.isArray(data.teamMembers) ? data.teamMembers : (data.teamMembers || '').split(',').map((m: string) => m.trim()),
+    teamMembers: teamArray,
     publicationStatus: data.publicationStatus || 'Published',
     createdAt: new Date().toISOString()
   };
+
+  // 1. Authoritative insert in Supabase
+  if (isSupabaseAdminConfigured()) {
+    try {
+      await supabaseAdmin.from('projects').insert({
+        id: newProj.id,
+        title: newProj.title,
+        description: newProj.description,
+        department: newProj.department,
+        technologies: techArray,
+        year: newProj.year,
+        status: newProj.status,
+        author: newProj.author,
+        mentor: newProj.mentor,
+        github_url: newProj.githubUrl,
+        demo_url: newProj.demoUrl,
+        image_url: newProj.imageUrl,
+        team_members: teamArray,
+        publication_status: newProj.publicationStatus,
+        created_at: newProj.createdAt
+      });
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase project create warning:', sbErr);
+    }
+  }
+
   db.projects.unshift(newProj);
   saveDb(db);
-  syncProjectToSupabase(newProj, false).catch(() => {});
   addAuditLog('PROJECT_CREATE', user, `Created project: ${newProj.title}`);
+  try {
+    revalidatePath('/projects');
+    revalidatePath('/admin/projects');
+    revalidatePath('/');
+  } catch {}
   return newProj;
 }
 
-export function updateProject(id: string, updates: any, user: AuthUser) {
+export async function updateProject(id: string, updates: any, user: AuthUser) {
   const db = loadDb();
   const idx = (db.projects || []).findIndex((p: any) => p.id === id);
   if (idx === -1) return null;
-  db.projects[idx] = { ...db.projects[idx], ...updates };
+
+  // 1. Authoritative update in Supabase
+  if (isSupabaseAdminConfigured()) {
+    try {
+      const sbUpdates: any = {};
+      if (updates.title !== undefined) sbUpdates.title = updates.title;
+      if (updates.description !== undefined) sbUpdates.description = updates.description;
+      if (updates.department !== undefined) sbUpdates.department = updates.department;
+      if (updates.technology !== undefined) {
+        sbUpdates.technologies = Array.isArray(updates.technology)
+          ? updates.technology
+          : (updates.technology || '').split(',').map((t: string) => t.trim()).filter(Boolean);
+      }
+      if (updates.year !== undefined) sbUpdates.year = updates.year;
+      if (updates.status !== undefined) sbUpdates.status = updates.status;
+      if (updates.author !== undefined) sbUpdates.author = updates.author;
+      if (updates.mentor !== undefined) sbUpdates.mentor = updates.mentor;
+      if (updates.githubUrl !== undefined) sbUpdates.github_url = updates.githubUrl;
+      if (updates.demoUrl !== undefined) sbUpdates.demo_url = updates.demoUrl;
+      if (updates.imageUrl !== undefined) sbUpdates.image_url = updates.imageUrl;
+      if (updates.teamMembers !== undefined) {
+        sbUpdates.team_members = Array.isArray(updates.teamMembers)
+          ? updates.teamMembers
+          : (updates.teamMembers || '').split(',').map((m: string) => m.trim()).filter(Boolean);
+      }
+      if (updates.publicationStatus !== undefined) sbUpdates.publication_status = updates.publicationStatus;
+      await supabaseAdmin.from('projects').update(sbUpdates).eq('id', id);
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase project update warning:', sbErr);
+    }
+  }
+
+  db.projects[idx] = { ...db.projects[idx], ...updates, updatedAt: new Date().toISOString() };
   saveDb(db);
-  syncProjectToSupabase(db.projects[idx], true).catch(() => {});
   addAuditLog('PROJECT_UPDATE', user, `Updated project: ${db.projects[idx].title}`);
+  try {
+    revalidatePath('/projects');
+    revalidatePath('/admin/projects');
+    revalidatePath('/');
+  } catch {}
   return db.projects[idx];
 }
 
-export function deleteProject(id: string, user: AuthUser) {
+export async function deleteProject(id: string, user: AuthUser) {
   const db = loadDb();
+  const existing = (db.projects || []).find((p: any) => p.id === id);
+
+  // 1. Authoritative delete in Supabase
+  if (isSupabaseAdminConfigured()) {
+    try {
+      await supabaseAdmin.from('projects').delete().eq('id', id);
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase project delete warning:', sbErr);
+    }
+  }
+
   db.projects = (db.projects || []).filter((p: any) => p.id !== id);
   saveDb(db);
-  deleteProjectFromSupabase(id).catch(() => {});
-  addAuditLog('PROJECT_DELETE', user, `Deleted project: ${id}`);
+  if (existing) {
+    addAuditLog('PROJECT_DELETE', user, `Deleted project: ${existing.title}`);
+  }
+  try {
+    revalidatePath('/projects');
+    revalidatePath('/admin/projects');
+    revalidatePath('/');
+  } catch {}
   return true;
 }
 
@@ -3867,13 +4106,33 @@ export async function updateUser(id: string, updates: any, user: AuthUser) {
       }
 
       if (authUserId) {
+        const finalAvatar = updates.avatar !== undefined ? updates.avatar : target.avatar;
         await supabaseAdmin.auth.admin.updateUserById(authUserId, {
           user_metadata: {
             username: newUsername,
             role: updates.role || target.role,
-            full_name: updates.full_name || target.full_name
+            full_name: updates.full_name || target.full_name,
+            avatar: finalAvatar
           }
         });
+
+        // Also sync to Supabase public.profiles table
+        try {
+          await supabaseAdmin.from('profiles').upsert(
+            {
+              id: authUserId,
+              username: newUsername,
+              email: target.email,
+              full_name: updates.full_name || target.full_name,
+              role: updates.role || target.role,
+              avatar: finalAvatar,
+              phone: updates.phone !== undefined ? updates.phone : target.phone,
+              department: updates.department !== undefined ? updates.department : target.department,
+              updated_at: new Date().toISOString()
+            },
+            { onConflict: 'id' }
+          );
+        } catch {}
       }
     } catch (sbErr) {
       console.warn('[serverStore] Supabase Auth updateUser metadata sync warning:', sbErr);
@@ -3993,14 +4252,24 @@ export function getAuditLogs() {
 }
 
 // -------------------------------------------------------------
-// GENERIC GETTERS FOR OTHER MODULES
+// BROCHURES MODULE
 // -------------------------------------------------------------
 export function getBrochures() {
   const db = loadDb();
   return db.brochures || [];
 }
 
-export function createBrochure(data: any, user: AuthUser) {
+export async function getBrochuresAsync() {
+  const remote = await fetchModuleFromRemoteStorage('brochures');
+  const db = loadDb();
+  if (remote && Array.isArray(remote)) {
+    db.brochures = remote;
+    saveDb(db);
+  }
+  return getBrochures();
+}
+
+export async function createBrochure(data: any, user: AuthUser) {
   const db = loadDb();
   if (!db.brochures) db.brochures = [];
   const newBro = {
@@ -4015,31 +4284,46 @@ export function createBrochure(data: any, user: AuthUser) {
   };
   db.brochures.unshift(newBro);
   saveDb(db);
+  await syncModuleToRemoteStorage('brochures', db.brochures);
   syncBrochureToSupabase(newBro, false).catch(() => {});
   addAuditLog('BROCHURE_UPLOAD', user, `Uploaded brochure: ${newBro.title}`);
+  try {
+    revalidatePath('/admin/brochures');
+    revalidatePath('/events');
+  } catch {}
   return newBro;
 }
 
-export function updateBrochure(id: string, updates: any, user: AuthUser) {
+export async function updateBrochure(id: string, updates: any, user: AuthUser) {
   const db = loadDb();
   if (!db.brochures) db.brochures = [];
   const idx = db.brochures.findIndex((b: any) => b.id === id);
   if (idx === -1) return null;
   db.brochures[idx] = { ...db.brochures[idx], ...updates, updatedAt: new Date().toISOString() };
   saveDb(db);
+  await syncModuleToRemoteStorage('brochures', db.brochures);
   syncBrochureToSupabase(db.brochures[idx], true).catch(() => {});
   addAuditLog('BROCHURE_UPDATE', user, `Updated brochure: ${db.brochures[idx].title}`);
+  try {
+    revalidatePath('/admin/brochures');
+    revalidatePath('/events');
+  } catch {}
   return db.brochures[idx];
 }
 
-export function deleteBrochure(id: string, user: AuthUser) {
+export async function deleteBrochure(id: string, user: AuthUser) {
   const db = loadDb();
   if (!db.brochures) db.brochures = [];
   const item = db.brochures.find((b: any) => b.id === id);
   db.brochures = db.brochures.filter((b: any) => b.id !== id);
   saveDb(db);
+  await syncModuleToRemoteStorage('brochures', db.brochures);
   deleteBrochureFromSupabase(id).catch(() => {});
   if (item) addAuditLog('BROCHURE_DELETE', user, `Deleted brochure: ${item.title}`);
+  try {
+    revalidatePath('/admin/brochures');
+    revalidatePath('/events');
+  } catch {}
   return true;
 }
 
@@ -4257,81 +4541,317 @@ export function deleteCertificateTemplate(templateId: string, user: AuthUser) {
   return true;
 }
 
+// -------------------------------------------------------------
+// INNOVATION IDEAS MODULE
+// -------------------------------------------------------------
 export function getIdeas() {
   const db = loadDb();
   return db.ideas || [];
 }
 
-export function updateIdea(id: string, status: string, mentor: string, user: AuthUser) {
+export async function getIdeasAsync(approvedOnly = false) {
+  const remote = await fetchModuleFromRemoteStorage('ideas');
+  const db = loadDb();
+  if (remote && Array.isArray(remote)) {
+    db.ideas = remote;
+    saveDb(db);
+  }
+  const list = getIdeas();
+  if (approvedOnly) {
+    return list.filter((i: any) => i.status === 'Approved');
+  }
+  return list;
+}
+
+export async function createIdea(data: any, user?: AuthUser) {
+  const db = loadDb();
+  if (!db.ideas) db.ideas = [];
+  const newIdea = {
+    id: `idea-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    title: String(data.title || '').trim(),
+    studentName: data.studentName || user?.full_name || 'Student Innovator',
+    registerNumber: data.registerNumber || user?.staffId || '',
+    department: data.department || 'Electronics Engineering',
+    problemStatement: String(data.problemStatement || '').trim(),
+    proposedSolution: String(data.proposedSolution || '').trim(),
+    status: data.status || 'Pending',
+    assignedMentor: data.assignedMentor || '',
+    createdAt: new Date().toISOString()
+  };
+  db.ideas.unshift(newIdea);
+  saveDb(db);
+  await syncModuleToRemoteStorage('ideas', db.ideas);
+  if (user) {
+    addAuditLog('IDEA_SUBMIT', user, `Submitted innovation pitch: ${newIdea.title}`);
+  }
+  try {
+    revalidatePath('/innovation');
+    revalidatePath('/admin/ideas');
+  } catch {}
+  return newIdea;
+}
+
+export async function updateIdea(id: string, status: string, mentor: string, user: AuthUser) {
   const db = loadDb();
   const idx = (db.ideas || []).findIndex((i: any) => i.id === id);
   if (idx === -1) return null;
   db.ideas[idx].status = status;
   if (mentor) db.ideas[idx].assignedMentor = mentor;
+  db.ideas[idx].updatedAt = new Date().toISOString();
   saveDb(db);
+  await syncModuleToRemoteStorage('ideas', db.ideas);
   addAuditLog('IDEA_STATUS_UPDATE', user, `Idea ${id} marked as ${status}`);
+  try {
+    revalidatePath('/innovation');
+    revalidatePath('/admin/ideas');
+  } catch {}
   return db.ideas[idx];
 }
 
-export function getStartups() {
+export async function deleteIdea(id: string, user: AuthUser) {
   const db = loadDb();
-  return db.startups || [];
+  const item = (db.ideas || []).find((i: any) => i.id === id);
+  db.ideas = (db.ideas || []).filter((i: any) => i.id !== id);
+  saveDb(db);
+  await syncModuleToRemoteStorage('ideas', db.ideas);
+  if (item) addAuditLog('IDEA_DELETE', user, `Deleted idea proposal: ${item.title}`);
+  try {
+    revalidatePath('/innovation');
+    revalidatePath('/admin/ideas');
+  } catch {}
+  return true;
 }
 
-export function createStartup(data: any, user: AuthUser) {
+// -------------------------------------------------------------
+// STARTUPS MODULE
+// -------------------------------------------------------------
+export function getStartups(publishedOnly = false) {
+  const db = loadDb();
+  const list = db.startups || [];
+  if (publishedOnly) {
+    return list.filter((s: any) => s.status === 'Published' || !s.status);
+  }
+  return list;
+}
+
+export async function getStartupsAsync(publishedOnly = false) {
+  if (isSupabaseAdminConfigured()) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('startups')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && Array.isArray(data)) {
+        const unpacked = data.map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          tagline: row.tagline || '',
+          description: row.description || '',
+          founders: Array.isArray(row.founders) ? row.founders : (row.founders ? [row.founders] : []),
+          founder: Array.isArray(row.founders) ? row.founders[0] : (row.founders || ''),
+          department: row.department || 'Electronics Engineering',
+          stage: row.stage || 'Incubated',
+          fundingAmount: row.funding_amount || '',
+          incubationStage: row.stage || 'Incubated',
+          grantReceived: row.funding_amount || '',
+          logo: row.logo_url || '',
+          logoUrl: row.logo_url || '',
+          website: row.website || '',
+          pitchDeckUrl: row.pitch_deck_url || '',
+          status: row.status || 'Published',
+          createdAt: row.created_at
+        }));
+        const db = loadDb();
+        db.startups = unpacked;
+        saveDb(db);
+        if (publishedOnly) {
+          return unpacked.filter((s: any) => s.status === 'Published' || !s.status);
+        }
+        return unpacked;
+      }
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase query startups warning:', sbErr);
+    }
+  }
+  return getStartups(publishedOnly);
+}
+
+export async function createStartup(data: any, user: AuthUser) {
   const db = loadDb();
   if (!db.startups) db.startups = [];
+  const foundersArray = Array.isArray(data.founders)
+    ? data.founders
+    : (data.founders || '').split(',').map((f: string) => f.trim()).filter(Boolean);
+
   const newStartup = {
     id: `startup-${Date.now()}`,
     name: data.name,
-    tagline: data.tagline,
-    description: data.description,
-    founders: Array.isArray(data.founders) ? data.founders : (data.founders || '').split(',').map((f: string) => f.trim()),
+    tagline: data.tagline || '',
+    description: data.description || '',
+    founders: foundersArray,
+    founder: foundersArray[0] || '',
     department: data.department || 'Electronics Engineering',
     stage: data.stage || 'Incubated',
     fundingAmount: data.fundingAmount || '₹2,00,000 YIP Grant',
-    logoUrl: data.logoUrl || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=300&auto=format&fit=crop&q=80',
+    incubationStage: data.stage || 'Incubated',
+    grantReceived: data.fundingAmount || '₹2,00,000 YIP Grant',
+    logo: data.logoUrl || data.logo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=300&auto=format&fit=crop&q=80',
+    logoUrl: data.logoUrl || data.logo || 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=300&auto=format&fit=crop&q=80',
     website: data.website || '',
     pitchDeckUrl: data.pitchDeckUrl || '',
     status: data.status || 'Published',
     createdAt: new Date().toISOString()
   };
+
+  if (isSupabaseAdminConfigured()) {
+    try {
+      await supabaseAdmin.from('startups').insert({
+        id: newStartup.id,
+        name: newStartup.name,
+        tagline: newStartup.tagline,
+        description: newStartup.description,
+        founders: foundersArray,
+        department: newStartup.department,
+        stage: newStartup.stage,
+        funding_amount: newStartup.fundingAmount,
+        logo_url: newStartup.logoUrl,
+        website: newStartup.website,
+        status: newStartup.status,
+        created_at: newStartup.createdAt
+      });
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase startup create warning:', sbErr);
+    }
+  }
+
   db.startups.unshift(newStartup);
   saveDb(db);
-  syncStartupToSupabase(newStartup, false).catch(() => {});
   addAuditLog('STARTUP_ADD', user, `Added startup: ${newStartup.name}`);
+  try {
+    revalidatePath('/startups');
+    revalidatePath('/admin/startups');
+    revalidatePath('/');
+  } catch {}
   return newStartup;
 }
 
-export function updateStartup(id: string, updates: any, user: AuthUser) {
+export async function updateStartup(id: string, updates: any, user: AuthUser) {
   const db = loadDb();
   if (!db.startups) db.startups = [];
   const idx = db.startups.findIndex((s: any) => s.id === id);
   if (idx === -1) return null;
+
+  if (isSupabaseAdminConfigured()) {
+    try {
+      const sbUpdates: any = {};
+      if (updates.name !== undefined) sbUpdates.name = updates.name;
+      if (updates.tagline !== undefined) sbUpdates.tagline = updates.tagline;
+      if (updates.description !== undefined) sbUpdates.description = updates.description;
+      if (updates.founders !== undefined) {
+        sbUpdates.founders = Array.isArray(updates.founders)
+          ? updates.founders
+          : (updates.founders || '').split(',').map((f: string) => f.trim()).filter(Boolean);
+      }
+      if (updates.department !== undefined) sbUpdates.department = updates.department;
+      if (updates.stage !== undefined) sbUpdates.stage = updates.stage;
+      if (updates.fundingAmount !== undefined) sbUpdates.funding_amount = updates.fundingAmount;
+      if (updates.logoUrl !== undefined) sbUpdates.logo_url = updates.logoUrl;
+      if (updates.website !== undefined) sbUpdates.website = updates.website;
+      if (updates.status !== undefined) sbUpdates.status = updates.status;
+      await supabaseAdmin.from('startups').update(sbUpdates).eq('id', id);
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase startup update warning:', sbErr);
+    }
+  }
+
   db.startups[idx] = { ...db.startups[idx], ...updates, updatedAt: new Date().toISOString() };
   saveDb(db);
-  syncStartupToSupabase(db.startups[idx], true).catch(() => {});
   addAuditLog('STARTUP_UPDATE', user, `Updated startup: ${db.startups[idx].name}`);
+  try {
+    revalidatePath('/startups');
+    revalidatePath('/admin/startups');
+    revalidatePath('/');
+  } catch {}
   return db.startups[idx];
 }
 
-export function deleteStartup(id: string, user: AuthUser) {
+export async function deleteStartup(id: string, user: AuthUser) {
   const db = loadDb();
   if (!db.startups) db.startups = [];
   const item = db.startups.find((s: any) => s.id === id);
+
+  if (isSupabaseAdminConfigured()) {
+    try {
+      await supabaseAdmin.from('startups').delete().eq('id', id);
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase startup delete warning:', sbErr);
+    }
+  }
+
   db.startups = db.startups.filter((s: any) => s.id !== id);
   saveDb(db);
-  deleteStartupFromSupabase(id).catch(() => {});
   if (item) addAuditLog('STARTUP_DELETE', user, `Deleted startup: ${item.name}`);
+  try {
+    revalidatePath('/startups');
+    revalidatePath('/admin/startups');
+    revalidatePath('/');
+  } catch {}
   return true;
 }
 
-export function getResources() {
+// -------------------------------------------------------------
+// LEARNING RESOURCES MODULE
+// -------------------------------------------------------------
+export function getResources(publishedOnly = false) {
   const db = loadDb();
-  return db.resources || [];
+  const list = db.resources || [];
+  if (publishedOnly) {
+    return list.filter((r: any) => r.status === 'Published' || !r.status);
+  }
+  return list;
 }
 
-export function createResource(data: any, user: AuthUser) {
+export async function getResourcesAsync(publishedOnly = false) {
+  if (isSupabaseAdminConfigured()) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('resources')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && Array.isArray(data)) {
+        const unpacked = data.map((row: any) => ({
+          id: row.id,
+          title: row.title,
+          category: row.category || 'General',
+          fileType: row.file_type || 'PDF',
+          type: row.file_type || 'PDF Notes',
+          description: row.description || '',
+          fileUrl: row.file_url || '',
+          downloadUrl: row.file_url || '',
+          fileSize: row.file_size || '2.0 MB',
+          author: row.author || 'Faculty',
+          views: row.views || 0,
+          status: row.status || 'Published',
+          createdAt: row.created_at
+        }));
+        const db = loadDb();
+        db.resources = unpacked;
+        saveDb(db);
+        if (publishedOnly) {
+          return unpacked.filter((r: any) => r.status === 'Published' || !r.status);
+        }
+        return unpacked;
+      }
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase query resources warning:', sbErr);
+    }
+  }
+  return getResources(publishedOnly);
+}
+
+export async function createResource(data: any, user: AuthUser) {
   const db = loadDb();
   if (!db.resources) db.resources = [];
   const newRes = {
@@ -4339,52 +4859,160 @@ export function createResource(data: any, user: AuthUser) {
     title: data.title,
     category: data.category || 'General',
     fileType: data.fileType || 'PDF',
+    type: data.fileType || 'PDF Notes',
     description: data.description || '',
     fileUrl: data.fileUrl,
+    downloadUrl: data.fileUrl,
     fileSize: data.fileSize || '2.0 MB',
     author: data.author || user.full_name,
     views: 0,
     status: data.status || 'Published',
     createdAt: new Date().toISOString()
   };
+
+  if (isSupabaseAdminConfigured()) {
+    try {
+      await supabaseAdmin.from('resources').insert({
+        id: newRes.id,
+        title: newRes.title,
+        category: newRes.category,
+        file_type: newRes.fileType,
+        description: newRes.description,
+        file_url: newRes.fileUrl,
+        author: newRes.author,
+        status: newRes.status,
+        created_at: newRes.createdAt
+      });
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase resource create warning:', sbErr);
+    }
+  }
+
   db.resources.unshift(newRes);
   saveDb(db);
-  syncResourceToSupabase(newRes, false).catch(() => {});
   addAuditLog('RESOURCE_UPLOAD', user, `Uploaded resource: ${newRes.title}`);
+  try {
+    revalidatePath('/resources');
+    revalidatePath('/admin/resources');
+    revalidatePath('/');
+  } catch {}
   return newRes;
 }
 
-export function updateResource(id: string, updates: any, user: AuthUser) {
+export async function updateResource(id: string, updates: any, user: AuthUser) {
   const db = loadDb();
   if (!db.resources) db.resources = [];
   const idx = db.resources.findIndex((r: any) => r.id === id);
   if (idx === -1) return null;
+
+  if (isSupabaseAdminConfigured()) {
+    try {
+      const sbUpdates: any = {};
+      if (updates.title !== undefined) sbUpdates.title = updates.title;
+      if (updates.category !== undefined) sbUpdates.category = updates.category;
+      if (updates.fileType !== undefined) sbUpdates.file_type = updates.fileType;
+      if (updates.description !== undefined) sbUpdates.description = updates.description;
+      if (updates.fileUrl !== undefined) sbUpdates.file_url = updates.fileUrl;
+      if (updates.author !== undefined) sbUpdates.author = updates.author;
+      if (updates.status !== undefined) sbUpdates.status = updates.status;
+      await supabaseAdmin.from('resources').update(sbUpdates).eq('id', id);
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase resource update warning:', sbErr);
+    }
+  }
+
   db.resources[idx] = { ...db.resources[idx], ...updates, updatedAt: new Date().toISOString() };
   saveDb(db);
-  syncResourceToSupabase(db.resources[idx], true).catch(() => {});
   addAuditLog('RESOURCE_UPDATE', user, `Updated resource: ${db.resources[idx].title}`);
+  try {
+    revalidatePath('/resources');
+    revalidatePath('/admin/resources');
+    revalidatePath('/');
+  } catch {}
   return db.resources[idx];
 }
 
-export function deleteResource(id: string, user: AuthUser) {
+export async function deleteResource(id: string, user: AuthUser) {
   const db = loadDb();
   if (!db.resources) db.resources = [];
   const item = db.resources.find((r: any) => r.id === id);
+
+  if (isSupabaseAdminConfigured()) {
+    try {
+      await supabaseAdmin.from('resources').delete().eq('id', id);
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase resource delete warning:', sbErr);
+    }
+  }
+
   db.resources = db.resources.filter((r: any) => r.id !== id);
   saveDb(db);
-  deleteResourceFromSupabase(id).catch(() => {});
   if (item) addAuditLog('RESOURCE_DELETE', user, `Deleted resource: ${item.title}`);
+  try {
+    revalidatePath('/resources');
+    revalidatePath('/admin/resources');
+    revalidatePath('/');
+  } catch {}
   return true;
 }
 
-export function getBlogs() {
+// -------------------------------------------------------------
+// BLOGS MODULE
+// -------------------------------------------------------------
+export function getBlogs(publishedOnly = false) {
   const db = loadDb();
-  return db.blogs || [];
+  const list = db.blogs || [];
+  if (publishedOnly) {
+    return list.filter((b: any) => b.status === 'Published' || !b.status);
+  }
+  return list;
 }
 
-export function createBlog(data: any, user: AuthUser) {
+export async function getBlogsAsync(publishedOnly = false) {
+  if (isSupabaseAdminConfigured()) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('blogs')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && Array.isArray(data)) {
+        const unpacked = data.map((row: any) => ({
+          id: row.id,
+          title: row.title,
+          excerpt: row.excerpt || '',
+          content: row.content || '',
+          author: row.author || 'IEDC Editorial',
+          authorRole: row.author_role || 'Student Lead',
+          category: row.category || 'Innovation',
+          tags: Array.isArray(row.tags) ? row.tags : (row.tags ? [row.tags] : []),
+          readTime: row.read_time || '4 min read',
+          imageUrl: row.image_url || '',
+          status: row.status || 'Published',
+          createdAt: row.created_at
+        }));
+        const db = loadDb();
+        db.blogs = unpacked;
+        saveDb(db);
+        if (publishedOnly) {
+          return unpacked.filter((b: any) => b.status === 'Published' || !b.status);
+        }
+        return unpacked;
+      }
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase query blogs warning:', sbErr);
+    }
+  }
+  return getBlogs(publishedOnly);
+}
+
+export async function createBlog(data: any, user: AuthUser) {
   const db = loadDb();
   if (!db.blogs) db.blogs = [];
+  const tagsArray = Array.isArray(data.tags)
+    ? data.tags
+    : (data.tags || '').split(',').map((t: string) => t.trim()).filter(Boolean);
+
   const newBlog = {
     id: `blog-${Date.now()}`,
     title: data.title,
@@ -4393,45 +5021,149 @@ export function createBlog(data: any, user: AuthUser) {
     author: user.full_name,
     authorRole: user.role === 'faculty_coordinator' ? 'Nodal Officer' : 'Student Lead',
     category: data.category || 'Innovation',
-    tags: Array.isArray(data.tags) ? data.tags : (data.tags || '').split(',').map((t: string) => t.trim()),
+    tags: tagsArray,
     readTime: data.readTime || '4 min read',
     imageUrl: data.imageUrl || 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80',
     status: data.status || 'Published',
     createdAt: new Date().toISOString()
   };
+
+  if (isSupabaseAdminConfigured()) {
+    try {
+      await supabaseAdmin.from('blogs').insert({
+        id: newBlog.id,
+        title: newBlog.title,
+        excerpt: newBlog.excerpt,
+        content: newBlog.content,
+        author: newBlog.author,
+        author_role: newBlog.authorRole,
+        category: newBlog.category,
+        read_time: newBlog.readTime,
+        image_url: newBlog.imageUrl,
+        status: newBlog.status,
+        created_at: newBlog.createdAt
+      });
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase blog create warning:', sbErr);
+    }
+  }
+
   db.blogs.unshift(newBlog);
   saveDb(db);
-  syncBlogToSupabase(newBlog, false).catch(() => {});
   addAuditLog('BLOG_CREATE', user, `Created blog post: ${newBlog.title}`);
+  try {
+    revalidatePath('/blog');
+    revalidatePath('/admin/blogs');
+    revalidatePath('/');
+  } catch {}
   return newBlog;
 }
 
-export function updateBlog(id: string, updates: any, user: AuthUser) {
+export async function updateBlog(id: string, updates: any, user: AuthUser) {
   const db = loadDb();
   if (!db.blogs) db.blogs = [];
   const idx = db.blogs.findIndex((b: any) => b.id === id);
   if (idx === -1) return null;
+
+  if (isSupabaseAdminConfigured()) {
+    try {
+      const sbUpdates: any = {};
+      if (updates.title !== undefined) sbUpdates.title = updates.title;
+      if (updates.excerpt !== undefined) sbUpdates.excerpt = updates.excerpt;
+      if (updates.content !== undefined) sbUpdates.content = updates.content;
+      if (updates.author !== undefined) sbUpdates.author = updates.author;
+      if (updates.authorRole !== undefined) sbUpdates.author_role = updates.authorRole;
+      if (updates.category !== undefined) sbUpdates.category = updates.category;
+      if (updates.readTime !== undefined) sbUpdates.read_time = updates.readTime;
+      if (updates.imageUrl !== undefined) sbUpdates.image_url = updates.imageUrl;
+      if (updates.status !== undefined) sbUpdates.status = updates.status;
+      await supabaseAdmin.from('blogs').update(sbUpdates).eq('id', id);
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase blog update warning:', sbErr);
+    }
+  }
+
   db.blogs[idx] = { ...db.blogs[idx], ...updates, updatedAt: new Date().toISOString() };
   saveDb(db);
-  syncBlogToSupabase(db.blogs[idx], true).catch(() => {});
   addAuditLog('BLOG_UPDATE', user, `Updated blog post: ${db.blogs[idx].title}`);
+  try {
+    revalidatePath('/blog');
+    revalidatePath('/admin/blogs');
+    revalidatePath('/');
+  } catch {}
   return db.blogs[idx];
 }
 
-export function deleteBlog(id: string, user: AuthUser) {
+export async function deleteBlog(id: string, user: AuthUser) {
   const db = loadDb();
   if (!db.blogs) db.blogs = [];
   const item = db.blogs.find((b: any) => b.id === id);
+
+  if (isSupabaseAdminConfigured()) {
+    try {
+      await supabaseAdmin.from('blogs').delete().eq('id', id);
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase blog delete warning:', sbErr);
+    }
+  }
+
   db.blogs = db.blogs.filter((b: any) => b.id !== id);
   saveDb(db);
-  deleteBlogFromSupabase(id).catch(() => {});
   if (item) addAuditLog('BLOG_DELETE', user, `Deleted blog post: ${item.title}`);
+  try {
+    revalidatePath('/blog');
+    revalidatePath('/admin/blogs');
+    revalidatePath('/');
+  } catch {}
   return true;
 }
 
+// -------------------------------------------------------------
+// ANNOUNCEMENTS MODULE
+// -------------------------------------------------------------
 export function getAnnouncements() {
   const db = loadDb();
   return db.announcements || [];
+}
+
+export async function getAnnouncementsAsync(activeOnly = false) {
+  if (isSupabaseAdminConfigured()) {
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('announcements')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!error && data && Array.isArray(data)) {
+        const unpacked = data.map((row: any) => ({
+          id: row.id,
+          title: row.title,
+          message: row.message,
+          priority: row.priority || 'Medium',
+          targetAudience: 'All',
+          isActive: row.status === 'Published' || !row.status,
+          actionLink: row.action_link || '',
+          attachmentUrl: '',
+          createdAt: row.created_at,
+          updatedAt: row.created_at
+        }));
+        const db = loadDb();
+        db.announcements = unpacked;
+        saveDb(db);
+        if (activeOnly) {
+          return unpacked.filter((a: any) => a.isActive);
+        }
+        return unpacked;
+      }
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase query announcements warning:', sbErr);
+    }
+  }
+  const list = getAnnouncements();
+  if (activeOnly) {
+    return list.filter((a: any) => a.isActive);
+  }
+  return list;
 }
 
 export function getAnnouncementById(id: string) {
@@ -4439,7 +5171,7 @@ export function getAnnouncementById(id: string) {
   return (db.announcements || []).find((a: any) => a.id === id) || null;
 }
 
-export function createAnnouncement(data: any, user: AuthUser) {
+export async function createAnnouncement(data: any, user: AuthUser) {
   const db = loadDb();
   if (!db.announcements) db.announcements = [];
   const newAnn = {
@@ -4454,14 +5186,35 @@ export function createAnnouncement(data: any, user: AuthUser) {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString()
   };
+
+  if (isSupabaseAdminConfigured()) {
+    try {
+      await supabaseAdmin.from('announcements').insert({
+        id: newAnn.id,
+        title: newAnn.title,
+        message: newAnn.message,
+        priority: newAnn.priority,
+        is_urgent: newAnn.priority === 'High',
+        action_link: newAnn.actionLink,
+        status: newAnn.isActive ? 'Published' : 'Archived',
+        created_at: newAnn.createdAt
+      });
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase announcement create warning:', sbErr);
+    }
+  }
+
   db.announcements.unshift(newAnn);
   saveDb(db);
-  syncAnnouncementToSupabase(newAnn, false).catch(() => {});
   addAuditLog('ANNOUNCEMENT_CREATE', user, `Broadcast announcement: ${newAnn.title}`);
+  try {
+    revalidatePath('/admin/announcements');
+    revalidatePath('/');
+  } catch {}
   return newAnn;
 }
 
-export function updateAnnouncement(id: string, updates: any, user: AuthUser) {
+export async function updateAnnouncement(id: string, updates: any, user: AuthUser) {
   const db = loadDb();
   if (!db.announcements) db.announcements = [];
   const idx = db.announcements.findIndex((a: any) => a.id === id);
@@ -4484,14 +5237,32 @@ export function updateAnnouncement(id: string, updates: any, user: AuthUser) {
     updatedAt: new Date().toISOString()
   };
 
+  if (isSupabaseAdminConfigured()) {
+    try {
+      await supabaseAdmin.from('announcements').update({
+        title: updatedAnn.title,
+        message: updatedAnn.message,
+        priority: updatedAnn.priority,
+        is_urgent: updatedAnn.priority === 'High',
+        action_link: updatedAnn.actionLink,
+        status: updatedAnn.isActive ? 'Published' : 'Archived'
+      }).eq('id', id);
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase announcement update warning:', sbErr);
+    }
+  }
+
   db.announcements[idx] = updatedAnn;
   saveDb(db);
-  syncAnnouncementToSupabase(updatedAnn, true).catch(() => {});
   addAuditLog('ANNOUNCEMENT_UPDATE', user, `Updated announcement: ${updatedAnn.title}`);
+  try {
+    revalidatePath('/admin/announcements');
+    revalidatePath('/');
+  } catch {}
   return updatedAnn;
 }
 
-export function deleteAnnouncement(id: string, user: AuthUser) {
+export async function deleteAnnouncement(id: string, user: AuthUser) {
   const db = loadDb();
   if (!db.announcements) return false;
   const idx = db.announcements.findIndex((a: any) => a.id === id);
@@ -4500,9 +5271,21 @@ export function deleteAnnouncement(id: string, user: AuthUser) {
   }
 
   const removed = db.announcements.splice(idx, 1)[0];
+
+  if (isSupabaseAdminConfigured()) {
+    try {
+      await supabaseAdmin.from('announcements').delete().eq('id', id);
+    } catch (sbErr) {
+      console.warn('[serverStore] Supabase announcement delete warning:', sbErr);
+    }
+  }
+
   saveDb(db);
-  deleteAnnouncementFromSupabase(id).catch(() => {});
   addAuditLog('ANNOUNCEMENT_DELETE', user, `Deleted announcement: ${removed.title}`);
+  try {
+    revalidatePath('/admin/announcements');
+    revalidatePath('/');
+  } catch {}
   return true;
 }
 

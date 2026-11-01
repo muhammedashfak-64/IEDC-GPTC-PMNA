@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const { user, errorResponse } = requireAdminAuth(req, true);
+  const { user, errorResponse } = requireAdminAuth(req);
   if (errorResponse) return errorResponse;
 
   try {
@@ -45,12 +45,43 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'User ID is required.' }, { status: 400 });
     }
 
+    const isSelfUpdate = user!.id === id;
+    const isElevated = user!.role === 'main_admin' || user!.role === 'faculty_coordinator';
+
+    // Disallow non-elevated operators from modifying other admins' accounts
+    if (!isSelfUpdate && !isElevated) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden. Managing other operator accounts requires Faculty Coordinator or Main Administrator privileges.' },
+        { status: 403 }
+      );
+    }
+
+    // Disallow non-main-admin from altering roles or deactivating accounts
+    if (updates?.role && updates.role !== user!.role && user!.role !== 'main_admin') {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden. Only the Main Administrator can modify account roles.' },
+        { status: 403 }
+      );
+    }
+
     if (action === 'reset_password' || newPassword) {
+      if (!isSelfUpdate && !isElevated) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden. Resetting other passwords requires administrator privileges.' },
+          { status: 403 }
+        );
+      }
       const result = await resetUserPassword(id, newPassword, user!);
       return NextResponse.json({ ...result });
     }
 
     if (action === 'toggle_status') {
+      if (!isElevated) {
+        return NextResponse.json(
+          { success: false, error: 'Forbidden. Changing account status requires administrator privileges.' },
+          { status: 403 }
+        );
+      }
       const updated = toggleUserStatus(id, user!);
       return NextResponse.json({ success: true, data: updated });
     }
@@ -61,6 +92,12 @@ export async function PUT(req: NextRequest) {
     }
 
     // Default toggle
+    if (!isElevated) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden. Changing account status requires administrator privileges.' },
+        { status: 403 }
+      );
+    }
     const updated = toggleUserStatus(id, user!);
     return NextResponse.json({ success: true, data: updated });
   } catch (err: any) {

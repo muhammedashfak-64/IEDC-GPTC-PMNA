@@ -95,6 +95,9 @@ export async function POST(req: NextRequest) {
       team: 'team-photos',
       faculty: 'team-photos',
       committee: 'team-photos',
+      avatars: 'website-assets',
+      profile: 'website-assets',
+      'admin-profiles': 'website-assets',
       events: 'event-posters',
       gallery: 'gallery',
       projects: 'project-files',
@@ -114,7 +117,11 @@ export async function POST(req: NextRequest) {
 
     const bucket = explicitBucket || bucketMap[folder] || 'website-assets';
     let fileUrl = '';
-    let storagePath = `${folder}/${filename}`;
+    
+    // For admin profile photos: enforce authenticated user isolation with dedicated path
+    let storagePath = (folder === 'avatars' || folder === 'profile' || folder === 'admin-profiles')
+      ? `admin-profiles/${user.id}/profile_${Date.now()}${extension}`
+      : `${folder}/${filename}`;
 
     // 1. Upload to Supabase Storage using service-role client (secure & bypasses client RLS)
     if (isSupabaseAdminConfigured()) {

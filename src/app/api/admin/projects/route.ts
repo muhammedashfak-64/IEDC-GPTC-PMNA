@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/adminAuthHelper';
-import { getProjects, createProject, updateProject, deleteProject } from '@/lib/serverStore';
+import { getProjectsAsync, createProject, updateProject, deleteProject } from '@/lib/serverStore';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
   const { errorResponse } = requireAdminAuth(req);
   if (errorResponse) return errorResponse;
 
-  const projects = getProjects(false);
+  const projects = await getProjectsAsync(false);
   return NextResponse.json({ success: true, count: projects.length, data: projects });
 }
 
@@ -16,7 +19,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const created = createProject(body, user);
+    const created = await createProject(body, user!);
     return NextResponse.json({ success: true, data: created }, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 400 });
@@ -30,7 +33,7 @@ export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
     const { id, ...updates } = body;
-    const updated = updateProject(id, updates, user);
+    const updated = await updateProject(id, updates, user!);
     return NextResponse.json({ success: true, data: updated });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 400 });
@@ -44,7 +47,8 @@ export async function DELETE(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
-    deleteProject(id!, user);
+    if (!id) return NextResponse.json({ success: false, error: 'ID is required' }, { status: 400 });
+    await deleteProject(id, user!);
     return NextResponse.json({ success: true, message: 'Deleted successfully' });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 400 });

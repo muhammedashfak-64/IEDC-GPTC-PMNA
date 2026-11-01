@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { loadDb, saveDb } from '@/lib/serverStore';
+import { loadDb, saveDb, getResourcesAsync } from '@/lib/serverStore';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 // GET /api/resources - Public learning hub resources & templates from database
 export async function GET(req: NextRequest) {
   try {
-    const db = loadDb();
-    const resources = (db.resources || []).filter((r: any) => r.status === 'Published');
+    const resources = await getResourcesAsync(true);
     return NextResponse.json({
       success: true,
       count: resources.length,

@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getProjects } from '@/lib/serverStore';
+import { getProjectsAsync } from '@/lib/serverStore';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET() {
   try {
-    const published = getProjects(true);
+    const published = await getProjectsAsync(true);
     return NextResponse.json({ success: true, count: published.length, data: published });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });

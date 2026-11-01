@@ -101,171 +101,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   // Initial Data
-  const [events, setEvents] = useState<EventItem[]>([
-    {
-      id: 'event-1',
-      title: 'GPTC PMNA Hackathon 2026',
-      description: '24-Hour State-Level Prototype Hackathon focused on Smart Campus & Green Energy.',
-      date: 'Aug 20, 2026',
-      time: '09:00 AM - 09:00 AM',
-      venue: 'Main Auditorium, GPTC PMNA',
-      category: 'Hackathon',
-      level: 'State',
-      seatsAvailable: 42,
-      totalSeats: 100,
-      bannerImage: 'https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=800&auto=format&fit=crop&q=80',
-      registrationOpen: true,
-      certificateEligible: true
-    },
-    {
-      id: 'event-2',
-      title: 'Hands-on ESP32 IoT Bootcamp',
-      description: 'Master microcontrollers, MQTT cloud protocols, and sensor interfacing.',
-      date: 'Aug 28, 2026',
-      time: '10:00 AM - 04:00 PM',
-      venue: 'Electronics ICFC Lab',
-      category: 'Workshop',
-      level: 'College',
-      seatsAvailable: 12,
-      totalSeats: 30,
-      bannerImage: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80',
-      registrationOpen: true,
-      certificateEligible: true
-    }
-  ]);
-
-  const [projects, setProjects] = useState<Project[]>([
-    {
-      id: 'proj-1',
-      title: 'Autonomous Solar Campus Rover',
-      description: 'Obstacle-avoiding campus surveillance rover with solar charging and live telemetry.',
-      department: 'Electronics Engineering',
-      author: 'Rahul V & Team',
-      year: '2026',
-      technology: ['ESP32', 'OpenCV', 'Solar', 'Python'],
-      status: 'Incubated',
-      likes: 48,
-      bookmarks: 12,
-      imageUrl: 'https://images.unsplash.com/photo-1485827404703-89b55fcc595e?w=800&auto=format&fit=crop&q=80',
-      teamMembers: ['Rahul V', 'Arjun K'],
-      commentsCount: 5
-    }
-  ]);
-
-  const [startups, setStartups] = useState<Startup[]>([
-    {
-      id: 'startup-1',
-      name: 'AgriTech Automation Systems',
-      tagline: 'IoT Smart Irrigation for Malappuram Farmers',
-      description: 'AI-driven irrigation valves tailored for Malappuram spice plantations.',
-      founders: ['Fathima Riya (ECE S6)'],
-      founder: 'Fathima Riya (ECE S6)',
-      department: 'Electronics Engineering',
-      stage: 'Incubated at KSUM',
-      fundingAmount: '₹2,00,000 YIP Grant',
-      incubationStage: 'Incubated at KSUM',
-      grantReceived: '₹2,00,000 YIP Grant',
-      logo: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=300&auto=format&fit=crop&q=80',
-      logoUrl: 'https://images.unsplash.com/photo-1560179707-f14e90ef3623?w=300&auto=format&fit=crop&q=80'
-    }
-  ]);
-
-  const [ideas, setIdeas] = useState<IdeaItem[]>([
-    {
-      id: 'idea-1',
-      title: 'Smart Polytechnic Water Recycling Grid',
-      problemStatement: 'Polytechnic campus labs waste 500L water daily during testing.',
-      proposedSolution: 'Automated graywater filtration using ESP32 sensor solenoid valves.',
-      studentName: 'Arjun K',
-      registerNumber: '21051236',
-      department: 'Electrical Engineering',
-      status: 'Pending',
-      createdAt: '2026-08-01'
-    }
-  ]);
-
-  const [certificates, setCertificates] = useState<CertificateItem[]>([
-    {
-      id: 'cert-1',
-      certificateId: 'IEDC-2026-PMNA-1001',
-      participantName: 'Rahul V',
-      registerNumber: '21051234',
-      email: 'rahul.v@gptcpmna.edu.in',
-      eventName: 'GPTC PMNA Hackathon 2026',
-      eventDate: '2026-08-01',
-      certificateType: 'Winner',
-      qrCodeUrl: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=IEDC-2026-PMNA-1001',
-      issueDate: '2026-08-02',
-      status: 'Verified'
-    }
-  ]);
-
-  const [bookings, setBookings] = useState<EquipmentBooking[]>([
-    {
-      id: 'bk-1',
-      equipmentName: 'Ender 3 3D Printer (PLA/PETG)',
-      studentName: 'Rahul V',
-      registerNumber: '21051234',
-      bookingDate: '2026-08-10',
-      durationHours: 3,
-      purpose: 'Printing enclosure for solar rover telemetry unit',
-      status: 'Approved'
-    }
-  ]);
-
-  const [blogs, setBlogs] = useState<BlogPost[]>([
-    {
-      id: 'blog-1',
-      title: 'How IEDC GPTC PMNA Built a State-Level IoT Winner',
-      excerpt: 'A deep dive into how diploma electronics students engineered an autonomous solar rover.',
-      content: 'Detailed story on prototype development...',
-      author: 'Prof. Muhammed Rashid',
-      authorRole: 'Nodal Officer',
-      category: 'Innovation',
-      tags: ['IoT', 'ESP32', 'Robotics'],
-      date: '2026-08-03',
-      readTime: '4 min read',
-      imageUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?w=800&auto=format&fit=crop&q=80',
-      commentsCount: 8
-    }
-  ]);
-
-  const [forumThreads] = useState<ForumThread[]>([
-    {
-      id: 'thread-1',
-      title: 'Best ESP32 firmware libraries for MQTT sensor telemetry?',
-      author: 'Rahul V',
-      department: 'Electronics Engineering',
-      category: 'Hardware',
-      content: 'Which MQTT library offers lowest RAM overhead for ESP32?',
-      repliesCount: 4,
-      createdAt: '2026-08-04',
-      likes: 12
-    }
-  ]);
-
-  const [learningResources, setLearningResources] = useState<LearningResource[]>([
-    {
-      id: 'lr-1',
-      title: 'ESP32 Firmware Programming Guide for Diploma Students',
-      category: 'ESP32',
-      type: 'PDF Notes',
-      description: 'Comprehensive manual covering FreeRTOS and WiFi stack.',
-      downloadUrl: '#',
-      author: 'Prof. Muhammed Rashid',
-      views: 340
-    }
-  ]);
-
-  const [templates, setTemplates] = useState<ResourceTemplate[]>([
-    {
-      id: 'tpl-1',
-      title: 'Official IEDC Innovation Pitch Deck Template (PPTX)',
-      type: 'PPT Template',
-      fileSize: '4.2 MB',
-      downloadUrl: '#'
-    }
-  ]);
+  const [events, setEvents] = useState<EventItem[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [startups, setStartups] = useState<Startup[]>([]);
+  const [ideas, setIdeas] = useState<IdeaItem[]>([]);
+  const [certificates, setCertificates] = useState<CertificateItem[]>([]);
+  const [bookings, setBookings] = useState<EquipmentBooking[]>([]);
+  const [blogs, setBlogs] = useState<BlogPost[]>([]);
+  const [forumThreads] = useState<ForumThread[]>([]);
+  const [learningResources, setLearningResources] = useState<LearningResource[]>([]);
+  const [templates, setTemplates] = useState<ResourceTemplate[]>([]);
 
   // Synchronize collections with real database & public API endpoints
   useEffect(() => {
@@ -273,7 +118,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fetch('/api/public/events')
       .then((r) => r.json())
       .then((res) => {
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        if (res.success && Array.isArray(res.data)) {
           setEvents(res.data);
         }
       })
@@ -283,7 +128,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fetch('/api/public/projects')
       .then((r) => r.json())
       .then((res) => {
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        if (res.success && Array.isArray(res.data)) {
           setProjects(res.data);
         }
       })
@@ -293,7 +138,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fetch('/api/public/startups')
       .then((r) => r.json())
       .then((res) => {
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        if (res.success && Array.isArray(res.data)) {
           setStartups(res.data);
         }
       })
@@ -303,7 +148,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fetch('/api/public/resources')
       .then((r) => r.json())
       .then((res) => {
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        if (res.success && Array.isArray(res.data)) {
           setLearningResources(res.data);
         }
       })
@@ -313,8 +158,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     fetch('/api/public/blogs')
       .then((r) => r.json())
       .then((res) => {
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+        if (res.success && Array.isArray(res.data)) {
           setBlogs(res.data);
+        }
+      })
+      .catch(() => {});
+
+    // 6. Ideas
+    fetch('/api/public/ideas')
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.success && Array.isArray(res.data)) {
+          setIdeas(res.data);
         }
       })
       .catch(() => {});
@@ -402,13 +257,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const submitIdea = (newIdea: Omit<IdeaItem, 'id' | 'createdAt' | 'status'>) => {
-    const created: IdeaItem = {
+    fetch('/api/public/ideas', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newIdea)
+    })
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.success && res.data) {
+          setIdeas((prev) => [res.data, ...prev.filter((i) => i.id !== res.data.id)]);
+        }
+      })
+      .catch((err) => console.error('Failed to submit idea:', err));
+
+    const optimistic: IdeaItem = {
       ...newIdea,
       id: `idea-${Date.now()}`,
       status: 'Pending',
       createdAt: new Date().toISOString().split('T')[0]
     };
-    setIdeas((prev) => [created, ...prev]);
+    setIdeas((prev) => [optimistic, ...prev]);
     addToast('Proposal Submitted!', 'Your idea was sent to the IEDC review committee.', 'success');
   };
 

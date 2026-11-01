@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
-import { getBlogs } from '@/lib/serverStore';
+import { getBlogsAsync } from '@/lib/serverStore';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET() {
   try {
-    const list = getBlogs();
-    const published = list.filter((b: any) => b.status === 'Published' || !b.status);
+    const published = await getBlogsAsync(true);
     return NextResponse.json({
       success: true,
       count: published.length,

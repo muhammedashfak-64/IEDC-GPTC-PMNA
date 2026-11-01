@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdminAuth } from '@/lib/adminAuthHelper';
-import { getGallery, createGalleryItem, updateGalleryItem, deleteGalleryItem } from '@/lib/serverStore';
+import { getGalleryAsync, createGalleryItem, updateGalleryItem, deleteGalleryItem } from '@/lib/serverStore';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
   const { errorResponse } = requireAdminAuth(req);
   if (errorResponse) return errorResponse;
 
-  const gallery = getGallery(false);
+  const gallery = await getGalleryAsync(false);
   return NextResponse.json({ success: true, count: gallery.length, data: gallery });
 }
 
@@ -16,7 +19,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const created = createGalleryItem(body, user);
+    const created = await createGalleryItem(body, user!);
     return NextResponse.json({ success: true, data: created }, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 400 });
@@ -30,7 +33,7 @@ export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
     const { id, ...updates } = body;
-    const updated = updateGalleryItem(id, updates, user);
+    const updated = await updateGalleryItem(id, updates, user!);
     return NextResponse.json({ success: true, data: updated });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 400 });
@@ -46,7 +49,7 @@ export async function DELETE(req: NextRequest) {
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ success: false, error: 'ID required' }, { status: 400 });
 
-    deleteGalleryItem(id, user);
+    await deleteGalleryItem(id, user!);
     return NextResponse.json({ success: true, message: 'Deleted successfully' });
   } catch (err: any) {
     return NextResponse.json({ success: false, error: err.message }, { status: 400 });

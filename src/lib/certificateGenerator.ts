@@ -743,8 +743,27 @@ export async function generateSingleCertificatePdf(
   };
 }
 
+// Cached Base64 TrueType font to guarantee vector glyph rendering on serverless Linux
+let cachedEmbeddedFontBase64 = '';
+function getEmbeddedFontBase64(): string {
+  if (cachedEmbeddedFontBase64) return cachedEmbeddedFontBase64;
+  const possiblePaths = [
+    path.join(process.cwd(), 'public', 'fonts', 'Geist-Regular.ttf'),
+    path.join(process.cwd(), 'node_modules', 'next', 'dist', 'compiled', '@vercel', 'og', 'Geist-Regular.ttf')
+  ];
+  for (const p of possiblePaths) {
+    if (fs.existsSync(/*turbopackIgnore: true*/ p)) {
+      try {
+        cachedEmbeddedFontBase64 = fs.readFileSync(/*turbopackIgnore: true*/ p).toString('base64');
+        break;
+      } catch {}
+    }
+  }
+  return cachedEmbeddedFontBase64;
+}
+
 function escapeXml(str: string): string {
-  return str
+  return String(str || '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -827,17 +846,18 @@ export async function generateSingleCertificatePng(
       ? 'start'
       : 'middle';
 
-  // Dynamic shrink for long recipient names
+  // Dynamic shrink for long recipient names with strict lower bound
   const cleanName = params.recipientName.trim().toUpperCase();
   const maxNameWidth = imgWidth - 240 * scaleX;
   const approxCharWidth = nameFontSize * 0.62;
   if (cleanName.length * approxCharWidth > maxNameWidth) {
-    nameFontSize = Math.max(16 * scaleY, (maxNameWidth / (cleanName.length * approxCharWidth)) * nameFontSize);
+    nameFontSize = Math.max(20 * scaleY, (maxNameWidth / (cleanName.length * approxCharWidth)) * nameFontSize);
   }
+  nameFontSize = Math.max(20 * scaleY, nameFontSize);
 
   const paraY = (595.5 - normalizeNumber(config.paraY, DEFAULT_CERT_CONFIG.paraY)) * scaleY;
-  const paraFontSize = normalizeNumber(config.paraFontSize, DEFAULT_CERT_CONFIG.paraFontSize, 8, 30) * scaleY;
-  const paraLineSpacing = normalizeNumber(config.paraLineSpacing, DEFAULT_CERT_CONFIG.paraLineSpacing, 10, 50) * scaleY;
+  const paraFontSize = Math.max(10 * scaleY, normalizeNumber(config.paraFontSize, DEFAULT_CERT_CONFIG.paraFontSize, 8, 30) * scaleY);
+  const paraLineSpacing = Math.max(14 * scaleY, normalizeNumber(config.paraLineSpacing, DEFAULT_CERT_CONFIG.paraLineSpacing, 10, 50) * scaleY);
   const paraMaxWidth = normalizeNumber(config.paraMaxWidth, DEFAULT_CERT_CONFIG.paraMaxWidth, 200, 800) * scaleX;
   const paraRgb = normalizeColorToRgb(config.paraColor, [31 / 255, 41 / 255, 55 / 255]);
   const paraHex =
@@ -857,7 +877,7 @@ export async function generateSingleCertificatePng(
       const awardCat = params.awardCategory || params.role || 'Winner';
       paraText = `In recognition of your outstanding achievement as ${awardCat} in the ${params.programName}, organized by ${orgBody}, held on ${params.programDate}.`;
     } else {
-      const roleText = params.role && params.role !== 'Participant' ? ` as ${params.role}` : '';
+      const roleText = params.role && params.role !== 'Participant' && params.role !== 'Participation' ? ` as ${params.role}` : '';
       paraText = `In recognition of your outstanding participation and dedication${roleText} in the ${params.programName}, organized by ${orgBody}, held on ${params.programDate}.`;
     }
   }
@@ -902,25 +922,49 @@ export async function generateSingleCertificatePng(
     templatePathLower.includes('iedc_participate') ||
     templatePathLower.includes('fubu');
 
+  // Determine whether it is a standard participation certificate
+  const certTypeLower = (params.certificateType || params.role || '').toLowerCase();
+  const isParticipationType =
+    !isWinnerOrAchievement &&
+    (!params.certificateType ||
+      certTypeLower === 'participation' ||
+      certTypeLower === 'participant');
+
   // Should we draw subtitle & intro?
   // On master templates, they are already pre-printed for standard Participation.
   // We only need to cover & draw them if it is Winner, Achievement, Appreciation, Completion, or custom subtitle.
   const isCustomOrNonParticipation =
     !isMasterRaster ||
     isWinnerOrAchievement ||
-    (params.certificateType && params.certificateType !== 'Participation') ||
-    (params.certificateSubtitle && !params.certificateSubtitle.includes('PARTICIPATION'));
+    !isParticipationType ||
+    (params.certificateSubtitle && !params.certificateSubtitle.toUpperCase().includes('PARTICIPATION'));
 
-  const needsCover = isMasterRaster && (isWinnerOrAchievement || (params.certificateType && params.certificateType !== 'Participation'));
+  const needsCover = isMasterRaster && (isWinnerOrAchievement || !isParticipationType);
+
+  const embeddedFontBase64 = getEmbeddedFontBase64();
 
   const svgContent = `
     <svg width="${imgWidth}" height="${imgHeight}" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        ${
+          embeddedFontBase64
+            ? `<style>
+                @font-face {
+                  font-family: 'EmbeddedGeist';
+                  src: url('data:font/truetype;charset=utf-8;base64,${embeddedFontBase64}') format('truetype');
+                  font-weight: normal;
+                  font-style: normal;
+                }
+              </style>`
+            : ''
+        }
+      </defs>
       <style>
-        .name { fill: ${nameHex}; font-size: ${nameFontSize}px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: bold; text-anchor: ${nameAnchor}; }
-        .para { fill: ${paraHex}; font-size: ${paraFontSize}px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: ${config.paraBold ? 'bold' : 'normal'}; text-anchor: ${paraAnchor}; }
-        .subtitle { fill: #1A2456; font-size: ${13 * scaleY}px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: bold; text-anchor: middle; letter-spacing: ${0.5 * scaleX}px; }
-        .intro { fill: #1F2937; font-size: ${11 * scaleY}px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; text-anchor: middle; letter-spacing: ${0.2 * scaleX}px; }
-        .cert-id { fill: #9CA3AF; font-size: ${8.5 * scaleY}px; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; text-anchor: middle; font-weight: bold; }
+        .name { fill: ${nameHex}; font-size: ${nameFontSize}px; font-family: 'EmbeddedGeist', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, 'Helvetica Neue', Helvetica, sans-serif; font-weight: bold; text-anchor: ${nameAnchor}; }
+        .para { fill: ${paraHex}; font-size: ${paraFontSize}px; font-family: 'EmbeddedGeist', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, 'Helvetica Neue', Helvetica, sans-serif; font-weight: ${config.paraBold ? 'bold' : 'normal'}; text-anchor: ${paraAnchor}; }
+        .subtitle { fill: #1A2456; font-size: ${Math.max(12 * scaleY, 13 * scaleY)}px; font-family: 'EmbeddedGeist', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, 'Helvetica Neue', Helvetica, sans-serif; font-weight: bold; text-anchor: middle; letter-spacing: ${0.5 * scaleX}px; }
+        .intro { fill: #1F2937; font-size: ${Math.max(10 * scaleY, 11 * scaleY)}px; font-family: 'EmbeddedGeist', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, 'Helvetica Neue', Helvetica, sans-serif; text-anchor: middle; letter-spacing: ${0.2 * scaleX}px; }
+        .cert-id { fill: #9CA3AF; font-size: ${Math.max(8 * scaleY, 8.5 * scaleY)}px; font-family: 'EmbeddedGeist', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, 'Helvetica Neue', Helvetica, sans-serif; text-anchor: middle; font-weight: bold; }
       </style>
       ${
         needsCover
