@@ -31,6 +31,7 @@ import {
 import QRCode from 'react-qr-code';
 import { getEventRegistrationStatus } from '@/lib/quotaUtils';
 import { downloadPass } from '@/lib/downloadHelper';
+import { EventPass } from '@/components/EventPass';
 
 function getCanonicalDept(dept: string): string {
   const d = (dept || '').trim().toLowerCase();
@@ -282,8 +283,9 @@ function RegisterFormContent() {
     window.print();
   };
 
-  // SUCCESS CONFIRMATION PASS VIEW
+  // SUCCESS CONFIRMATION PASS VIEW (AUTHORITATIVE ENTRY PASS)
   if (registeredData) {
+    const matchedEvent = events.find((e) => e.id === registeredData.eventId);
     return (
       <div className="max-w-2xl mx-auto py-12 px-4 sm:px-6 space-y-8">
         <div className="text-center space-y-3">
@@ -296,175 +298,33 @@ function RegisterFormContent() {
           </p>
         </div>
 
-        {/* Digital Entry Pass */}
-        <div
-          id="registration-pass"
-          className="rounded-3xl border border-white/20 bg-[#121216] p-6 sm:p-8 shadow-2xl relative overflow-hidden space-y-6"
-        >
-          {/* Top Header */}
-          <div className="flex items-center justify-between border-b border-white/10 pb-5">
-            <div>
-              <span className="text-[10px] font-mono tracking-widest text-[#F98A5B] uppercase block">
-                OFFICIAL ENTRY PASS • IEDC GPTC PMNA
-              </span>
-              <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
-                {registeredData.eventTitle}
-              </h2>
-            </div>
-            {registeredData.status === 'Waitlisted' ? (
-              <span className="px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 font-mono text-xs font-bold">
-                WAITLISTED #{registeredData.waitlistPosition || 1}
-              </span>
-            ) : (
-              <span className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-xs font-bold">
-                CONFIRMED
-              </span>
-            )}
-          </div>
+        {/* Unified Authoritative Entry Pass Component */}
+        <EventPass
+          registration={registeredData}
+          event={matchedEvent}
+          showActions={true}
+          onReset={() => {
+            setRegisteredData(null);
+            setActiveTab('register');
+            setFormData({
+              studentName: '',
+              registerNumber: '',
+              department: 'Electronics Engineering',
+              branch: '',
+              academicYear: 'First Year',
+              semester: 'Semester 1',
+              email: '',
+              phone: '',
+              collegeName: 'Govt Polytechnic College Perinthalmanna',
+              district: 'Malappuram',
+              course: '',
+              additionalNotes: '',
+              consent: true
+            });
+          }}
+        />
 
-          {/* Registration Code Display */}
-          <div className="p-4 rounded-2xl bg-black/50 border border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div>
-              <span className="text-[10px] font-mono text-neutral-400 uppercase">Registration ID</span>
-              <p className="text-2xl font-mono font-black text-white tracking-wider">
-                {registeredData.registrationCode}
-              </p>
-            </div>
-            <button
-              onClick={() => copyToClipboard(registeredData.registrationCode)}
-              className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white font-mono text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <Copy className="w-3.5 h-3.5 text-[#F98A5B]" />
-              <span>{copiedId ? 'Copied!' : 'Copy Pass ID'}</span>
-            </button>
-          </div>
-
-          {/* QR Code & Student Details */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-center">
-            <div className="p-4 rounded-2xl bg-white p-3 flex flex-col items-center justify-center shrink-0 w-fit mx-auto">
-              <QRCode
-                value={
-                  registeredData.qrPayload ||
-                  `IEDCPASS:${registeredData.eventId}:${registeredData.registrationCode}:${registeredData.passToken || registeredData.id}`
-                }
-                size={130}
-              />
-              <span className="text-[9px] font-mono text-black font-bold mt-2">SCAN FOR CHECK-IN</span>
-            </div>
-
-            <div className="sm:col-span-2 space-y-2.5 text-xs text-neutral-300">
-              <div className="flex justify-between border-b border-white/5 pb-1.5">
-                <span className="text-neutral-500 font-medium">Participant:</span>
-                <span className="font-bold text-white">{registeredData.studentName}</span>
-              </div>
-              {registeredData.registerNumber && registeredData.registerNumber !== 'N/A' && !registeredData.registerNumber.startsWith('REG-') && (
-                <div className="flex justify-between border-b border-white/5 pb-1.5">
-                  <span className="text-neutral-500 font-medium">Register No:</span>
-                  <span className="font-mono text-white">{registeredData.registerNumber}</span>
-                </div>
-              )}
-              <div className="flex justify-between border-b border-white/5 pb-1.5">
-                <span className="text-neutral-500 font-medium">Branch / Dept:</span>
-                <span className="text-white">{registeredData.department}</span>
-              </div>
-              <div className="flex justify-between border-b border-white/5 pb-1.5">
-                <span className="text-neutral-500 font-medium">Year &amp; Semester:</span>
-                <span className="text-white">
-                  {registeredData.academicYear}
-                  {registeredData.semester ? ` • ${registeredData.semester}` : ''}
-                </span>
-              </div>
-              <div className="flex justify-between border-b border-white/5 pb-1.5">
-                <span className="text-neutral-500 font-medium">Institution:</span>
-                <span className="text-white truncate max-w-[200px]">{registeredData.collegeName}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-neutral-500 font-medium">Registered On:</span>
-                <span className="font-mono text-neutral-400">
-                  {new Date(registeredData.registeredAt).toLocaleDateString('en-IN', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric'
-                  })}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Verification Notice */}
-          <div className="p-3.5 rounded-xl bg-white/5 border border-white/10 text-[11px] text-neutral-400 flex items-start gap-2">
-            <ShieldCheck className="w-4 h-4 text-[#F98A5B] shrink-0 mt-0.5" />
-            <span>
-              Show this pass at the IEDC reception desk on the day of the event. A confirmation email has been logged in
-              our database.
-            </span>
-          </div>
-        </div>
-
-        {/* Pass Actions */}
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <a
-            href={`/api/public/registrations/${registeredData.id}/pass/pdf`}
-            download={`IEDC_Pass_${(registeredData.studentName || 'Student').replace(/\s+/g, '_')}.pdf`}
-            className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#F98A5B] to-[#EC3A74] hover:opacity-90 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-[#F98A5B]/20 transition-all cursor-pointer"
-          >
-            <Download className="w-4 h-4" />
-            <span>Download Pass (PDF)</span>
-          </a>
-          <a
-            href={`/api/public/registrations/${registeredData.id}/pass/png`}
-            download={`IEDC_Pass_${(registeredData.studentName || 'Student').replace(/\s+/g, '_')}.png`}
-            className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer"
-          >
-            <Download className="w-4 h-4 text-[#F98A5B]" />
-            <span>Download Pass (PNG)</span>
-          </a>
-          <a
-            href={`/api/public/registrations/${registeredData.id}/pass/jpg`}
-            download={`IEDC_Pass_${(registeredData.studentName || 'Student').replace(/\s+/g, '_')}.jpg`}
-            className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer"
-          >
-            <Download className="w-4 h-4 text-purple-400" />
-            <span>Download Pass (JPG)</span>
-          </a>
-          <button
-            onClick={handlePrint}
-            className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer"
-          >
-            <Printer className="w-4 h-4 text-[#F98A5B]" />
-            <span>Print Pass</span>
-          </button>
-          <button
-            onClick={openWhatsAppShare}
-            className="px-5 py-2.5 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-300 font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer"
-          >
-            <Share2 className="w-4 h-4 text-emerald-400" />
-            <span>Share via WhatsApp</span>
-          </button>
-          <button
-            onClick={() => {
-              setRegisteredData(null);
-              setActiveTab('register');
-              setFormData({
-                studentName: '',
-                registerNumber: '',
-                department: 'Electronics Engineering',
-                branch: '',
-                academicYear: 'First Year',
-                semester: 'Semester 1',
-                email: '',
-                phone: '',
-                collegeName: 'Govt Polytechnic College Perinthalmanna',
-                district: 'Malappuram',
-                course: '',
-                additionalNotes: '',
-                consent: true
-              });
-            }}
-            className="px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-neutral-300 font-bold text-xs transition-colors cursor-pointer"
-          >
-            Register Another Participant
-          </button>
+        <div className="flex justify-center pt-2">
           <Link
             href="/events"
             className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white font-bold text-xs flex items-center gap-1.5 transition-colors"
