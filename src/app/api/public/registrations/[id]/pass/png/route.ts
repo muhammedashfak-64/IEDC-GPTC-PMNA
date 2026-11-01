@@ -83,7 +83,9 @@ export async function GET(
       headers: {
         'Content-Type': 'image/png',
         'Content-Disposition': `attachment; filename="IEDC_Pass_${safeName}_${safeCode}.png"`,
-        'Cache-Control': 'public, max-age=3600'
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0'
       }
     });
   } catch (err: any) {

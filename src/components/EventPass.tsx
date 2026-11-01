@@ -222,6 +222,63 @@ export function EventPass({
     }
   };
 
+  // High-Resolution PDF Export with instant fallback
+  const handleExportPdf = async () => {
+    if (downloadingFormat) return;
+    setDownloadingFormat('pdf');
+    setExportError(null);
+
+    const safeName = studentName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safeCode = regCode.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `IEDC_Pass_${safeName}_${safeCode}.pdf`;
+
+    try {
+      // 1. Fetch authoritative 300+ DPI PDF from server API route with cache-busting timestamp
+      const res = await fetch(`/api/public/registrations/${registration.id}/pass/pdf?t=${Date.now()}`);
+      if (res.ok) {
+        const blob = await res.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(() => {
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(blobUrl);
+        }, 500);
+        return;
+      }
+      throw new Error(`Server returned status ${res.status}`);
+    } catch (fetchErr: any) {
+      console.warn('Backend pass PDF fetch notice, falling back to client-side PDF export:', fetchErr);
+      try {
+        const { default: jsPDF } = await import('jspdf');
+        if (typeof document !== 'undefined' && document.fonts && document.fonts.ready) {
+          await document.fonts.ready;
+        }
+        const canvas = await html2canvas(passRef.current!, {
+          scale: 3,
+          backgroundColor: '#0B0B0F',
+          useCORS: true,
+          logging: false
+        });
+        const imgData = canvas.toDataURL('image/png', 0.98);
+        const pdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'pt',
+          format: [400, 540]
+        });
+        pdf.addImage(imgData, 'PNG', 0, 0, 400, 540);
+        pdf.save(filename);
+      } catch (clientErr: any) {
+        setExportError(clientErr.message || 'Failed to download PDF pass.');
+      }
+    } finally {
+      setDownloadingFormat(null);
+    }
+  };
+
   return (
     <div className="w-full max-w-xl mx-auto space-y-6">
       {/* ============================================================== */}
@@ -511,15 +568,25 @@ export function EventPass({
               )}
             </button>
 
-            {/* Download PDF (Authoritative 300+ DPI Pipeline) */}
-            <a
-              href={`/api/public/registrations/${registration.id}/pass/pdf`}
-              download={`IEDC_Pass_${studentName.replace(/\s+/g, '_')}_${regCode}.pdf`}
-              className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer"
+            {/* Download PDF (Authoritative 300+ DPI Pipeline with Instant Fallback) */}
+            <button
+              type="button"
+              onClick={handleExportPdf}
+              disabled={!!downloadingFormat}
+              className="px-5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold text-xs flex items-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
             >
-              <Download className="w-4 h-4 text-[#F98A5B]" />
-              <span>Download Pass (PDF)</span>
-            </a>
+              {downloadingFormat === 'pdf' ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-[#F98A5B]" />
+                  <span>Rendering HD PDF...</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 text-[#F98A5B]" />
+                  <span>Download Pass (PDF)</span>
+                </>
+              )}
+            </button>
 
             {/* Print Pass */}
             <button

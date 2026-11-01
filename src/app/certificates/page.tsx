@@ -16,7 +16,7 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
-  Image as ImageIcon
+  Printer
 } from 'lucide-react';
 
 export default function CertificatesDownloadPage() {
@@ -242,48 +242,49 @@ export default function CertificatesDownloadPage() {
                 </div>
               </div>
 
-              {/* Download Actions: View, PDF, PNG, QR */}
+              {/* Download Actions: PDF Download, View, Print, Verify */}
               <div className="flex flex-wrap items-center gap-2">
                 <a
                   href={`/api/public/certificates/${retrievedCert.certificateId}/pdf`}
                   target="_blank"
-                  className="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-bold text-white flex items-center gap-1.5 transition-colors"
+                  className="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-bold text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="View PDF Certificate"
                 >
                   <Eye className="w-4 h-4 text-sky-400" />
-                  <span>View</span>
+                  <span>View PDF</span>
                 </a>
 
                 <a
                   href={`/api/public/certificates/${retrievedCert.certificateId}/pdf`}
                   download={`Certificate_${retrievedCert.participantName?.replace(/\s+/g, '_')}_IEDC.pdf`}
-                  className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#F98A5B] to-[#EC3A74] text-white text-xs font-extrabold flex items-center gap-2 shadow-lg hover:scale-[1.02] transition-transform cursor-pointer"
+                  className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#F98A5B] to-[#EC3A74] text-white text-xs font-extrabold flex items-center gap-2 shadow-lg hover:scale-[1.02] transition-transform cursor-pointer"
+                  title="Download Official High-Resolution PDF Certificate"
                 >
                   <Download className="w-4 h-4" />
-                  <span>Download PDF</span>
+                  <span>Download PDF Certificate</span>
                 </a>
 
-                <a
-                  href={`/api/public/certificates/${retrievedCert.certificateId}/png`}
-                  download={`Certificate_${retrievedCert.participantName?.replace(/\s+/g, '_')}_IEDC.png`}
-                  className="px-3.5 py-2.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 text-xs font-bold text-purple-300 flex items-center gap-1.5 transition-colors cursor-pointer"
+                <button
+                  type="button"
+                  onClick={() => {
+                    const iframe = document.querySelector('iframe');
+                    if (iframe && iframe.contentWindow) {
+                      iframe.contentWindow.print();
+                    } else {
+                      window.print();
+                    }
+                  }}
+                  className="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-bold text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+                  title="Print Certificate"
                 >
-                  <ImageIcon className="w-4 h-4 text-purple-400" />
-                  <span>Download PNG</span>
-                </a>
-
-                <a
-                  href={`/api/public/certificates/${retrievedCert.certificateId}/jpg`}
-                  download={`Certificate_${retrievedCert.participantName?.replace(/\s+/g, '_')}_IEDC.jpg`}
-                  className="px-3.5 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/30 text-xs font-bold text-amber-300 flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <ImageIcon className="w-4 h-4 text-amber-400" />
-                  <span>Download JPG</span>
-                </a>
+                  <Printer className="w-4 h-4 text-emerald-400" />
+                  <span>Print</span>
+                </button>
 
                 <Link
                   href={`/verify/${retrievedCert.certificateId}`}
                   target="_blank"
-                  className="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-bold text-white flex items-center gap-1.5 transition-colors"
+                  className="px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/10 text-xs font-bold text-white flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <QrCode className="w-4 h-4 text-amber-300" />
                   <span>Verify Record</span>

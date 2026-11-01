@@ -14,7 +14,8 @@ import {
   AlertTriangle,
   Loader2,
   QrCode,
-  FileCheck
+  FileCheck,
+  Printer
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -103,8 +104,6 @@ export default function CertificateDetailPage() {
   }
 
   const pdfUrl = certificate.pdfUrl || `/api/public/certificates/${certificate.certificateId}/pdf`;
-  const pngUrl = certificate.pngUrl || `/api/public/certificates/${certificate.certificateId}/png`;
-  const jpgUrl = certificate.jpgUrl || `/api/public/certificates/${certificate.certificateId}/jpg`;
 
   return (
     <div className="py-12 px-4 sm:px-6 lg:px-8 max-w-5xl mx-auto space-y-8 relative z-10">
@@ -163,11 +162,11 @@ export default function CertificateDetailPage() {
         </div>
       </div>
 
-      {/* Action Download Buttons */}
+      {/* Action Download Buttons: Official PDF Only */}
       <div className="flex flex-wrap items-center justify-between gap-4 p-5 rounded-2xl bg-white/[0.03] border border-white/10">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-          <span className="text-xs font-semibold text-slate-300">Official High-Resolution Vector Assets Available</span>
+          <span className="text-xs font-semibold text-slate-300">Official High-Resolution Vector PDF Certificate Ready</span>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -175,31 +174,26 @@ export default function CertificateDetailPage() {
             href={pdfUrl}
             download={`${certificate.participantName}_${certificate.certificateId}.pdf`}
             className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-extrabold text-xs flex items-center gap-2 shadow-lg hover:opacity-95 transition-all cursor-pointer"
+            title="Download Official PDF Certificate"
           >
-            <Download className="w-4 h-4" /> Download PDF
+            <Download className="w-4 h-4" /> Download PDF Certificate
           </a>
 
-          <a
-            href={pngUrl}
-            download={`${certificate.participantName}_${certificate.certificateId}.png`}
-            className="px-5 py-2.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 font-extrabold text-xs flex items-center gap-2 border border-purple-500/30 transition-all cursor-pointer"
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="px-4 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Print Certificate"
           >
-            <Download className="w-4 h-4" /> Download PNG
-          </a>
-
-          <a
-            href={jpgUrl}
-            download={`${certificate.participantName}_${certificate.certificateId}.jpg`}
-            className="px-5 py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-extrabold text-xs flex items-center gap-2 border border-amber-500/30 transition-all cursor-pointer"
-          >
-            <Download className="w-4 h-4" /> Download JPG
-          </a>
+            <Printer className="w-4 h-4 text-emerald-400" />
+            <span>Print</span>
+          </button>
 
           <a
             href={pdfUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs flex items-center gap-1.5 transition-all"
+            className="px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer"
           >
             <span>Fullscreen</span> <ExternalLink className="w-3.5 h-3.5" />
           </a>

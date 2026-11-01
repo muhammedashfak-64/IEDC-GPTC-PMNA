@@ -81,6 +81,25 @@ function escapeXml(str: string): string {
     });
 }
 
+// Cached Base64 TrueType font to guarantee vector glyph rendering on serverless Linux
+let cachedEmbeddedFontBase64 = '';
+function getEmbeddedFontBase64(): string {
+  if (cachedEmbeddedFontBase64) return cachedEmbeddedFontBase64;
+  const possiblePaths = [
+    path.join(process.cwd(), 'public', 'fonts', 'Geist-Regular.ttf'),
+    path.join(process.cwd(), 'node_modules', 'next', 'dist', 'compiled', '@vercel', 'og', 'Geist-Regular.ttf')
+  ];
+  for (const p of possiblePaths) {
+    if (fs.existsSync(p)) {
+      try {
+        cachedEmbeddedFontBase64 = fs.readFileSync(p).toString('base64');
+        break;
+      } catch {}
+    }
+  }
+  return cachedEmbeddedFontBase64;
+}
+
 /**
  * Generates an authentic, high-quality companion PNG entry pass image (1200 x 1620 px).
  * Features:
@@ -119,9 +138,42 @@ export async function generatePassPng(
   const nameFontSize = studentName.length > 24 ? 26 : studentName.length > 18 ? 30 : 34;
   const titleFontSize = eventTitle.length > 40 ? 26 : eventTitle.length > 30 ? 29 : 32;
 
+  const embeddedFontBase64 = getEmbeddedFontBase64();
+
   const svgTemplate = `
     <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
       <defs>
+        ${
+          embeddedFontBase64
+            ? `<style>
+                @font-face {
+                  font-family: 'EmbeddedGeist';
+                  src: url('data:font/truetype;charset=utf-8;base64,${embeddedFontBase64}') format('truetype');
+                  font-weight: 400;
+                  font-style: normal;
+                }
+                @font-face {
+                  font-family: 'EmbeddedGeist';
+                  src: url('data:font/truetype;charset=utf-8;base64,${embeddedFontBase64}') format('truetype');
+                  font-weight: 600;
+                  font-style: normal;
+                }
+                @font-face {
+                  font-family: 'EmbeddedGeist';
+                  src: url('data:font/truetype;charset=utf-8;base64,${embeddedFontBase64}') format('truetype');
+                  font-weight: 700;
+                  font-style: normal;
+                }
+                @font-face {
+                  font-family: 'EmbeddedGeist';
+                  src: url('data:font/truetype;charset=utf-8;base64,${embeddedFontBase64}') format('truetype');
+                  font-weight: 800;
+                  font-style: normal;
+                }
+              </style>`
+            : ''
+        }
+
         <!-- Official IEDC Brand Gradient -->
         <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stop-color="#F98A5B"/>
@@ -135,10 +187,10 @@ export async function generatePassPng(
         </filter>
 
         <style>
-          .sans-bold { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, Helvetica, sans-serif; font-weight: 800; }
-          .sans-semibold { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, Helvetica, sans-serif; font-weight: 600; }
-          .sans-regular { font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, Helvetica, sans-serif; font-weight: 400; }
-          .font-mono { font-family: 'Consolas', 'Courier New', Monaco, monospace; font-weight: 800; }
+          .sans-bold { font-family: 'EmbeddedGeist', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, Helvetica, sans-serif; font-weight: 800; }
+          .sans-semibold { font-family: 'EmbeddedGeist', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, Helvetica, sans-serif; font-weight: 600; }
+          .sans-regular { font-family: 'EmbeddedGeist', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, Helvetica, sans-serif; font-weight: 400; }
+          .font-mono { font-family: 'EmbeddedGeist', 'Consolas', 'Courier New', Monaco, monospace; font-weight: 800; }
         </style>
       </defs>
 
